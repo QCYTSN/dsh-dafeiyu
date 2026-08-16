@@ -69,7 +69,7 @@ When several DSH sessions run at once, the default attention priority is:
 
 ## Requirements
 
-- Windows 10/11 x64
+- Windows 10/11 x64 (native, or WSL2 — DSH can run inside WSL while the helper window still appears on the Windows desktop)
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - `dsh-dafeiyu@alpha` from npm, or a `.tgz` archive from GitHub Releases
@@ -122,12 +122,34 @@ Do not extract it. Install the downloaded archive from the DSH directory:
 pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<version>.tgz"
 ```
 
-### 4. Start DSH
+### 4. WSL2 install
+
+DSH can also be installed inside WSL2 (Ubuntu and other distributions). The plugin
+detects the WSL environment via `/proc/sys/fs/binfmt_misc/WSLInterop` and launches the
+bundled Win32 helper directly through WSL interop, so the BigFish window still appears on
+the Windows desktop with the same topmost and translucent behavior as on native Windows.
+
+The install command is the same as on native Windows (run it in the WSL terminal):
+
+```bash
+dsh plugin --profile web add dsh-dafeiyu@alpha
+chmod +x ~/.dsh/profiles/web/node_modules/dsh-dafeiyu/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe
+```
+
+Then restart dsh web. Notes:
+
+- Python and PySide6 are **not** required inside WSL;
+- if the release archive loses the exe's executable bit, the plugin falls back to the
+  python3 path, in which case PySide6 must be installed inside WSL;
+- window position is remembered on the Windows side at
+  `%LOCALAPPDATA%\DSH\dsh-dafeiyu\layout.json`.
+
+### 5. Start DSH
 
 Launch the DSH WebUI normally. The plugin is enabled by default, and DSH starts BigFish
 automatically. Do not start the Helper yourself.
 
-### 5. Open the settings
+### 6. Open the settings
 
 In the DSH WebUI, go to:
 

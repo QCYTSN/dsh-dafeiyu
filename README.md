@@ -68,7 +68,7 @@ stateDiagram-v2
 
 ## 系统要求
 
-- Windows 10/11 x64
+- Windows 10/11 x64（原生系统，或 WSL2 —— DSH 可以安装在 WSL 内，helper 窗口仍显示在 Windows 桌面）
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的 `dsh-dafeiyu@alpha`，或 GitHub Release 中的 `.tgz` 安装包
@@ -120,11 +120,32 @@ dsh-dafeiyu-<version>.tgz
 pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<version>.tgz"
 ```
 
-### 4. 启动 DSH
+### 4. WSL2 安装
+
+DSH 也可以安装在 WSL2 内（Ubuntu 等发行版）。插件会通过
+`/proc/sys/fs/binfmt_misc/WSLInterop` 自动检测 WSL 环境，并直接启动打包的
+Win32 helper（经 WSL interop 桥接），大肥鱼窗口依然显示在 Windows 桌面上，
+置顶与透明行为与原生 Windows 一致。
+
+安装命令与原生 Windows 相同（在 WSL 终端执行）：
+
+```bash
+dsh plugin --profile web add dsh-dafeiyu@alpha
+chmod +x ~/.dsh/profiles/web/node_modules/dsh-dafeiyu/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe
+```
+
+然后重启 dsh web。注意：
+
+- WSL 内**不需要**安装 Python 或 PySide6；
+- 若发布包丢失了 exe 的可执行位，插件会自动回退到 python3 分支，
+  此时需要在 WSL 内安装 PySide6；
+- 窗口位置记忆写入 Windows 侧 `%LOCALAPPDATA%\DSH\dsh-dafeiyu\layout.json`。
+
+### 5. 启动 DSH
 
 照常启动 DSH WebUI。插件默认启用，大肥鱼会由 DSH 自动拉起；不要手动打开 Helper。
 
-### 5. 找到设置入口
+### 6. 找到设置入口
 
 在 DSH WebUI 中进入：
 
