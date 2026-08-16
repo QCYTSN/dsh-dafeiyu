@@ -1,5 +1,5 @@
 import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { accessSync, constants, existsSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -17,9 +17,33 @@ const bundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'ds
 // and the window appears on the Windows desktop (upstream is Windows-only).
 const isWsl = process.platform === 'linux' && existsSync('/proc/sys/fs/binfmt_misc/WSLInterop')
 
+function canExecute(path) {
+  try {
+    accessSync(path, constants.X_OK)
+    return true
+  } catch {
+    return false
+  }
+}
+
+// Pure decision logic, exported for tests. On WSL the bundled exe must also carry
+// the executable bit (npm packs from Windows often drop it); otherwise fall back
+// to python3 + helper.py instead of failing spawn with EACCES.
+export function resolveHelperCommand({ platform, isWslEnv, bundledPath, pythonEnv }) {
+  const useBundled = platform === 'win32'
+    ? existsSync(bundledPath)
+    : isWslEnv && existsSync(bundledPath) && canExecute(bundledPath)
+  if (useBundled) return bundledPath
+  return pythonEnv || (platform === 'win32' ? 'py' : 'python3')
+}
+
 function defaultCommand() {
-  if ((process.platform === 'win32' || isWsl) && existsSync(bundledHelperPath)) return bundledHelperPath
-  return process.env.DSH_DAFEIYU_PYTHON || (process.platform === 'win32' ? 'py' : 'python3')
+  return resolveHelperCommand({
+    platform: process.platform,
+    isWslEnv: isWsl,
+    bundledPath: bundledHelperPath,
+    pythonEnv: process.env.DSH_DAFEIYU_PYTHON,
+  })
 }
 
 function defaultArgs(command, helperPath) {
