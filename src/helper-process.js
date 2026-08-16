@@ -13,8 +13,12 @@ const here = dirname(fileURLToPath(import.meta.url))
 const defaultHelperPath = resolve(here, '..', 'runtime', 'helper.py')
 const bundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'dsh-dafeiyu-helper.exe')
 
+// WSL2: Linux kernel with interop enabled can spawn the bundled Win32 helper directly,
+// and the window appears on the Windows desktop (upstream is Windows-only).
+const isWsl = process.platform === 'linux' && existsSync('/proc/sys/fs/binfmt_misc/WSLInterop')
+
 function defaultCommand() {
-  if (process.platform === 'win32' && existsSync(bundledHelperPath)) return bundledHelperPath
+  if ((process.platform === 'win32' || isWsl) && existsSync(bundledHelperPath)) return bundledHelperPath
   return process.env.DSH_DAFEIYU_PYTHON || (process.platform === 'win32' ? 'py' : 'python3')
 }
 

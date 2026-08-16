@@ -32,12 +32,6 @@
     "ASSET_LICENSE.md",
     "LICENSE"
   ],
-  "os": [
-    "win32"
-  ],
-  "cpu": [
-    "x64"
-  ],
   "engines": {
     "node": ">=22.19"
   },
