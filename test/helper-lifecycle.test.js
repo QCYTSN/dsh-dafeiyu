@@ -6,7 +6,9 @@ import test from 'node:test'
 import { HelperProcess } from '../src/helper-process.js'
 import { CompanionMessageKind, CompanionState, createMessage } from '../src/protocol.js'
 
-async function waitFor(predicate, timeoutMs = 3000) {
+// WSL interop spawns the onefile exe through a cold PyInstaller extraction
+// (3s+ for the bundled build), so keep the default poll window generous.
+async function waitFor(predicate, timeoutMs = 8000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     if (await predicate()) return
