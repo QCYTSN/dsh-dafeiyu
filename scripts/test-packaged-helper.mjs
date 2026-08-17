@@ -57,6 +57,15 @@ try {
     message: 'Packaged visual smoke test',
     detail: 'Qt renderer and assets are available',
   })}\n`)
+  child.stdin.write(`${JSON.stringify({
+    protocolVersion: 1,
+    kind: 'tasks',
+    timestamp: Date.now(),
+    tasks: [
+      { sessionId: 'one', state: 'WORKING', project: 'dsh-dafeiyu', task: 'Windows package validation' },
+      { sessionId: 'two', state: 'WAITING', project: 'WSL2 interop', task: 'User confirmation' },
+    ],
+  })}\n`)
   await waitUntil(async () => {
     try {
       return (await stat(snapshot)).size > 1024

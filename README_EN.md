@@ -17,7 +17,7 @@ stops its native Helper, and provides the Agent events that drive it. The transp
 frameless companion stays above other Windows apps, so you can see whether DSH is thinking,
 editing, testing, waiting, or finished while working in VS Code, a browser, or File Explorer.
 
-> Current version: `0.1.0-alpha.9` · Windows MVP Alpha
+> Current version: `0.1.0-alpha.10` · Windows / WSL2 Alpha
 
 ## What is it for?
 
@@ -67,9 +67,11 @@ When several DSH sessions run at once, the default attention priority is:
 
 `Waiting > Error > Working > Thinking > Idle`
 
+When multiple tasks are active, the status bubble lists them at the same time.
+
 ## Requirements
 
-- Windows 10/11 x64
+- Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - `dsh-dafeiyu@alpha` from npm, or a `.tgz` archive from GitHub Releases
@@ -106,6 +108,11 @@ If `dsh` is already available globally, the command is simply:
 dsh plugin --profile web add dsh-dafeiyu@alpha
 ```
 
+When DSH runs inside WSL2, run the same install command in the WSL terminal. The plugin
+launches the bundled Windows Helper through `cmd.exe`; no manual `chmod`, Python, or
+PySide6 installation is required inside WSL. The current target is WSL2 on Windows x64,
+not ordinary Linux, remote Linux, or containers.
+
 ### 3. GitHub Release fallback
 
 Open [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) and download:
@@ -113,8 +120,6 @@ Open [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) an
 ```text
 dsh-dafeiyu-<version>.tgz
 ```
-
-Do not extract it.
 
 Do not extract it. Install the downloaded archive from the DSH directory:
 
@@ -176,7 +181,7 @@ DSH persists these settings, so a normal plugin update does not require reconfig
 
 - **Drag:** move BigFish; its position is saved automatically.
 - **Click or double-click:** trigger brief head-pat, poke, or tail reactions, then return to the latest DSH state.
-- **Right-click:** change size, bubble size, reduce motion, hide the bubble, hide for now, or close for this run.
+- **Right-click:** change size, bubble size, reduce motion, hide the bubble, open WebUI, hide for now, or close for this run.
 - **Hide for now:** hides the window without disabling the plugin.
 - **Close for this run:** closes the current Helper and suppresses restart until the next DSH launch.
 

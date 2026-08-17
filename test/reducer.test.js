@@ -167,15 +167,36 @@ test('multi-session selection follows attention priority instead of latest-event
   }, 2))
   assert.equal(blocked.state, CompanionState.WAITING)
 
-  assert.deepEqual(reducer.handle(working, event('turn/start', { turn: 1 }, 1)), [])
-  assert.deepEqual(reducer.handle(working, event('tool/call', {
+  const [tasksAfterStart] = reducer.handle(working, event('turn/start', { turn: 1 }, 1))
+  assert.equal(tasksAfterStart.kind, CompanionMessageKind.TASKS)
+  assert.equal(tasksAfterStart.tasks.length, 2)
+  assert.equal(tasksAfterStart.tasks[0].sessionId, 'waiting-session')
+  const [tasksAfterTool] = reducer.handle(working, event('tool/call', {
     callId: 'call-working',
     name: 'shell_command',
-  }, 2)), [])
+  }, 2))
+  assert.equal(tasksAfterTool.kind, CompanionMessageKind.TASKS)
+  assert.equal(tasksAfterTool.tasks[0].state, CompanionState.WAITING)
+  assert.equal(tasksAfterTool.tasks[1].state, CompanionState.WORKING)
 
   const [revealed] = reducer.disposeSession(waiting)
   assert.equal(revealed.sessionId, 'working-session')
   assert.equal(revealed.state, CompanionState.WORKING)
+})
+
+test('multi-task list is cleared when only one active task remains', () => {
+  const reducer = new CompanionReducer()
+  const first = { header: { id: 'first' } }
+  const second = { header: { id: 'second' } }
+  reducer.handle(first, event('turn/start', { turn: 1 }, 1))
+  reducer.handle(second, event('turn/start', { turn: 1 }, 1))
+  const messages = reducer.handle(first, event('turn/end', {
+    turn: 1,
+    reason: { kind: 'completed' },
+  }, 2))
+  assert.equal(messages.some((message) => message.kind === CompanionMessageKind.TASKS), true)
+  const clearTasks = messages.find((message) => message.kind === CompanionMessageKind.TASKS)
+  assert.deepEqual(clearTasks.tasks, [])
 })
 
 test('completion pulse resumes the highest-priority remaining session', () => {
@@ -208,7 +229,10 @@ test('failed turns remain visible until that session changes or is disposed', ()
     reason: { kind: 'error' },
   }, 2))
   assert.equal(failure.state, CompanionState.ERROR)
-  assert.deepEqual(reducer.handle(newer, event('turn/start', { turn: 1 }, 1)), [])
+  const [tasksAfterNewer] = reducer.handle(newer, event('turn/start', { turn: 1 }, 1))
+  assert.equal(tasksAfterNewer.kind, CompanionMessageKind.TASKS)
+  assert.equal(tasksAfterNewer.tasks.length, 2)
+  assert.equal(tasksAfterNewer.tasks[0].state, CompanionState.ERROR)
 })
 
 test('todo events preserve real project and progress context for the status card', () => {

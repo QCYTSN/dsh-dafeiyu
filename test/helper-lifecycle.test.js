@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
-import { HelperProcess } from '../src/helper-process.js'
+import { HelperProcess, defaultCommand, isWsl, shouldUseBundledHelper } from '../src/helper-process.js'
 import { CompanionMessageKind, CompanionState, createMessage } from '../src/protocol.js'
 
 async function waitFor(predicate, timeoutMs = 3000) {
@@ -15,6 +15,13 @@ async function waitFor(predicate, timeoutMs = 3000) {
   }
   throw new Error('timed out waiting for helper condition')
 }
+
+test('helper process exposes WSL detection helpers without throwing', () => {
+  assert.equal(typeof isWsl(), 'boolean')
+  assert.equal(typeof shouldUseBundledHelper(), 'boolean')
+  assert.equal(typeof defaultCommand(), 'string')
+  assert.equal(typeof defaultCommand(true), 'string')
+})
 
 test('helper consumes events and exits when the plugin stops', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-dafeiyu-test-'))

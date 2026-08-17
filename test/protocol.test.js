@@ -24,6 +24,17 @@ test('protocol accepts the helper readiness handshake', () => {
   assert.equal(assertCompanionMessage(message).kind, 'ready')
 })
 
+test('protocol creates and encodes a multi-task message', () => {
+  const message = createMessage(CompanionMessageKind.TASKS, {
+    tasks: [
+      { sessionId: 'one', state: CompanionState.WORKING, project: 'demo', task: 'write code' },
+      { sessionId: 'two', state: CompanionState.WAITING, project: 'demo', task: 'confirm' },
+    ],
+  })
+  assert.equal(assertCompanionMessage(message), message)
+  assert.deepEqual(JSON.parse(encodeMessage(message)), message)
+})
+
 test('protocol creates and encodes a live config message', () => {
   const message = createMessage(CompanionMessageKind.CONFIG, {
     scale: 0.9,

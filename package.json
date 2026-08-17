@@ -1,6 +1,6 @@
 {
   "name": "dsh-dafeiyu",
-  "version": "0.1.0-alpha.9",
+  "version": "0.1.0-alpha.10",
   "description": "A desktop-native BigFish companion driven by DeepSeek Harness session events.",
   "author": "QCYTSN",
   "type": "module",
@@ -33,9 +33,6 @@
     "ASSET_LICENSE.md",
     "LICENSE"
   ],
-  "os": [
-    "win32"
-  ],
   "cpu": [
     "x64"
   ],
@@ -46,7 +43,7 @@
     "@deepseek-ai/schemastery": "^3.18.1"
   },
   "scripts": {
-    "test": "node --test --test-timeout=10000 test/assets.test.js test/config-endpoint.test.js test/protocol.test.js test/status-copy.test.js test/reducer.test.js test/helper-lifecycle.test.js test/helper-restart.test.js test/plugin-integration.test.js",
+    "test": "node --test --test-timeout=10000 test/assets.test.js test/config-endpoint.test.js test/helper-command.test.js test/protocol.test.js test/status-copy.test.js test/reducer.test.js test/helper-lifecycle.test.js test/helper-restart.test.js test/plugin-integration.test.js",
     "test:helper": "node --test test/helper-lifecycle.test.js",
     "test:python": "py -3 -m unittest discover -s runtime/tests -t .",
     "test:ui": "node test/fixtures/ui-acceptance.js",

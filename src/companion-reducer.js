@@ -105,6 +105,7 @@ export class CompanionReducer {
     this.clock = 0
     this.selectedSessionId = undefined
     this.outputSignature = undefined
+    this.tasksSignature = undefined
   }
 
   setIncludeSubagents(value) {
@@ -244,7 +245,7 @@ export class CompanionReducer {
       return this.#render(selection)
     }
     this.#remember(selection)
-    return [createMessage(CompanionMessageKind.PULSE, {
+    return this.#withTasks([createMessage(CompanionMessageKind.PULSE, {
       sessionId: record.id,
       sourceSeq: event.seq,
       state: CompanionState.ERROR,
@@ -256,7 +257,7 @@ export class CompanionReducer {
       message: statusCopy('toolError', event.seq),
       detail: detailFor(record),
       errorCode: event.data.error.code,
-    })]
+    })])
   }
 
   #todo(record, event) {
@@ -275,7 +276,7 @@ export class CompanionReducer {
     record.updatedAt = ++this.clock
     const selection = this.#select()
     if (selection.record.id !== record.id) return this.#render(selection)
-    return [createMessage(CompanionMessageKind.TASK, {
+    return this.#withTasks([createMessage(CompanionMessageKind.TASK, {
       sessionId: record.id,
       sourceSeq: event.seq,
       task: record.task,
@@ -283,7 +284,7 @@ export class CompanionReducer {
       project: record.project,
       message: taskCopy(record.task),
       detail: detailFor(record, '执行阶段'),
-    })]
+    })])
   }
 
   #turnEnd(record, event) {
@@ -332,7 +333,7 @@ export class CompanionReducer {
       return this.#render(selection)
     }
     this.#remember(selection)
-    return [createMessage(CompanionMessageKind.PULSE, {
+    return this.#withTasks([createMessage(CompanionMessageKind.PULSE, {
       sessionId: record.id,
       sourceSeq: event.seq,
       state: CompanionState.SUCCESS,
@@ -344,7 +345,7 @@ export class CompanionReducer {
       phase: 'turn-end',
       message: statusCopy('success', event.seq),
       detail: detailFor(record, '本轮已完成'),
-    })]
+    })])
   }
 
   #record(sessionId) {
@@ -394,18 +395,65 @@ export class CompanionReducer {
   }
 
   #render(selection = this.#select()) {
+    const messages = []
     const signature = this.#signature(selection.record)
-    if (signature === this.outputSignature) return []
-    this.#remember(selection)
-    return [createMessage(CompanionMessageKind.STATE, {
-      sessionId: selection.record.id,
-      state: selection.record.state,
-      ...selection.record.payload,
-      task: selection.record.task,
-      progress: selection.record.progress,
-      project: selection.record.project,
-      detail: detailFor(selection.record),
-    })]
+    if (signature !== this.outputSignature) {
+      this.#remember(selection)
+      messages.push(createMessage(CompanionMessageKind.STATE, {
+        sessionId: selection.record.id,
+        state: selection.record.state,
+        ...selection.record.payload,
+        task: selection.record.task,
+        progress: selection.record.progress,
+        project: selection.record.project,
+        detail: detailFor(selection.record),
+      }))
+    }
+    messages.push(...this.#taskMessages())
+    return messages
+  }
+
+  #taskMessages() {
+    const tasks = this.#activeTaskList()
+    if (tasks.length < 2) {
+      if (this.tasksSignature !== undefined) {
+        this.tasksSignature = undefined
+        return [createMessage(CompanionMessageKind.TASKS, { tasks: [] })]
+      }
+      return []
+    }
+    const signature = tasks.map((task) => [
+      task.sessionId,
+      task.state,
+      task.project ?? '',
+      task.task ?? '',
+      task.message ?? '',
+      task.detail ?? '',
+    ].join('|')).join('~')
+    if (signature === this.tasksSignature) return []
+    this.tasksSignature = signature
+    return [createMessage(CompanionMessageKind.TASKS, { tasks })]
+  }
+
+  #activeTaskList() {
+    return [...this.sessions.values()]
+      .filter((record) => record.state !== CompanionState.IDLE && record.state !== CompanionState.DISCONNECTED)
+      .sort((left, right) => {
+        const priority = (statePriority[right.state] ?? 0) - (statePriority[left.state] ?? 0)
+        return priority || right.updatedAt - left.updatedAt || left.id.localeCompare(right.id)
+      })
+      .map((record) => ({
+        sessionId: record.id,
+        state: record.state,
+        project: record.project,
+        task: record.task,
+        message: record.payload.message,
+        detail: detailFor(record),
+      }))
+  }
+
+  #withTasks(messages) {
+    return [...messages, ...this.#taskMessages()]
   }
 
   #remember(selection) {

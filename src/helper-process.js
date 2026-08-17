@@ -1,5 +1,5 @@
-import { spawn } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { execFileSync, spawn } from 'node:child_process'
+import { existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -13,9 +13,67 @@ const here = dirname(fileURLToPath(import.meta.url))
 const defaultHelperPath = resolve(here, '..', 'runtime', 'helper.py')
 const bundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'dsh-dafeiyu-helper.exe')
 
-function defaultCommand() {
-  if (process.platform === 'win32' && existsSync(bundledHelperPath)) return bundledHelperPath
-  return process.env.DSH_DAFEIYU_PYTHON || (process.platform === 'win32' ? 'py' : 'python3')
+function isWsl() {
+  if (process.platform !== 'linux') return false
+  try {
+    return readFileSync('/proc/sys/fs/binfmt_misc/WSLInterop', 'utf8').includes('enabled')
+  } catch {
+    try {
+      return /microsoft/i.test(readFileSync('/proc/version', 'utf8'))
+    } catch {
+      return false
+    }
+  }
+}
+
+function shouldUseBundledHelper() {
+  return (process.platform === 'win32' || isWsl()) && existsSync(bundledHelperPath)
+}
+
+function toWindowsPath(path) {
+  return execFileSync('wslpath', ['-w', path], { encoding: 'utf8' }).trim()
+}
+
+function resolveHelperLaunch({
+  platform,
+  isWslEnv,
+  bundledPath,
+  helperPath,
+  pythonEnv,
+  headless = false,
+  fileExists = existsSync,
+  windowsPath = toWindowsPath,
+}) {
+  if (platform === 'win32' && fileExists(bundledPath)) {
+    return { command: bundledPath, args: [] }
+  }
+  if (platform === 'linux' && isWslEnv && !headless && fileExists(bundledPath)) {
+    // npm archives created on Windows store ordinary files as 0644. Launching
+    // the EXE directly from WSL can therefore fail with EACCES. cmd.exe opens
+    // the Windows path without relying on the Linux executable bit and keeps
+    // stdin/stdout attached for the companion protocol.
+    return {
+      command: 'cmd.exe',
+      args: ['/d', '/c', windowsPath(bundledPath)],
+    }
+  }
+  const command = pythonEnv || (platform === 'win32' ? 'py' : 'python3')
+  return { command, args: defaultArgs(command, helperPath) }
+}
+
+function defaultLaunch(headless = false) {
+  return resolveHelperLaunch({
+    platform: process.platform,
+    isWslEnv: isWsl(),
+    bundledPath: bundledHelperPath,
+    helperPath: defaultHelperPath,
+    pythonEnv: process.env.DSH_DAFEIYU_PYTHON,
+    headless,
+  })
+}
+
+function defaultCommand(headless = false) {
+  return defaultLaunch(headless).command
 }
 
 function defaultArgs(command, helperPath) {
@@ -45,11 +103,14 @@ export class HelperProcess {
 
   start() {
     if (this.child || this.stopping || this.restartSuppressed) return this.child
-    const command = this.options.command || defaultCommand()
-    const helperPath = this.options.helperPath || defaultHelperPath
-    const args = this.options.args || defaultArgs(command, helperPath)
-    const extraArgs = []
     const headless = this.options.headless ?? process.env.DSH_DAFEIYU_HEADLESS === '1'
+    const helperPath = this.options.helperPath || defaultHelperPath
+    const launch = this.options.command
+      ? { command: this.options.command, args: defaultArgs(this.options.command, helperPath) }
+      : defaultLaunch(headless)
+    const command = launch.command
+    const args = this.options.args || launch.args
+    const extraArgs = []
     const eventLog = this.options.eventLog || process.env.DSH_DAFEIYU_EVENT_LOG
     const snapshot = this.options.snapshot || process.env.DSH_DAFEIYU_SNAPSHOT
     if (headless) extraArgs.push('--headless')
@@ -99,7 +160,7 @@ export class HelperProcess {
     const line = encodeMessage(message)
     if (!this.child || !this.spawned || !this.child.stdin.writable || this.child.stdin.destroyed) {
       if (!this.hasEverSpawned
-        || ![CompanionMessageKind.HELLO, CompanionMessageKind.STATE, CompanionMessageKind.TASK, CompanionMessageKind.PULSE, CompanionMessageKind.CONFIG].includes(message.kind)) {
+        || ![CompanionMessageKind.HELLO, CompanionMessageKind.STATE, CompanionMessageKind.TASK, CompanionMessageKind.TASKS, CompanionMessageKind.PULSE, CompanionMessageKind.CONFIG].includes(message.kind)) {
         this.queue.push(line)
       }
       return
@@ -129,6 +190,7 @@ export class HelperProcess {
     if (message.kind === CompanionMessageKind.HELLO) this.snapshot.set('hello', encodeMessage(message))
     if (message.kind === CompanionMessageKind.STATE) this.snapshot.set('state', encodeMessage(message))
     if (message.kind === CompanionMessageKind.TASK) this.snapshot.set('task', encodeMessage(message))
+    if (message.kind === CompanionMessageKind.TASKS) this.snapshot.set('tasks', encodeMessage(message))
     if (message.kind === CompanionMessageKind.CONFIG) this.snapshot.set('config', encodeMessage(message))
   }
 
@@ -228,4 +290,14 @@ export class HelperProcess {
   }
 }
 
-export { bundledHelperPath, defaultHelperPath }
+export {
+  bundledHelperPath,
+  defaultHelperPath,
+  defaultArgs,
+  defaultCommand,
+  defaultLaunch,
+  isWsl,
+  resolveHelperLaunch,
+  shouldUseBundledHelper,
+  toWindowsPath,
+}

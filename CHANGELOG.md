@@ -1,5 +1,32 @@
 # Changelog
 
+## 0.1.0-alpha.10
+
+WSL2 support and Issue #12 desktop interaction enhancements.
+
+### Added
+
+- WSL2 support: allow installation on Linux and run the bundled Win32 Helper through WSL interop ([#8](https://github.com/QCYTSN/dsh-dafeiyu/pull/8))
+- Right-click “打开 WebUI” action to reopen the DSH WebUI from the desktop pet ([#12](https://github.com/QCYTSN/dsh-dafeiyu/issues/12))
+- Completion/error alert feedback: beep plus a brief window shake on SUCCESS/ERROR pulses ([#12](https://github.com/QCYTSN/dsh-dafeiyu/issues/12))
+- Multi-task status card: when multiple DSH sessions are active, the pet bubble lists the running tasks and their states ([#12](https://github.com/QCYTSN/dsh-dafeiyu/issues/12))
+
+### Changed
+
+- Removed the npm `os` restriction so WSL2 installs are accepted while retaining the x64 CPU requirement
+- WSL2 launches the Helper through `cmd.exe`, so npm's Linux executable bit is not required
+- The helper now snapshots and replays the multi-task list after a restart
+
+### Update
+
+Fully exit DSH, then run:
+
+```powershell
+dsh plugin --profile web update dsh-dafeiyu@alpha
+```
+
+Restart DSH after the update.
+
 ## 0.1.0-alpha.9
 
 Windows drag-stability hotfix release.

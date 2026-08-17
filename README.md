@@ -16,7 +16,7 @@ DSH 大肥鱼不是一个需要单独启动的桌宠应用。它由 DSH 插件�
 一起启动和退出，并以透明、无边框、始终置顶的原生窗口显示在桌面上。即使切换到
 VS Code、浏览器或文件管理器，也能知道 DSH 当前在思考、修改、测试、等待还是已经完成。
 
-> 当前版本：`0.1.0-alpha.9` · Windows MVP Alpha
+> 当前版本：`0.1.0-alpha.10` · Windows / WSL2 Alpha
 
 ## 它有什么用？
 
@@ -66,9 +66,11 @@ stateDiagram-v2
 
 `等待确认 > 错误 > 工作 > 思考 > 空闲`
 
+当有多个活动任务时，状态气泡会同时列出这些任务的状态。
+
 ## 系统要求
 
-- Windows 10/11 x64
+- Windows 10/11 x64，或 WSL2（通过 Windows interop 运行桌面 Helper）
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的 `dsh-dafeiyu@alpha`，或 GitHub Release 中的 `.tgz` 安装包
@@ -103,6 +105,11 @@ pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha
 ```powershell
 dsh plugin --profile web add dsh-dafeiyu@alpha
 ```
+
+如果 DSH 运行在 WSL2，请在 WSL 终端执行同一条安装命令。插件会自动通过
+`cmd.exe` 启动包内的 Windows Helper，不需要手动 `chmod`，也不需要在 WSL
+安装 Python 或 PySide6。当前支持范围是 Windows x64 上的 WSL2；普通 Linux、
+远程 Linux 和容器不是本版本的桌面显示目标。
 
 ### 3. GitHub Release 备用安装方式
 
@@ -173,7 +180,7 @@ pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<vers
 
 - **拖动**：按住大肥鱼移动位置，位置会自动保存。
 - **点击或双击**：触发摸头、戳一下、尾巴等短互动，之后恢复最新 DSH 状态。
-- **右键菜单**：调整大小、气泡大小、减少动态、隐藏气泡、本次隐藏或本次关闭。
+- **右键菜单**：调整大小、气泡大小、减少动态、隐藏气泡、打开 WebUI、本次隐藏或本次关闭。
 - **本次隐藏**：只隐藏窗口，不禁用插件。
 - **本次关闭**：关闭当前 Helper，本次 DSH 运行期间不会自动重启；下次启动 DSH 会再次出现。
 

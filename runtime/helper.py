@@ -111,8 +111,8 @@ def run_headless(recorder: EventRecorder) -> int:
 
 def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> int:
     try:
-        from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, Signal
-        from PySide6.QtGui import QColor, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
+        from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
+        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
         from PySide6.QtWidgets import QApplication, QMenu, QWidget
     except ImportError:
         print(
@@ -198,6 +198,11 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.overlay_detail = ""
             self.overlay_deadline_ms: int | None = None
             self.task = ""
+            self.tasks: list[dict[str, Any]] = []
+            self.webui_url = os.environ.get("DSH_DAFEIYU_WEBUI_URL", "http://127.0.0.1:3080/")
+            self.shake_timer: QTimer | None = None
+            self.shake_origin: QPoint | None = None
+            self.shake_count = 0
             self.drag_origin: QPoint | None = None
             self.pet_origin: QPoint | None = None
             self.pet_x = 0
@@ -242,6 +247,11 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self.model.base_state,
                     None if self.model.base_state in {"THINKING", "WORKING", "WAITING", "ERROR"} else 6000,
                 )
+            elif kind == "tasks":
+                raw_tasks = message.get("tasks")
+                self.tasks = raw_tasks if isinstance(raw_tasks, list) else []
+                self._apply_window_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
             elif kind == "config":
                 self._apply_config(message)
             elif kind in {"state", "pulse"}:
@@ -269,6 +279,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                         state,
                         ttl_ms,
                     )
+                    if state in {"SUCCESS", "ERROR"}:
+                        self._notify_alert(state)
                 else:
                     activity = None if self.reduced_motion else message.get("activity")
                     self.model.apply_state(state, activity)
@@ -414,7 +426,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             pet_height = round(int(manifest["maxFrameHeight"]) * self.scale)
             if self.show_bubble:
                 bubble_width = round(420 * self.bubble_scale)
-                bubble_height = round(84 * self.bubble_scale)
+                bubble_height = self._card_height()
                 self.setFixedSize(max(pet_width + 50, bubble_width + 28), pet_height + bubble_height + 34)
             else:
                 # Bubble hidden: the window only needs to contain the pet.
@@ -480,7 +492,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def _bubble_rect(self) -> tuple[int, int, int, int]:
             card_width = round(420 * self.bubble_scale)
-            card_height = round(84 * self.bubble_scale)
+            card_height = self._card_height()
             pet_width, _ = self._pet_size()
             pet_center_x = self._pet_offset_x(pet_width) + pet_width // 2
             margin = 14
@@ -615,6 +627,127 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.setBrush(foreground)
                 painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
 
+        def _card_height(self) -> int:
+            if len(self.tasks) >= 2:
+                rows = min(len(self.tasks), 3)
+                return round((58 + rows * 26) * self.bubble_scale)
+            return round(84 * self.bubble_scale)
+
+        def _draw_card_background(
+            self,
+            painter: QPainter,
+            card_x: int,
+            card_y: int,
+            card_width: int,
+            card_height: int,
+            corner_radius: int,
+            s: float,
+        ) -> None:
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(17, 24, 39, 13))
+            painter.drawRoundedRect(
+                card_x + 1, card_y + round(13 * s), card_width - 2, card_height,
+                corner_radius, corner_radius,
+            )
+            painter.setBrush(QColor(17, 24, 39, 18))
+            painter.drawRoundedRect(
+                card_x, card_y + round(7 * s), card_width, card_height,
+                corner_radius, corner_radius,
+            )
+            painter.setPen(QPen(QColor(218, 221, 226, 205), 1))
+            painter.setBrush(QColor(252, 252, 253, 248))
+            painter.drawRoundedRect(
+                card_x, card_y, card_width, card_height,
+                corner_radius, corner_radius,
+            )
+
+        def _draw_multi_task_card(
+            self,
+            painter: QPainter,
+            card_x: int,
+            card_y: int,
+            card_width: int,
+            card_height: int,
+            s: float,
+        ) -> None:
+            title_font = QFont("Microsoft YaHei UI")
+            title_font.setPointSizeF(max(8.0, 11.0 * s))
+            title_font.setWeight(QFont.Weight.DemiBold)
+            detail_font = QFont("Microsoft YaHei UI")
+            detail_font.setPointSizeF(max(7.0, 9.0 * s))
+            text_x = card_x + round(16 * s)
+            text_width = max(40, card_width - round(32 * s))
+            painter.setFont(title_font)
+            painter.setPen(QColor("#25282D"))
+            title = f"{len(self.tasks)} 个任务进行中"
+            painter.drawText(
+                text_x,
+                card_y + round(10 * s),
+                text_width,
+                max(12, round(22 * s)),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                QFontMetrics(title_font).elidedText(title, Qt.TextElideMode.ElideRight, text_width),
+            )
+            painter.setFont(detail_font)
+            for index, task in enumerate(self.tasks[:3]):
+                row_y = card_y + round((36 + index * 24) * s)
+                state = str(task.get("state", "IDLE"))
+                state_label = self.LABELS.get(state, state)
+                label = task.get("project") or task.get("task") or task.get("message") or state_label
+                line = f"{state_label} · {label}"
+                _, foreground = self._status_colors(state)
+                painter.setPen(Qt.PenStyle.NoPen)
+                painter.setBrush(foreground)
+                painter.drawEllipse(text_x, row_y + round(4 * s), round(8 * s), round(8 * s))
+                painter.setPen(QColor("#747981"))
+                painter.drawText(
+                    text_x + round(14 * s),
+                    row_y,
+                    text_width - round(14 * s),
+                    max(12, round(20 * s)),
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                    QFontMetrics(detail_font).elidedText(line, Qt.TextElideMode.ElideRight, text_width - round(14 * s)),
+                )
+            if len(self.tasks) > 3:
+                more = f"还有 {len(self.tasks) - 3} 个任务…"
+                painter.setPen(QColor("#9AA0A6"))
+                painter.drawText(
+                    text_x + round(14 * s),
+                    card_y + round((36 + 3 * 24) * s),
+                    text_width,
+                    max(12, round(20 * s)),
+                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                    more,
+                )
+
+        def _notify_alert(self, state: str) -> None:
+            try:
+                QApplication.beep()
+            except Exception:
+                pass
+            self._shake_window()
+
+        def _shake_window(self) -> None:
+            if self.shake_timer is None:
+                self.shake_timer = QTimer(self)
+                self.shake_timer.timeout.connect(self._shake_tick)
+            self.shake_origin = self.pos()
+            self.shake_count = 0
+            self.shake_timer.start(30)
+
+        def _shake_tick(self) -> None:
+            offsets = [(6, 0), (-6, 0), (4, 0), (-4, 0), (2, 0), (-2, 0), (0, 0)]
+            if self.shake_origin is None:
+                self.shake_timer.stop()
+                return
+            if self.shake_count < len(offsets):
+                dx, dy = offsets[self.shake_count]
+                self.move(self.shake_origin.x() + dx, self.shake_origin.y() + dy)
+                self.shake_count += 1
+            else:
+                self.shake_timer.stop()
+                self.move(self.shake_origin)
+
         def paintEvent(self, _event: Any) -> None:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
@@ -622,30 +755,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
             card = self._current_card() if self.show_bubble else None
             bubble_height = 12
-            if card:
-                title, detail, card_state = card
-                card_x, card_y, card_width, card_height = self._bubble_rect()
-                bubble_height = card_y + card_height + 19
-                s = self.bubble_scale
-                corner_radius = round(30 * s)
-                painter.setPen(Qt.PenStyle.NoPen)
-                painter.setBrush(QColor(17, 24, 39, 13))
-                painter.drawRoundedRect(
-                    card_x + 1, card_y + round(13 * s), card_width - 2, card_height,
-                    corner_radius, corner_radius,
-                )
-                painter.setBrush(QColor(17, 24, 39, 18))
-                painter.drawRoundedRect(
-                    card_x, card_y + round(7 * s), card_width, card_height,
-                    corner_radius, corner_radius,
-                )
-                painter.setPen(QPen(QColor(218, 221, 226, 205), 1))
-                painter.setBrush(QColor(252, 252, 253, 248))
-                painter.drawRoundedRect(
-                    card_x, card_y, card_width, card_height,
-                    corner_radius, corner_radius,
-                )
+            card_x, card_y, card_width, card_height = self._bubble_rect()
+            s = self.bubble_scale
+            corner_radius = round(30 * s)
 
+            if len(self.tasks) >= 2:
+                bubble_height = card_y + card_height + 19
+                self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
+                self._draw_multi_task_card(painter, card_x, card_y, card_width, card_height, s)
+            elif card:
+                title, detail, card_state = card
+                bubble_height = card_y + card_height + 19
+                self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
                 icon_center_x = card_x + card_width - round(39 * s)
                 icon_center_y = card_y + card_height // 2
                 painter.save()
@@ -832,6 +953,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             bubble_action = menu.addAction("隐藏气泡")
             bubble_action.setCheckable(True)
             bubble_action.setChecked(not self.show_bubble)
+            open_webui_action = menu.addAction("打开 WebUI")
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
             exit_action = menu.addAction("本次关闭")
@@ -865,6 +987,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("settings", {"showBubble": self.show_bubble})
                 self.update()
+            elif selected == open_webui_action:
+                QDesktopServices.openUrl(QUrl(self.webui_url))
             elif selected == hide_action:
                 self.hide()
             elif selected == exit_action:
