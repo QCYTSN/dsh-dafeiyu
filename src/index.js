@@ -20,6 +20,7 @@ export const Config = Schema.object({
     Schema.const('lively').description('活泼'),
   ]).default('normal').description('空闲微动作频率'),
   reducedMotion: Schema.boolean().default(false).description('减少走动、循环帧和程序化晃动'),
+  showBubble: Schema.boolean().default(true).description('显示状态气泡'),
   includeSubagents: Schema.boolean().default(false).description('允许子 Agent 抢占宠物状态'),
 }).description('由 DeepSeek Harness 状态驱动的桌面大肥鱼伴侣')
 
@@ -29,6 +30,7 @@ const defaults = Object.freeze({
   bubbleScale: 1,
   activityLevel: 'normal',
   reducedMotion: false,
+  showBubble: true,
   includeSubagents: false,
 })
 
@@ -39,6 +41,7 @@ function publicConfig(config = {}) {
     bubbleScale: config.bubbleScale ?? defaults.bubbleScale,
     activityLevel: config.activityLevel ?? defaults.activityLevel,
     reducedMotion: config.reducedMotion ?? defaults.reducedMotion,
+    showBubble: config.showBubble ?? defaults.showBubble,
     includeSubagents: config.includeSubagents ?? defaults.includeSubagents,
   }
 }
@@ -141,6 +144,7 @@ function mount(ctx, config = {}, eventCtx = ctx) {
       bubbleScale: next.bubbleScale ?? defaults.bubbleScale,
       activityLevel: next.activityLevel ?? defaults.activityLevel,
       reducedMotion: next.reducedMotion === true,
+      showBubble: next.showBubble !== false,
     }))
   }
 
@@ -167,6 +171,18 @@ function mount(ctx, config = {}, eventCtx = ctx) {
         DSH_DAFEIYU_BUBBLE_SCALE: String(resolved.bubbleScale ?? defaults.bubbleScale),
         DSH_DAFEIYU_ACTIVITY_LEVEL: String(resolved.activityLevel ?? defaults.activityLevel),
         DSH_DAFEIYU_REDUCED_MOTION: resolved.reducedMotion === true ? '1' : '0',
+        DSH_DAFEIYU_SHOW_BUBBLE: resolved.showBubble !== false ? '1' : '0',
+      },
+      onSettingsChange: (report) => {
+        const patch = {}
+        const allowed = Object.keys(defaults)
+        for (const key of allowed) {
+          if (report[key] !== undefined) patch[key] = report[key]
+        }
+        if (Object.keys(patch).length === 0) return
+        void settings.update(patch).catch((error) => {
+          logger.warn?.(`dsh-dafeiyu: settings sync from helper failed: ${error instanceof Error ? error.message : String(error)}`)
+        })
       },
     }, logger)
     reducer = new CompanionReducer({ includeSubagents: resolved.includeSubagents === true })

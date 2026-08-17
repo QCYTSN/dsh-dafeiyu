@@ -170,6 +170,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 if configured_reduced_motion is not None
                 else self.layout["reducedMotion"]
             )
+            configured_show_bubble = os.environ.get("DSH_DAFEIYU_SHOW_BUBBLE")
+            self.show_bubble = (
+                configured_show_bubble == "1"
+                if configured_show_bubble is not None
+                else bool(self.layout.get("showBubble", True))
+            )
             self.activity_level = os.environ.get("DSH_DAFEIYU_ACTIVITY_LEVEL", "normal")
             self.model = AnimationModel(manifest)
             self.pixmaps: dict[str, QPixmap] = {}
@@ -300,6 +306,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.activity_level = activity_level
                 if not self.reduced_motion:
                     self._schedule_micro()
+            show_bubble = message.get("showBubble")
+            if isinstance(show_bubble, bool) and show_bubble != self.show_bubble:
+                self.show_bubble = show_bubble
             self._apply_window_size()
             self._move_to_pet(self.pet_x, self.pet_y)
             self._save_layout()
@@ -403,9 +412,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         def _apply_window_size(self) -> None:
             pet_width = round(int(manifest["maxFrameWidth"]) * self.scale)
             pet_height = round(int(manifest["maxFrameHeight"]) * self.scale)
-            bubble_width = round(420 * self.bubble_scale)
-            bubble_height = round(84 * self.bubble_scale)
-            self.setFixedSize(max(pet_width + 50, bubble_width + 28), pet_height + bubble_height + 34)
+            if self.show_bubble:
+                bubble_width = round(420 * self.bubble_scale)
+                bubble_height = round(84 * self.bubble_scale)
+                self.setFixedSize(max(pet_width + 50, bubble_width + 28), pet_height + bubble_height + 34)
+            else:
+                # Bubble hidden: the window only needs to contain the pet.
+                self.setFixedSize(pet_width + 50, pet_height + 26)
 
         def _screen_geometry_at(self, x: int, y: int):
             screen = QApplication.screenAt(QPoint(x, y)) or QApplication.primaryScreen()
@@ -513,6 +526,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 "scale": self.scale,
                 "bubbleScale": self.bubble_scale,
                 "reducedMotion": self.reduced_motion,
+                "showBubble": self.show_bubble,
             }
             try:
                 save_layout(self.layout_path, self.layout)
@@ -606,7 +620,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             # 平滑缩放：放大/缩小时插值，避免锯齿和模糊
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-            card = self._current_card()
+            card = self._current_card() if self.show_bubble else None
             bubble_height = 12
             if card:
                 title, detail, card_state = card
@@ -815,6 +829,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
+            bubble_action = menu.addAction("隐藏气泡")
+            bubble_action.setCheckable(True)
+            bubble_action.setChecked(not self.show_bubble)
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
             exit_action = menu.addAction("本次关闭")
@@ -824,11 +841,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._apply_window_size()
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
+                emit_reply("settings", {"scale": self.scale})
             elif selected in bubble_size_actions:
                 self.bubble_scale = bubble_size_actions[selected]
                 self._apply_window_size()
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
+                emit_reply("settings", {"bubbleScale": self.bubble_scale})
             elif selected == reduced_action:
                 self.reduced_motion = reduced_action.isChecked()
                 self.animation_timer.setInterval(40 if self.reduced_motion else 20)
@@ -837,6 +856,14 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 else:
                     self._schedule_micro()
                 self._save_layout()
+                emit_reply("settings", {"reducedMotion": self.reduced_motion})
+                self.update()
+            elif selected == bubble_action:
+                self.show_bubble = not bubble_action.isChecked()
+                self._apply_window_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self._save_layout()
+                emit_reply("settings", {"showBubble": self.show_bubble})
                 self.update()
             elif selected == hide_action:
                 self.hide()

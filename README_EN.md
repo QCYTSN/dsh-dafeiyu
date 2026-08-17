@@ -167,6 +167,7 @@ DSH Agent events can change its work state.
 | Bubble size | Scale the status bubble from 80% to 120% while keeping status text readable |
 | Activity level | Control the frequency of idle blinks and micro-animations |
 | Reduced motion | Reduce walking, looping frames, and procedural movement |
+| Show status bubble | When off, only the character is shown without the status card |
 | Include subagents | Allow subagent sessions to participate in status priority; off by default |
 
 DSH persists these settings, so a normal plugin update does not require reconfiguration.
@@ -175,7 +176,7 @@ DSH persists these settings, so a normal plugin update does not require reconfig
 
 - **Drag:** move BigFish; its position is saved automatically.
 - **Click or double-click:** trigger brief head-pat, poke, or tail reactions, then return to the latest DSH state.
-- **Right-click:** change size, bubble size, reduce motion, hide for now, or close for this run.
+- **Right-click:** change size, bubble size, reduce motion, hide the bubble, hide for now, or close for this run.
 - **Hide for now:** hides the window without disabling the plugin.
 - **Close for this run:** closes the current Helper and suppresses restart until the next DSH launch.
 

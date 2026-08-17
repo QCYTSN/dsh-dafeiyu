@@ -16,7 +16,7 @@ class LayoutStoreTests(unittest.TestCase):
     def test_layout_is_clamped_and_saved_atomically(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "nested" / "layout.json"
-            save_layout(path, {"x": 120, "y": -20, "scale": 5, "reducedMotion": True})
+            save_layout(path, {"x": 120, "y": -20, "scale": 5, "reducedMotion": True, "showBubble": False})
             self.assertEqual(load_layout(path), {
                 "version": 1,
                 "x": 120,
@@ -26,6 +26,7 @@ class LayoutStoreTests(unittest.TestCase):
                 "scale": 1.4,
                 "bubbleScale": 1.0,
                 "reducedMotion": True,
+                "showBubble": False,
             })
             self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["scale"], 1.4)
             self.assertEqual(list(path.parent.glob("*.tmp")), [])

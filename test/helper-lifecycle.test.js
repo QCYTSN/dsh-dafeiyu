@@ -1,7 +1,8 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { HelperProcess } from '../src/helper-process.js'
 import { CompanionMessageKind, CompanionState, createMessage } from '../src/protocol.js'
@@ -70,5 +71,30 @@ test('helper heartbeat stays healthy and responds without a restart', async () =
       return false
     }
   })
+  await rm(directory, { recursive: true, force: true })
+})
+
+test('a settings reply from the helper reaches onSettingsChange', async () => {
+  const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'settings-helper.js')
+  const directory = await mkdtemp(join(tmpdir(), 'dsh-dafeiyu-settings-'))
+  const eventLog = join(directory, 'events.jsonl')
+  const logger = { debug() {}, info() {}, warn() {}, error() {} }
+  let reported
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    args: [fixture, eventLog],
+    headless: false,
+    heartbeatMs: 0,
+    onSettingsChange: (reply) => { reported = reply },
+  }, logger)
+  bridge.start()
+  bridge.send(createMessage(CompanionMessageKind.STATE, {
+    state: CompanionState.IDLE,
+    message: 'trigger the fixture',
+  }))
+  await waitFor(() => reported !== undefined)
+  assert.equal(reported.kind, CompanionMessageKind.SETTINGS)
+  assert.equal(reported.showBubble, false)
+  bridge.stop('settings-test-complete')
   await rm(directory, { recursive: true, force: true })
 })

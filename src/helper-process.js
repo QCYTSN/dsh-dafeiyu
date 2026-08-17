@@ -174,6 +174,12 @@ export class HelperProcess {
         this.restartSuppressed = true
         return
       }
+      if (reply?.protocolVersion === 1 && reply.kind === CompanionMessageKind.SETTINGS) {
+        // A user action inside the helper window (context menu) changed a
+        // setting; forward it so DSH settings stay the single source of truth.
+        this.options.onSettingsChange?.(reply)
+        return
+      }
     } catch {
       // Non-protocol stdout is still useful in development logs.
     }
