@@ -11,6 +11,7 @@
     "thinking": { "frames": ["idle_think/idle_think_238.png"], "frameMs": 180, "loop": true, "motion": "think" },
     "working": { "frames": ["sweep/sweep_238.png"], "frameMs": 180, "loop": true, "motion": "work" },
     "working_search": { "frames": ["walk_side/walk_side_238_00.png", "walk_side/walk_side_238_01.png", "walk_side/walk_side_238_02.png", "walk_side/walk_side_238_03.png"], "frameMs": 135, "loop": true },
+    "file_search": { "frames": ["file_search/01-stand.png", "file_search/02-shake-folder.png", "file_search/03-look-folder.png", "file_search/04-throw-folder.png", "file_search/05-crouch-search.png", "file_search/06-careful-search.png", "file_search/06-1-rummage.png", "file_search/06-2-pick-folder.png", "file_search/06-3-quick-check.png", "file_search/06-4-not-this.png", "file_search/06-5-toss-aside.png", "file_search/06-7-found-target.png", "file_search/07-found-folder.png", "file_search/08-found-stars.png", "file_search/09-happy-put-away.png", "file_search/10-stand-organize.png", "file_search/11-return-idle.png"], "frameMs": 220, "loop": false },
     "working_command": { "frames": ["walk_side_right/walk_side_right_238_00.png", "walk_side_right/walk_side_right_238_01.png", "walk_side_right/walk_side_right_238_02.png", "walk_side_right/walk_side_right_238_03.png"], "frameMs": 135, "loop": true },
     "walk_start_left": { "frames": ["walk_start_left/walk_start_left_238_00.png", "walk_start_left/walk_start_left_238_01.png"], "frameMs": 118, "loop": false },
     "walk_stop_left": { "frames": ["walk_stop_left/walk_stop_left_238_00.png", "walk_stop_left/walk_stop_left_238_01.png"], "frameMs": 135, "loop": false },
@@ -35,7 +36,7 @@
     "DISCONNECTED": "idle"
   },
   "workingActivityMap": {
-    "searching": "working_search",
+    "searching": "file_search",
     "commanding": "working_command",
     "editing": "working",
     "testing": "working_command",
