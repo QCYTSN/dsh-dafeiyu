@@ -3,8 +3,8 @@
 ## Pinned DSH baseline
 
 - Repository: `deepseek-ai/deepseek-harness`
-- Source version observed: `0.1.0-rc.5`
-- npm runtime verified: `0.1.0-rc.6`
+- Source version observed: `0.1.0-rc.7`
+- npm runtime verified: `0.1.0-rc.7`
 - Commit: `47f943859bef60e4160492346772ded9b24f765a`
 - Required service: `sessions`
 - Observed event bus: `ctx.on('session/event', (session, event) => ...)`
@@ -27,7 +27,7 @@ normal DSH startup opens the visual helper.
 
 ## Acceptance result (2026-08-14)
 
-Verified on Windows against the published `@deepseek-ai/dsh@0.1.0-rc.6` runtime
+Verified on Windows against the published `@deepseek-ai/dsh@0.1.0-rc.7` runtime
 in an isolated `DSH_HOME`:
 
 1. `dsh plugin --profile bigfish-phase0 add D:\Github_Ku\dsh-dafeiyu` completed.

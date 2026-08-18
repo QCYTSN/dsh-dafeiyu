@@ -42,8 +42,43 @@ function toolCallIdOf(event, fallback = '') {
 }
 
 function isUserQuestionTool(name) {
+  // Operate on whole name tokens instead of substring regexes: `_` is a word
+  // character so `\b` does not delimit snake_case, and bare substrings like
+  // "review", "allow" or "permission" turn ordinary tools (code_review,
+  // allowlist_files, permission_scan) into fake "waiting for user" states.
   const value = String(name || '').toLowerCase()
-  return /ask.*user.*question|request.*user.*input|user[-_/.:]?questions?/u.test(value)
+  const tokens = value.split(/[^a-z0-9]+/u).filter(Boolean)
+
+  const asks = new Set(['ask', 'asking', 'request', 'requests', 'requesting', 'require', 'requires', 'prompt', 'needs', 'need', 'seek', 'seeks', 'get', 'gets'])
+  const filler = new Set(['for', 'from', 'the', 'a', 'an'])
+  const userWords = new Set(['user', 'human', 'me'])
+  const nouns = new Set(['question', 'questions', 'input', 'answer', 'answers', 'decision', 'decisions', 'confirmation', 'approval', 'permission', 'authorization', 'authorisation', 'consent', 'clarify', 'clarification', 'help'])
+
+  // user/human <noun> or <noun> from user/human
+  const hasUserNoun = tokens.some((token, index) =>
+    userWords.has(token) && nouns.has(tokens[index + 1] ?? '')
+  )
+  const hasNounFromUser = tokens.some((token, index) =>
+    nouns.has(token) && tokens[index + 1] === 'from' && userWords.has(tokens[index + 2] ?? '')
+  )
+  // verb [for/the] [user] <noun>, or verb followed by user (optionally + noun)
+  const hasAsk = tokens.some((token, index) => {
+    if (!asks.has(token)) return false
+    let cursor = index + 1
+    while (cursor < tokens.length && (filler.has(tokens[cursor]) || userWords.has(tokens[cursor]))) {
+      if (userWords.has(tokens[cursor])) {
+        const next = tokens[cursor + 1]
+        return !next || nouns.has(next)
+      }
+      cursor += 1
+    }
+    return cursor < tokens.length && nouns.has(tokens[cursor])
+  })
+  // Unambiguous approval words that always mean "waiting for the human".
+  const strong = tokens.some((token) =>
+    token === 'authorize' || token === 'authorise' || token === 'consent'
+  )
+  return hasUserNoun || hasNounFromUser || hasAsk || strong
 }
 
 function sessionIdOf(session) {
@@ -99,9 +134,10 @@ function detailFor(record, stage = record.payload.stage) {
 }
 
 export class CompanionReducer {
-  constructor({ includeSubagents = false } = {}) {
+  constructor({ includeSubagents = false, maxSessions = 256 } = {}) {
     this.includeSubagents = includeSubagents
     this.sessions = new Map()
+    this.maxSessions = maxSessions
     this.clock = 0
     this.selectedSessionId = undefined
     this.outputSignature = undefined
@@ -136,6 +172,7 @@ export class CompanionReducer {
         record.turnActive = true
         record.openTools.clear()
         record.waitingCallId = undefined
+        record.waitingApprovalId = undefined
         record.task = undefined
         record.progress = undefined
         this.#update(record, CompanionState.THINKING, {
@@ -194,6 +231,22 @@ export class CompanionReducer {
       case 'turn/end':
         return this.#turnEnd(record, event)
 
+      case 'approval/asked': {
+        const id = String(event.data?.id ?? '')
+        const toolName = String(event.data?.toolName ?? 'approval')
+        record.waitingApprovalId = id
+        this.#update(record, CompanionState.WAITING, {
+          phase: 'approval',
+          stage: '等待审批',
+          toolName,
+          message: statusCopy('approval', event.seq),
+        })
+        return this.#render()
+      }
+
+      case 'approval/decided':
+        return this.#approvalDecided(record, event)
+
       default:
         return []
     }
@@ -217,6 +270,14 @@ export class CompanionReducer {
     if (!record.waitingCallId) return []
     record.openTools.delete(record.waitingCallId)
     record.waitingCallId = undefined
+    return this.#resumeAfterTool(record, event)
+  }
+
+
+  #approvalDecided(record, event) {
+    const id = String(event.data?.id ?? '')
+    if (!record.waitingApprovalId || id !== record.waitingApprovalId) return []
+    record.waitingApprovalId = undefined
     return this.#resumeAfterTool(record, event)
   }
 
@@ -291,6 +352,7 @@ export class CompanionReducer {
     record.turnActive = false
     record.openTools.clear()
     record.waitingCallId = undefined
+    record.waitingApprovalId = undefined
     const kind = String(event.data?.reason?.kind ?? 'completed')
 
     if (kind === 'blocked') {
@@ -358,6 +420,7 @@ export class CompanionReducer {
       turnActive: false,
       openTools: new Map(),
       waitingCallId: undefined,
+      waitingApprovalId: undefined,
       task: undefined,
       progress: undefined,
       project: undefined,
@@ -366,7 +429,21 @@ export class CompanionReducer {
       updatedAt: ++this.clock,
     }
     this.sessions.set(sessionId, record)
+    // DSH normally disposes sessions, but never rely on it: cap the map so a
+    // host that stops emitting `session/disposed` cannot leak memory forever.
+    // The freshly-inserted record is still IDLE at this point, so keep it and
+    // evict the oldest existing idle record (or the oldest overall).
+    if (this.sessions.size > this.maxSessions && this.maxSessions > 0) this.#evictSessions(record)
     return record
+  }
+
+  #evictSessions(keep) {
+    const records = [...this.sessions.values()].filter((record) => record !== keep)
+    const idle = records
+      .filter((record) => record.state === CompanionState.IDLE)
+      .sort((left, right) => left.updatedAt - right.updatedAt)
+    const victim = idle[0] ?? records.sort((left, right) => left.updatedAt - right.updatedAt)[0]
+    if (victim) this.sessions.delete(victim.id)
   }
 
   #update(record, state, payload) {

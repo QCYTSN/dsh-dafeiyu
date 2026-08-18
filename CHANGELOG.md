@@ -1,5 +1,98 @@
 # Changelog
 
+## 0.1.0
+
+Promoted to stable. Same hardened build that shipped as 0.1.0-alpha.15, now the default
+`latest` npm version so plain `dsh plugin add dsh-dafeiyu` installs a DSH rc.7-compatible
+release instead of the stale 0.1.0-alpha.6.
+
+## 0.1.0-alpha.15
+
+Fault isolation and robustness hardening so the pet can never take down
+other plugins or the whole DSH host.
+
+### Fixed
+
+- Host-side `session/event` and `session/disposed` listeners are now exception-isolated,
+  so a single bad event from DSH can no longer throw into the shared bus and stop every
+  other subscriber (which previously could present as "installing the pet broke other
+  plugins")
+- The bundled web client registers its settings card inside a fault-isolated guard: if DSH
+  changes the slot contract again, only the BigFish card is lost instead of the whole WebUI
+  failing to load
+- Helper pipe errors (EPIPE) are now swallowed on stdin/stdout/stderr so a dead helper can
+  never crash the DSH host process with an unhandled `error` event
+- The bounded-restart guard now also covers helpers that spawn successfully but die before
+  sending `READY`, instead of only missing/broken binaries (no more unbounded restart loops)
+- README download links point at `/releases` instead of `/releases/latest`, which returned
+  404 while every published release is a pre-release
+
+### Release engineering
+
+- Added GitHub Actions trusted publishing: the Windows Helper is built and smoke-tested on Windows,
+  while npm publishing uses short-lived OIDC credentials instead of local npm login state
+- Added retry-safe npm archive verification and automatic GitHub Release attachment publishing
+
+## 0.1.0-alpha.13
+
+
+
+Bug fixes and DSH rc.7 compatibility hardening.
+
+
+
+### Fixed
+
+
+
+- Helper now clears a failed spawn and schedules a restart, so a missing/broken Helper no longer leaves the plugin wedged
+
+- Added `approval/asked` / `approval/decided` handling so permission approvals show a “等待审批” desktop prompt instead of staying on “工作中”
+
+- `pluginVersion` now reads from `package.json` instead of a stale hardcoded version
+
+- README current-version badges updated
+
+- Added a regression test that actually exercises the DSH rc.7 keyed slot registration
+
+
+
+## 0.1.0-alpha.14
+
+
+
+Reliability hardening.
+
+
+
+### Fixed
+
+
+
+- Helper start failures are now bounded: after `maxStartFailures` (default 5) consecutive failed spawns the plugin stops retrying instead of looping forever, protecting DSH and logs from a missing/broken Helper
+
+- Added regression coverage for the bounded retry behavior
+
+
+
+## 0.1.0-alpha.12
+
+
+
+Loader compatibility fix.
+
+
+
+### Fixed
+
+
+
+- Updated `cordis.patch.yml` to include the current plugin config fields (`bubbleScale`, `bubbleMode`, `bubbleStates`), reducing the chance of `failed to apply loader entry` after DSH Harness updates
+
+- Added the required `key: 'dsh-dafeiyu'` when registering the `settings.plugin.item` slot, fixing DSH rc.7 `requires options.key` loader failures
+
+
+
 ## 0.1.0-alpha.11
 
 

@@ -6,7 +6,7 @@
 
 Enabled by DSH, owned by the DSH lifecycle, rendered on the desktop.
 
-[中文](README.md) · [npm](https://www.npmjs.com/package/dsh-dafeiyu) · [Latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) · [Changelog](CHANGELOG.md) · [Update and rollback](docs/UPDATING.md) · [Acceptance notes](docs/ACCEPTANCE.md)
+[中文](README.md) · [npm](https://www.npmjs.com/package/dsh-dafeiyu) · [Latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases) · [Changelog](CHANGELOG.md) · [Update and rollback](docs/UPDATING.md) · [Acceptance notes](docs/ACCEPTANCE.md)
 
 </div>
 
@@ -17,7 +17,7 @@ stops its native Helper, and provides the Agent events that drive it. The transp
 frameless companion stays above other Windows apps, so you can see whether DSH is thinking,
 editing, testing, waiting, or finished while working in VS Code, a browser, or File Explorer.
 
-> Current version: `0.1.0-alpha.10` · Windows / WSL2 Alpha
+> Current version: `0.1.0` · Windows / WSL2 Alpha
 
 ## What is it for?
 
@@ -74,7 +74,7 @@ When multiple tasks are active, the status bubble lists them at the same time.
 - Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
-- `dsh-dafeiyu@alpha` from npm, or a `.tgz` archive from GitHub Releases
+- the stable `dsh-dafeiyu` from npm (or `dsh-dafeiyu@alpha` to try prereleases early), or a `.tgz` archive from GitHub Releases
 
 Regular users do **not** need Python or PySide6 and should not launch
 `dsh-dafeiyu-helper.exe` manually. The Windows Helper is bundled in the release archive.
@@ -96,17 +96,20 @@ Open PowerShell in your DSH installation directory, for example:
 cd D:\DSH
 ```
 
-Install the current Alpha from npm:
+Install the current stable release from npm:
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
 ```
 
 If `dsh` is already available globally, the command is simply:
 
 ```powershell
-dsh plugin --profile web add dsh-dafeiyu@alpha
+dsh plugin --profile web add dsh-dafeiyu
 ```
+
+To try new features before they are stable, install from the `@alpha` tag instead:
+`pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha`.
 
 When DSH runs inside WSL2, run the same install command in the WSL terminal. The plugin
 launches the bundled Windows Helper through `cmd.exe`; no manual `chmod`, Python, or
@@ -115,7 +118,7 @@ not ordinary Linux, remote Linux, or containers.
 
 ### 3. GitHub Release fallback
 
-Open [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) and download:
+Open [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) and download:
 
 ```text
 dsh-dafeiyu-<version>.tgz
@@ -188,18 +191,20 @@ DSH persists these settings, so a normal plugin update does not require reconfig
 ## Update
 
 An installed plugin does **not** change when new commits appear on GitHub. After a new version
-is published, fully exit DSH and update the npm Alpha package:
+is published, fully exit DSH and update the npm stable package:
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web update dsh-dafeiyu@alpha
+pnpm exec dsh plugin --profile web update dsh-dafeiyu
 ```
 
-Running the install command again also resolves the newest version behind the `alpha` tag:
+Running the install command again also resolves the newest version behind the npm `latest` tag:
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
 ```
+
+Users who opted into `@alpha` can run the same commands with the package name `dsh-dafeiyu@alpha` instead.
 
 Users who installed from GitHub Releases can download the new `.tgz` and install it over the
 old version:
@@ -307,6 +312,7 @@ npm run build:helper:windows
 - [Compatibility spike](docs/PHASE0.md)
 - [Windows acceptance and performance](docs/ACCEPTANCE.md)
 - [Update, rollback, and uninstall](docs/UPDATING.md)
+- [Maintainer release workflow](docs/RELEASING.md)
 - [Character asset license](ASSET_LICENSE.md)
 
 Related project: [QCYTSN/ds-local-pet](https://github.com/QCYTSN/ds-local-pet) is the

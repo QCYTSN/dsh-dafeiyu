@@ -1,3 +1,4 @@
+import { createRequire } from 'node:module'
 import Schema from '@deepseek-ai/schemastery'
 import { CompanionReducer } from './companion-reducer.js'
 import { HelperProcess } from './helper-process.js'
@@ -7,8 +8,15 @@ import {
   createMessage,
 } from './protocol.js'
 
+const require = createRequire(import.meta.url)
+const pkg = require('../package.json')
+
 export const name = 'dsh-dafeiyu'
-export const inject = ['sessions']
+// The plugin's feature is built on session events, and mounting requires the
+// settings service (used to read live config). Keep the declared inject in
+// sync with those real hard dependencies instead of listing a service that
+// is never consumed directly.
+export const inject = ['sessions', 'settings']
 export const CONFIG_ENDPOINT = '/plugins/dsh-dafeiyu/config'
 export const Config = Schema.object({
   enabled: Schema.boolean().default(true).description('启用桌面大肥鱼'),
@@ -189,7 +197,7 @@ function mount(ctx, config = {}, eventCtx = ctx) {
     bridge.send(createMessage(CompanionMessageKind.HELLO, {
       state: CompanionState.IDLE,
       host: 'deepseek-harness',
-      pluginVersion: '0.1.0-alpha.7',
+      pluginVersion: pkg.version,
       message: 'BigFish connected to DSH',
     }))
     bridge.send(createMessage(CompanionMessageKind.STATE, {
@@ -207,13 +215,25 @@ function mount(ctx, config = {}, eventCtx = ctx) {
   // The companion intentionally observes every DSH session. Loader entries may
   // live inside a scoped composition, so use the unscoped root bus and dispose
   // the registrations explicitly with this plugin's lifecycle.
+  // Never let an exception from this optional companion escape into the shared
+  // session bus: a throw here could stop every other subscriber from seeing
+  // the event, which would look exactly like "installing the pet broke other
+  // plugins".
   const offEvent = eventCtx.on('session/event', (session, event) => {
     if (!bridge || !reducer) return
-    for (const message of reducer.handle(session, event)) bridge.send(message)
+    try {
+      for (const message of reducer.handle(session, event)) bridge.send(message)
+    } catch (error) {
+      logger.error?.('dsh-dafeiyu failed to handle session event', error)
+    }
   }, { global: true })
   const offDisposed = eventCtx.on('session/disposed', (session) => {
     if (!bridge || !reducer) return
-    for (const message of reducer.disposeSession(session)) bridge.send(message)
+    try {
+      for (const message of reducer.disposeSession(session)) bridge.send(message)
+    } catch (error) {
+      logger.error?.('dsh-dafeiyu failed to dispose session', error)
+    }
   }, { global: true })
 
   const unwatch = settings.watch((next) => {

@@ -9,6 +9,7 @@ import { CompanionMessageKind, CompanionState, createMessage } from '../src/prot
 
 const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'restart-helper.js')
 const closedFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'closed-helper.js')
+const crashBeforeReadyFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'crash-before-ready.js')
 
 async function waitFor(predicate, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs
@@ -67,6 +68,34 @@ test('unexpected helper exit restarts and replays the latest state snapshot', as
   await rm(directory, { recursive: true, force: true })
 })
 
+test('startup failure clears the failed process and gives up after the retry limit', async () => {
+  let failures = 0
+  const logger = {
+    debug() {},
+    info() {},
+    warn() {},
+    error() { failures += 1 },
+  }
+  const bridge = new HelperProcess({
+    command: 'dsh-dafeiyu-helper-does-not-exist',
+    headless: true,
+    heartbeatMs: 0,
+    restartDelayMs: 20,
+    maxStartFailures: 2,
+  }, logger)
+  bridge.start()
+  // The first spawn fails; the scheduler should retry once, then give up.
+  await waitFor(() => failures >= 2)
+  await waitFor(() => bridge.restartSuppressed === true)
+  await waitFor(() => bridge.child === undefined)
+
+  const failuresAfterGiveUp = failures
+  await new Promise((resolve) => setTimeout(resolve, 100))
+  assert.equal(failures, failuresAfterGiveUp)
+  assert.equal(bridge.child, undefined)
+  bridge.stop('startup-failure-test-complete')
+})
+
 test('explicit user close suppresses automatic restart until the next DSH boot', async () => {
   const logger = { debug() {}, info() {}, warn() {}, error() {} }
   const bridge = new HelperProcess({
@@ -86,4 +115,50 @@ test('explicit user close suppresses automatic restart until the next DSH boot',
   await new Promise((resolve) => setTimeout(resolve, 100))
   assert.equal(bridge.child, undefined)
   bridge.stop('closed-test-complete')
+})
+
+test('helper that spawns but crashes before READY is bounded by the retry limit', async () => {
+  const logger = { debug() {}, info() {}, warn() {}, error() {} }
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    args: [crashBeforeReadyFixture],
+    headless: false,
+    heartbeatMs: 0,
+    restartDelayMs: 15,
+    maxStartFailures: 3,
+  }, logger)
+  bridge.start()
+  // The process can spawn fine but never becomes ready; the restart must be
+  // bounded instead of looping forever.
+  await waitFor(() => bridge.restartSuppressed === true)
+  await waitFor(() => bridge.child === undefined)
+  await waitFor(() => bridge.startFailures >= 3)
+
+  const failuresAfterGiveUp = bridge.startFailures
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  assert.equal(bridge.startFailures, failuresAfterGiveUp)
+  assert.equal(bridge.child, undefined)
+  assert.equal(bridge.restartSuppressed, true)
+  bridge.stop('crash-before-ready-test-complete')
+})
+
+test('a launch that throws synchronously cannot crash the host and is bounded', async () => {
+  const logger = { debug() {}, info() {}, warn() {}, error() {} }
+  const bridge = new HelperProcess({
+    command: 123, // spawn() rejects this with a synchronous TypeError
+    headless: false,
+    heartbeatMs: 0,
+    restartDelayMs: 10,
+    maxStartFailures: 2,
+  }, logger)
+  assert.doesNotThrow(() => bridge.start())
+  await waitFor(() => bridge.restartSuppressed === true)
+  await waitFor(() => bridge.child === undefined)
+  await waitFor(() => bridge.startFailures >= 2)
+
+  const afterGiveUp = bridge.startFailures
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  assert.equal(bridge.startFailures, afterGiveUp)
+  assert.equal(bridge.child, undefined)
+  bridge.stop('launch-throw-test-complete')
 })

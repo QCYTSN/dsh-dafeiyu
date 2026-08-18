@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { CompanionReducer, toolActivity } from '../src/companion-reducer.js'
+import { CompanionReducer, isUserQuestionTool, toolActivity } from '../src/companion-reducer.js'
 import { CompanionMessageKind, CompanionState } from '../src/protocol.js'
 
 const session = { header: { id: 'session-main' } }
@@ -147,6 +147,29 @@ test('live subagent setting preserves top-level session state', () => {
   assert.equal(restored.task, '保留当前进度')
 })
 
+test('approval events show waiting and resume after the decision', () => {
+  const reducer = new CompanionReducer()
+  reducer.handle(session, event('turn/start', { turn: 1 }, 1))
+
+  const [asked] = reducer.handle(session, event('approval/asked', {
+    id: 'approval-1',
+    toolName: 'bash',
+  }, 2))
+  assert.equal(asked.state, CompanionState.WAITING)
+  assert.equal(asked.stage, '等待审批')
+
+  assert.deepEqual(reducer.handle(session, event('approval/decided', {
+    id: 'unrelated',
+    outcome: 'granted',
+  }, 3)), [])
+
+  const [resumed] = reducer.handle(session, event('approval/decided', {
+    id: 'approval-1',
+    outcome: 'granted',
+  }, 4))
+  assert.equal(resumed.state, CompanionState.THINKING)
+})
+
 test('tool categories keep renderer semantics independent from DSH tool names', () => {
   assert.equal(toolActivity('functions.search_files'), 'searching')
   assert.equal(toolActivity('apply_patch'), 'editing')
@@ -265,4 +288,33 @@ test('todo events preserve real project and progress context for the status card
   assert.equal(working.activity, 'editing')
   assert.equal(working.task, '重做桌面气泡')
   assert.match(working.detail, /dsh-dafeiyu/u)
+})
+
+test('user-question detection ignores ordinary tool names with broad words', () => {
+  // These used to be mistaken for "waiting for user" because of bare substring
+  // matches on review / allow / permission / approval.
+  for (const name of ['review_changes', 'code_review', 'allowlist_files', 'permission_scan', 'approval', 'approve', 'review_version', 'ask_llm', 'request_user_agent', 'get_client_context']) {
+    assert.equal(isUserQuestionTool(name), false, `expected ${name} not to be a user-question tool`)
+  }
+  // Real "ask the human" tools must still pause the pet.
+  for (const name of ['ask_user_question', 'request_user_input', 'ask_for_user_input', 'ask_user', 'require_approval', 'ask_for_approval', 'request_approval', 'ask_for_permission', 'request_permission', 'user_question', 'user_input', 'authorize', 'consent']) {
+    assert.equal(isUserQuestionTool(name), true, `expected ${name} to be a user-question tool`)
+  }
+})
+
+test('session records are bounded even if DSH never emits session/disposed', () => {
+  const reducer = new CompanionReducer({ maxSessions: 4 })
+  const sessions = []
+  for (let index = 0; index < 8; index += 1) {
+    const current = { header: { id: `session-${index}` } }
+    sessions.push(current)
+    reducer.handle(current, event('turn/start', { turn: 1 }, index + 1))
+    // Leave it working so the eviction must fall back to the oldest entry.
+    reducer.handle(current, event('tool/call', { callId: `work-${index}`, name: 'shell_command' }, index + 2))
+  }
+  assert.ok(reducer.sessions.size <= 4, `expected bounded sessions, got ${reducer.sessions.size}`)
+  // The two oldest records (0 and 1) should have been evicted first.
+  assert.equal(reducer.sessions.has('session-0'), false)
+  assert.equal(reducer.sessions.has('session-1'), false)
+  assert.equal(reducer.sessions.has('session-7'), true)
 })

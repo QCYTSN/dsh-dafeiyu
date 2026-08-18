@@ -1,0 +1,183 @@
+name: Publish package
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      dist_tag:
+        description: npm distribution tag
+        required: true
+        default: alpha
+        type: choice
+        options:
+          - alpha
+          - latest
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-windows-package:
+    name: Build and verify Windows package
+    runs-on: windows-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.21.0
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Helper build dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt pyinstaller
+
+      - name: Run JavaScript tests
+        run: npm test
+
+      - name: Run Python tests
+        run: python -m unittest discover -s runtime/tests -t .
+
+      - name: Build and smoke-test Windows Helper
+        shell: pwsh
+        run: |
+          $env:DSH_DAFEIYU_BUILD_PYTHON = (Get-Command python).Source
+          npm run build:helper:windows
+
+      - name: Create npm archive
+        run: npm pack
+
+      - name: Upload verified archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-package
+          path: dsh-dafeiyu-*.tgz
+          if-no-files-found: error
+          retention-days: 14
+
+  publish:
+    name: Publish with npm trusted publishing
+    needs: build-windows-package
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js for npm OIDC
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+
+      - name: Download verified Windows package
+        uses: actions/download-artifact@v4
+        with:
+          name: npm-package
+          path: dist
+
+      - name: Validate release identity
+        id: release
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REQUESTED_DIST_TAG: ${{ inputs.dist_tag }}
+        run: |
+          set -euo pipefail
+
+          package_name=$(node -p "require('./package.json').name")
+          version=$(node -p "require('./package.json').version")
+          archive="dist/${package_name}-${version}.tgz"
+
+          if [[ ! -f "$archive" ]]; then
+            echo "Expected archive was not produced: $archive" >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "push" && "$REF_NAME" != "v${version}" ]]; then
+            echo "Git tag $REF_NAME does not match package version v${version}." >&2
+            exit 1
+          fi
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            dist_tag="$REQUESTED_DIST_TAG"
+          elif [[ "$version" == *-* ]]; then
+            dist_tag="alpha"
+          else
+            dist_tag="latest"
+          fi
+
+          if [[ "$dist_tag" == "latest" && "$version" == *-* ]]; then
+            echo "A prerelease version cannot be published under the latest tag." >&2
+            exit 1
+          fi
+
+          local_integrity=$(node -e "const fs=require('fs');const crypto=require('crypto');const p=process.argv[1];console.log('sha512-'+crypto.createHash('sha512').update(fs.readFileSync(p)).digest('base64'))" "$archive")
+          remote_integrity=$(npm view "${package_name}@${version}" dist.integrity 2>/dev/null || true)
+
+          publish_needed=true
+          if [[ -n "$remote_integrity" ]]; then
+            if [[ "$remote_integrity" != "$local_integrity" ]]; then
+              echo "npm already contains ${package_name}@${version}, but its archive differs from this build." >&2
+              exit 1
+            fi
+            publish_needed=false
+            echo "The identical npm archive is already published; continuing with the GitHub Release step."
+          fi
+
+          echo "package_name=$package_name" >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          echo "dist_tag=$dist_tag" >> "$GITHUB_OUTPUT"
+          echo "publish_needed=$publish_needed" >> "$GITHUB_OUTPUT"
+
+      - name: Publish package to npm
+        if: steps.release.outputs.publish_needed == 'true'
+        run: npm publish "./${{ steps.release.outputs.archive }}" --tag "${{ steps.release.outputs.dist_tag }}" --access public
+
+      - name: Create or update GitHub Release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.release.outputs.version }}
+          ARCHIVE: ./${{ steps.release.outputs.archive }}
+        run: |
+          set -euo pipefail
+          release_tag="v${VERSION}"
+
+          if gh release view "$release_tag" >/dev/null 2>&1; then
+            gh release upload "$release_tag" "$ARCHIVE" --clobber
+          else
+            release_flags=()
+            if [[ "$VERSION" == *-* ]]; then
+              release_flags+=(--prerelease)
+            fi
+            gh release create "$release_tag" "$ARCHIVE" \
+              --target "$GITHUB_SHA" \
+              --title "DSH BigFish ${release_tag}" \
+              --generate-notes \
+              "${release_flags[@]}"
+          fi

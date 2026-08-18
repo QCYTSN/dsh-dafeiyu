@@ -4,7 +4,12 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createRequire } from 'node:module'
 import test from 'node:test'
-import { apply } from '../src/index.js'
+import { apply, inject } from '../src/index.js'
+
+test('plugin declares the service dependencies it actually consumes', () => {
+  assert.ok(inject.includes('settings'), 'settings is a real hard dependency for live config')
+  assert.ok(inject.includes('sessions'), 'sessions events drive the whole companion feature')
+})
 
 test('package metadata exposes the DSH web client bundle', () => {
   const require = createRequire(import.meta.url)

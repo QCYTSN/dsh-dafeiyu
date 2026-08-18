@@ -95,6 +95,7 @@ export class HelperProcess {
     this.hasEverSpawned = false
     this.stopping = false
     this.restartSuppressed = false
+    this.startFailures = 0
     this.restartTimer = undefined
     this.heartbeatTimer = undefined
     this.startupTimer = undefined
@@ -103,27 +104,46 @@ export class HelperProcess {
 
   start() {
     if (this.child || this.stopping || this.restartSuppressed) return this.child
-    const headless = this.options.headless ?? process.env.DSH_DAFEIYU_HEADLESS === '1'
-    const helperPath = this.options.helperPath || defaultHelperPath
-    const launch = this.options.command
-      ? { command: this.options.command, args: defaultArgs(this.options.command, helperPath) }
-      : defaultLaunch(headless)
-    const command = launch.command
-    const args = this.options.args || launch.args
-    const extraArgs = []
-    const eventLog = this.options.eventLog || process.env.DSH_DAFEIYU_EVENT_LOG
-    const snapshot = this.options.snapshot || process.env.DSH_DAFEIYU_SNAPSHOT
-    if (headless) extraArgs.push('--headless')
-    if (eventLog) extraArgs.push('--event-log', eventLog)
-    if (snapshot) extraArgs.push('--snapshot', snapshot)
+    // Resolving the launch command can throw synchronously (e.g. WSL interop
+    // probing). Never let that escape: it would crash the host when it happens
+    // inside the restart timer. Treat it like any other start failure instead.
+    let child
+    try {
+      const headless = this.options.headless ?? process.env.DSH_DAFEIYU_HEADLESS === '1'
+      const helperPath = this.options.helperPath || defaultHelperPath
+      const launch = this.options.command
+        ? { command: this.options.command, args: defaultArgs(this.options.command, helperPath) }
+        : defaultLaunch(headless)
+      const command = launch.command
+      const args = this.options.args || launch.args
+      const extraArgs = []
+      const eventLog = this.options.eventLog || process.env.DSH_DAFEIYU_EVENT_LOG
+      const snapshot = this.options.snapshot || process.env.DSH_DAFEIYU_SNAPSHOT
+      if (headless) extraArgs.push('--headless')
+      if (eventLog) extraArgs.push('--event-log', eventLog)
+      if (snapshot) extraArgs.push('--snapshot', snapshot)
 
-    const child = spawn(command, [...args, ...extraArgs], {
-      cwd: this.options.cwd || resolve(here, '..'),
-      env: { ...process.env, ...this.options.env },
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
-    })
+      child = spawn(command, [...args, ...extraArgs], {
+        cwd: this.options.cwd || resolve(here, '..'),
+        env: { ...process.env, ...this.options.env },
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+      })
+    } catch (error) {
+      this.child = undefined
+      this.spawned = false
+      this.logger.error?.(`dsh-dafeiyu helper failed to start: ${error.message}`)
+      if (!this.stopping && !this.restartSuppressed) {
+        this.#countStartFailure(`launch error: ${error.message}`)
+      }
+      return undefined
+    }
     this.child = child
+    // A broken pipe on any child channel must never crash the DSH host.
+    // EPIPE on stdin is expected after the helper dies before we flush.
+    child.stdin.on('error', () => {})
+    child.stdout.on('error', () => {})
+    child.stderr.on('error', () => {})
     child.once('spawn', () => {
       const startupTimeoutMs = this.options.startupTimeoutMs ?? 60000
       this.startupTimer = setTimeout(() => {
@@ -136,14 +156,30 @@ export class HelperProcess {
     })
     child.once('error', (error) => {
       this.logger.error?.(`dsh-dafeiyu helper failed to start: ${error.message}`)
-    })
-    child.once('exit', (code, signal) => {
       if (this.child !== child) return
       this.child = undefined
       this.spawned = false
       this.#clearHeartbeat()
       this.#clearStartupTimer()
       if (!this.stopping && !this.restartSuppressed) {
+        this.#countStartFailure(`spawn error: ${error.message}`)
+      }
+    })
+    child.once('exit', (code, signal) => {
+      if (this.child !== child) return
+      this.child = undefined
+      const wasReady = this.spawned
+      this.spawned = false
+      this.#clearHeartbeat()
+      this.#clearStartupTimer()
+      if (!this.stopping && !this.restartSuppressed) {
+        if (!wasReady) {
+          // The helper never became ready during this attempt (crashed before
+          // READY or timed out). Count it as a failed start so a broken
+          // helper cannot restart forever.
+          this.#countStartFailure(`exited before ready (code=${String(code)}, signal=${String(signal)})`)
+          return
+        }
         this.logger.warn?.(`dsh-dafeiyu helper exited (code=${String(code)}, signal=${String(signal)}); restarting`)
         this.#scheduleRestart()
       }
@@ -217,6 +253,7 @@ export class HelperProcess {
         const firstSpawn = !this.hasEverSpawned
         this.hasEverSpawned = true
         this.spawned = true
+        this.startFailures = 0
         this.lastPongAt = Date.now()
         this.#clearStartupTimer()
         if (firstSpawn) this.#flushQueue()
@@ -267,6 +304,18 @@ export class HelperProcess {
   #clearStartupTimer() {
     if (this.startupTimer) clearTimeout(this.startupTimer)
     this.startupTimer = undefined
+  }
+
+  #countStartFailure(reason) {
+    this.startFailures += 1
+    const maxFailures = this.options.maxStartFailures ?? 5
+    if (this.startFailures >= maxFailures) {
+      this.restartSuppressed = true
+      this.logger.error?.(`dsh-dafeiyu helper failed to start ${this.startFailures} times; giving up (${reason})`)
+      return
+    }
+    this.logger.warn?.(`dsh-dafeiyu helper failed to start; scheduling restart (${this.startFailures}/${maxFailures}) (${reason})`)
+    this.#scheduleRestart()
   }
 
   #scheduleRestart() {
