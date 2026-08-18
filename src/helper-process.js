@@ -196,7 +196,7 @@ export class HelperProcess {
     const line = encodeMessage(message)
     if (!this.child || !this.spawned || !this.child.stdin.writable || this.child.stdin.destroyed) {
       if (!this.hasEverSpawned
-        || ![CompanionMessageKind.HELLO, CompanionMessageKind.STATE, CompanionMessageKind.TASK, CompanionMessageKind.TASKS, CompanionMessageKind.PULSE, CompanionMessageKind.CONFIG].includes(message.kind)) {
+        || ![CompanionMessageKind.HELLO, CompanionMessageKind.STATE, CompanionMessageKind.TASK, CompanionMessageKind.TASKS, CompanionMessageKind.PULSE, CompanionMessageKind.CONFIG, CompanionMessageKind.QUESTION].includes(message.kind)) {
         this.queue.push(line)
       }
       return
@@ -228,6 +228,7 @@ export class HelperProcess {
     if (message.kind === CompanionMessageKind.TASK) this.snapshot.set('task', encodeMessage(message))
     if (message.kind === CompanionMessageKind.TASKS) this.snapshot.set('tasks', encodeMessage(message))
     if (message.kind === CompanionMessageKind.CONFIG) this.snapshot.set('config', encodeMessage(message))
+    if (message.kind === CompanionMessageKind.QUESTION) this.snapshot.set('question', encodeMessage(message))
   }
 
   #flushSnapshot() {

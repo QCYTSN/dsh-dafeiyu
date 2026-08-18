@@ -28,6 +28,21 @@ function toolActivity(name) {
   return 'using-tool'
 }
 
+function isQuestionTool(name) {
+  return String(name || '').toLowerCase() === 'ask_user_question'
+}
+
+function questionTextOf(event) {
+  const raw = event?.data?.arguments
+  if (typeof raw !== 'string') return undefined
+  try {
+    const args = JSON.parse(raw)
+    const questions = Array.isArray(args?.questions) ? args.questions : []
+    const texts = questions.map((item) => String(item?.question ?? '')).filter(Boolean)
+    return texts.length > 0 ? texts.join(' / ') : undefined
+  } catch { return undefined }
+}
+
 function toolCallIdOf(event, fallback = '') {
   const content = event?.data?.message?.content
   const contentCallId = Array.isArray(content)
@@ -197,6 +212,7 @@ export class CompanionReducer {
       case 'tool/call': {
         const callId = toolCallIdOf(event, `seq-${String(event.seq ?? 'unknown')}`)
         const name = String(event.data?.name ?? event.data?.message?.name ?? 'tool')
+        const firstToolOfBurst = record.openTools.size === 0
         record.openTools.set(callId, name)
         if (isUserQuestionTool(name)) {
           record.waitingCallId = callId
@@ -206,6 +222,18 @@ export class CompanionReducer {
             toolName: name,
             message: statusCopy('waiting', event.seq),
           })
+          const rendered = this.#render()
+          return [...rendered, createMessage(CompanionMessageKind.QUESTION, {
+            sessionId: record.id,
+            sourceSeq: event.seq,
+            state: 'asked',
+            question: questionTextOf(event),
+          })]
+        }
+        // Hold the current working pose for the whole tool burst: restarting
+        // the animation clip on every tool switch made the pet flicker between
+        // walking/searching/typing poses dozens of times per turn.
+        if (record.state === CompanionState.WORKING && !firstToolOfBurst) {
           return this.#render()
         }
         const activity = toolActivity(name)
@@ -216,7 +244,11 @@ export class CompanionReducer {
           toolName: name,
           message: activityCopy(activity, event.seq),
         })
-        return this.#render()
+        const rendered = this.#render()
+        if (!isQuestionTool(name)) return rendered
+        return [...rendered, createMessage(CompanionMessageKind.QUESTION, {
+          sessionId: record.id, sourceSeq: event.seq, state: 'asked', question: questionTextOf(event),
+        })]
       }
 
       case 'tool/result':
@@ -261,16 +293,18 @@ export class CompanionReducer {
 
   #toolResult(record, event) {
     const callId = toolCallIdOf(event)
+    const finishedName = callId ? record.openTools.get(callId) : undefined
     if (callId) record.openTools.delete(callId)
     if (callId && callId === record.waitingCallId) record.waitingCallId = undefined
-    return this.#resumeAfterTool(record, event)
+    return this.#resumeAfterTool(record, event, finishedName)
   }
 
   #userMessage(record, event) {
     if (!record.waitingCallId) return []
+    const finishedName = record.openTools.get(record.waitingCallId)
     record.openTools.delete(record.waitingCallId)
     record.waitingCallId = undefined
-    return this.#resumeAfterTool(record, event)
+    return this.#resumeAfterTool(record, event, finishedName)
   }
 
 
@@ -281,25 +315,35 @@ export class CompanionReducer {
     return this.#resumeAfterTool(record, event)
   }
 
-  #resumeAfterTool(record, event) {
+  #resumeAfterTool(record, event, finishedName) {
     if (record.waitingCallId && record.openTools.has(record.waitingCallId)) {
       return this.#render()
     }
     const next = record.openTools.size > 0 ? CompanionState.WORKING : CompanionState.THINKING
+    // While tools remain open, keep the activity (and therefore the animation
+    // clip) from before the result instead of re-deriving it from whichever
+    // tool happens to be next: re-deriving flipped the pose on every result.
+    const nextActivity = next === CompanionState.WORKING
+      ? (record.payload.activity ?? toolActivity(record.openTools.values().next().value))
+      : undefined
     const nextPayload = {
       phase: 'tool-result',
-      activity: next === CompanionState.WORKING
-        ? toolActivity(record.openTools.values().next().value)
-        : undefined,
+      activity: nextActivity,
       stage: next === CompanionState.WORKING
-        ? activityStage(toolActivity(record.openTools.values().next().value))
+        ? activityStage(nextActivity)
         : '整理阶段',
       message: next === CompanionState.WORKING
-        ? activityCopy(toolActivity(record.openTools.values().next().value), event.seq)
+        ? activityCopy(nextActivity, event.seq)
         : statusCopy('result', event.seq),
     }
     this.#update(record, next, nextPayload)
-    if (!event.data?.error) return this.#render()
+    if (!event.data?.error) {
+      const rendered = this.#render()
+      if (!isQuestionTool(finishedName)) return rendered
+      return [...rendered, createMessage(CompanionMessageKind.QUESTION, {
+        sessionId: record.id, sourceSeq: event.seq, state: 'answered',
+      })]
+    }
 
     const selection = this.#select()
     if (selection.record.state === CompanionState.WAITING || selection.record.state === CompanionState.ERROR) {
