@@ -84,4 +84,4 @@ https://github.com/1190fasheqi/dafeiyu-pet/compare/2822f8f215e34f3177c00b1fb6c0d
 1. Phase 0：真实 DSH 事件桥、无端口 IPC、Helper 生命周期、诊断渲染器。
 2. Phase 1：迁移动作白名单与渲染状态机，加入持久状态循环、微动作层和减少动态。
 3. Phase 2：DSH 内插件设置页、启用/禁用、尺寸/位置、多 Session 自动选择与手动固定。
-4. Phase 3：Windows 预构建 Helper、安装/升级/回滚、崩溃恢复与签名发布。
+4. Phase 3：Windows / Linux 预构建 Helper、安装/升级/回滚、崩溃恢复与签名发布。

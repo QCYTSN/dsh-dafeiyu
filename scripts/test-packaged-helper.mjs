@@ -10,7 +10,12 @@ const argument = (name) => {
   return index >= 0 ? process.argv[index + 1] : undefined
 }
 const executable = resolve(argument('--executable')
-  ?? resolve(projectRoot, 'runtime/bin/win32-x64/dsh-dafeiyu-helper.exe'))
+  ?? resolve(
+    projectRoot,
+    process.platform === 'win32'
+      ? 'runtime/bin/win32-x64/dsh-dafeiyu-helper.exe'
+      : 'runtime/bin/linux-x64/dsh-dafeiyu-helper',
+  ))
 const snapshot = resolve(argument('--snapshot')
   ?? resolve(projectRoot, '.build/helper/packaged-visual-smoke.png'))
 const timeoutMs = Number(argument('--timeout-ms') ?? 15_000)

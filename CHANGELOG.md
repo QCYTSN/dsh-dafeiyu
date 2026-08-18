@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+### Added
+
+- Native Linux x64 Helper packaged with PyInstaller as `runtime/bin/linux-x64/dsh-dafeiyu-helper`
+- `npm run build:helper:linux` and a platform-dispatching `npm run build:helper`
+- Linux launch path in the plugin: use the bundled Linux Helper instead of requiring a system Python
+- Prefer X11/`xcb` on Wayland desktops that still provide `DISPLAY`, falling back to Wayland if `libxcb-cursor0` is missing
+- Cross-platform `npm run test:python` / Helper source scripts that prefer the project `venv`
+
+### Changed
+
+- Ordinary Linux is now a desktop display target; WSL2 still uses the Windows Helper through `cmd.exe`
+- Packaged-helper smoke tests pick the current platform binary by default
+
 ### Release engineering
 
 - Added GitHub Actions trusted publishing: the Windows Helper is built and smoke-tested on Windows,

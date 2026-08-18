@@ -2,7 +2,7 @@
 
 # DSH 大肥鱼 🐋
 
-**住在 Windows 桌面上、由 DeepSeek Harness 真实工作状态驱动的 Agent 伴侣。**
+**住在 Windows 或 Linux 桌面上、由 DeepSeek Harness 真实工作状态驱动的 Agent 伴侣。**
 
 入口属于 DSH，生命周期属于 DSH，显示层属于桌面。
 
@@ -16,11 +16,11 @@ DSH 大肥鱼不是一个需要单独启动的桌宠应用。它由 DSH 插件�
 一起启动和退出，并以透明、无边框、始终置顶的原生窗口显示在桌面上。即使切换到
 VS Code、浏览器或文件管理器，也能知道 DSH 当前在思考、修改、测试、等待还是已经完成。
 
-> 当前版本：`0.1.0-alpha.11` · Windows / WSL2 Alpha
+> 当前版本：`0.1.0-alpha.12` · Windows / WSL2 / Linux Alpha
 
 ## 它有什么用？
 
-- **离开 DSH 页面也能看到状态**：大肥鱼始终显示在 Windows 桌面最上层。
+- **离开 DSH 页面也能看到状态**：大肥鱼始终显示在桌面最上层。
 - **反馈来自真实 Agent 事件**：不会读取屏幕，也不会把你在其他软件里的操作误判为 DSH 工作。
 - **展示足够但不过量的信息**：项目名、当前阶段、正在进行的步骤和真实待办进度会显示在状态卡上。
 - **有生命力但不打扰**：思考、查找、修改、执行、验证、等待、完成和错误都有对应动作与自然文案。
@@ -70,13 +70,14 @@ stateDiagram-v2
 
 ## 系统要求
 
-- Windows 10/11 x64，或 WSL2（通过 Windows interop 运行桌面 Helper）
+- Windows 10/11 x64、WSL2（通过 Windows interop 运行桌面 Helper），或 Linux x64 桌面
+- Linux 桌面建议安装 `libxcb-cursor0`（Debian/Ubuntu），以便使用 X11 置顶窗口
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的 `dsh-dafeiyu@alpha`，或 GitHub Release 中的 `.tgz` 安装包
 
-普通用户**不需要**安装 Python、PySide6 或单独运行
-`dsh-dafeiyu-helper.exe`。Windows Helper 已经包含在发布包里。
+普通用户**不需要**安装 Python、PySide6 或单独运行 Helper。Windows 与 Linux
+Helper 已经包含在对应平台的发布包里。
 
 当前 Alpha 版的设置与桌面状态文案使用简体中文。
 
@@ -94,6 +95,12 @@ stateDiagram-v2
 cd D:\DSH
 ```
 
+Linux 桌面则进入对应目录：
+
+```bash
+cd ~/dsh
+```
+
 然后从 npm 安装当前 Alpha：
 
 ```powershell
@@ -108,8 +115,12 @@ dsh plugin --profile web add dsh-dafeiyu@alpha
 
 如果 DSH 运行在 WSL2，请在 WSL 终端执行同一条安装命令。插件会自动通过
 `cmd.exe` 启动包内的 Windows Helper，不需要手动 `chmod`，也不需要在 WSL
-安装 Python 或 PySide6。当前支持范围是 Windows x64 上的 WSL2；普通 Linux、
-远程 Linux 和容器不是本版本的桌面显示目标。
+安装 Python 或 PySide6。
+
+如果 DSH 运行在普通 Linux 桌面（x64），请在终端进入 DSH 安装目录后执行同一条
+安装命令。插件会启动包内的 Linux Helper。需要可用的图形会话；Wayland 下会优先
+使用 XWayland（xcb），以便置顶和拖动。Debian/Ubuntu 建议安装 `libxcb-cursor0`。
+远程 Linux、无图形容器和 ARM 不是当前桌面显示目标。
 
 ### 3. GitHub Release 备用安装方式
 
@@ -277,20 +288,28 @@ DSH 后会恢复。若想永久关闭，请在 DSH 设置中取消“启用大�
 
 ## 开发与测试
 
-```powershell
+```bash
 pnpm install
 npm test
-py -3 -m unittest discover -s runtime/tests -t .
+npm run test:python
 ```
 
 开发时可以从源码运行 Helper，但正式用户不应手动启动它：
 
-```powershell
-py -3 -m pip install -r requirements.txt
-py -3 runtime\helper.py
+```bash
+python3 -m pip install -r requirements.txt
+python3 runtime/helper.py
 ```
 
-构建 Windows Helper：
+构建当前平台的 Helper：
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+export DSH_DAFEIYU_BUILD_PYTHON="$(pwd)/venv/bin/python"
+npm run build:helper
+```
+
+Windows 上也可以显式构建：
 
 ```powershell
 python -m pip install -r requirements.txt pyinstaller
@@ -298,12 +317,20 @@ $env:DSH_DAFEIYU_BUILD_PYTHON = (Get-Command python).Source
 npm run build:helper:windows
 ```
 
+Linux x64 桌面：
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+export DSH_DAFEIYU_BUILD_PYTHON="$(pwd)/venv/bin/python"
+npm run build:helper:linux
+```
+
 ## 更多文档
 
 - [产品范围与取舍](docs/PRODUCT_SCOPE.md)
 - [执行计划](docs/EXECUTION_PLAN.md)
 - [兼容性验证](docs/PHASE0.md)
-- [Windows 验收与性能记录](docs/ACCEPTANCE.md)
+- [Windows / Linux 验收与性能记录](docs/ACCEPTANCE.md)
 - [更新、回退与卸载](docs/UPDATING.md)
 - [维护者发布流程](docs/RELEASING.md)
 - [角色视觉资产许可](ASSET_LICENSE.md)

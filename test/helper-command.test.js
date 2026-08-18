@@ -3,6 +3,7 @@ import test from 'node:test'
 import { resolveHelperLaunch } from '../src/helper-process.js'
 
 const bundledPath = '/package/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe'
+const linuxBundledPath = '/package/runtime/bin/linux-x64/dsh-dafeiyu-helper'
 const helperPath = '/package/runtime/helper.py'
 
 function resolve(overrides = {}) {
@@ -10,6 +11,7 @@ function resolve(overrides = {}) {
     platform: 'linux',
     isWslEnv: false,
     bundledPath,
+    linuxBundledPath,
     helperPath,
     fileExists: () => true,
     windowsPath: () => 'C:\\package\\runtime\\bin\\win32-x64\\dsh-dafeiyu-helper.exe',
@@ -28,15 +30,21 @@ test('WSL visual mode uses cmd.exe so npm file modes cannot block the helper', (
   })
 })
 
-test('WSL headless mode stays on Linux Python for Linux event-log paths', () => {
+test('WSL headless mode uses the Linux helper so event-log paths stay on Linux', () => {
   assert.deepEqual(resolve({ isWslEnv: true, headless: true }), {
-    command: 'python3',
-    args: [helperPath],
+    command: linuxBundledPath,
+    args: [],
   })
 })
 
-test('ordinary Linux does not attempt Windows interop', () => {
-  assert.deepEqual(resolve(), { command: 'python3', args: [helperPath] })
+test('ordinary Linux launches the bundled linux helper', () => {
+  assert.deepEqual(resolve(), { command: linuxBundledPath, args: [] })
+})
+
+test('ordinary Linux does not attempt Windows interop when the linux helper is absent', () => {
+  assert.deepEqual(resolve({
+    fileExists: (path) => path !== linuxBundledPath,
+  }), { command: 'python3', args: [helperPath] })
 })
 
 test('missing bundled helper falls back to the configured Python', () => {

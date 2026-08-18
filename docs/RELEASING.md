@@ -1,7 +1,8 @@
 # Publishing releases
 
 The repository publishes the Windows package through GitHub Actions and npm trusted publishing.
-The Windows Helper is built and visually smoke-tested on a GitHub-hosted Windows runner. The exact
+Linux x64 Helper binaries can be built locally with `npm run build:helper:linux` and included via
+`runtime/bin/`. The Windows Helper is built and visually smoke-tested on a GitHub-hosted Windows runner. The exact
 resulting `.tgz` archive is then published from a GitHub-hosted Linux runner using short-lived OIDC
 credentials. No npm password or long-lived publish token is stored in GitHub, Windows, or WSL.
 

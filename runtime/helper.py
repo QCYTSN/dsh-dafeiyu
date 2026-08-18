@@ -38,6 +38,26 @@ def bundle_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def configure_qt_platform() -> None:
+    """Prefer X11 so the overlay can stay on top and be moved freely.
+
+    Native Wayland often ignores always-on-top hints and programmatic moves.
+    An explicit QT_QPA_PLATFORM value is left unchanged. xcb is tried first;
+    Wayland remains a fallback when libxcb-cursor is missing.
+    """
+    if sys.platform != "linux":
+        return
+    if os.environ.get("QT_QPA_PLATFORM"):
+        return
+    platforms: list[str] = []
+    if os.environ.get("DISPLAY"):
+        platforms.append("xcb")
+    if os.environ.get("WAYLAND_DISPLAY"):
+        platforms.append("wayland")
+    if platforms:
+        os.environ["QT_QPA_PLATFORM"] = ";".join(platforms)
+
+
 def configure_stdio() -> None:
     """Make the JSONL pipe UTF-8 regardless of the Windows console code page."""
     for stream, errors in ((sys.stdin, "strict"), (sys.stdout, "backslashreplace"), (sys.stderr, "backslashreplace")):
@@ -110,6 +130,7 @@ def run_headless(recorder: EventRecorder) -> int:
 
 
 def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> int:
+    configure_qt_platform()
     try:
         from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
         from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap

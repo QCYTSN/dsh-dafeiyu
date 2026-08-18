@@ -1,7 +1,7 @@
 # 插件更新与回退
 
 大肥鱼由 DSH 的 `web` profile 管理。Helper 不提供独立更新器，也不要手动替换
-`dsh-dafeiyu-helper.exe`。
+`dsh-dafeiyu-helper.exe` 或 `dsh-dafeiyu-helper`。
 
 ## 从 npm Alpha 更新
 
@@ -29,8 +29,14 @@ pnpm exec dsh plugin --profile web add "C:\下载目录\dsh-dafeiyu-<version>.tg
 ```
 
 `add` 会把 `web` profile 中原来的大肥鱼依赖替换为新安装包。重新启动 DSH 后，
-插件、设置卡和随包携带的 Windows Helper 会一起更新。用户设置由 DSH 保存，正常
+插件、设置卡和随包携带的 Helper 会一起更新。用户设置由 DSH 保存，正常
 更新不会要求重新配置。
+
+Linux 桌面可以使用同一条 `add` / `update` 命令，路径换成本机下载位置即可：
+
+```bash
+pnpm exec dsh plugin --profile web add ./dsh-dafeiyu-<version>.tgz
+```
 
 ## 回退
 

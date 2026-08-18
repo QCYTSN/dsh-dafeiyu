@@ -2,7 +2,7 @@
 
 # DSH BigFish 🐋
 
-**A desktop companion that lives on Windows and reacts to real DeepSeek Harness activity.**
+**A desktop companion that lives on Windows or Linux and reacts to real DeepSeek Harness activity.**
 
 Enabled by DSH, owned by the DSH lifecycle, rendered on the desktop.
 
@@ -14,14 +14,14 @@ Enabled by DSH, owned by the DSH lifecycle, rendered on the desktop.
 
 DSH BigFish is not a standalone desktop-pet application. DSH enables the plugin, starts and
 stops its native Helper, and provides the Agent events that drive it. The transparent,
-frameless companion stays above other Windows apps, so you can see whether DSH is thinking,
+frameless companion stays above other apps, so you can see whether DSH is thinking,
 editing, testing, waiting, or finished while working in VS Code, a browser, or File Explorer.
 
-> Current version: `0.1.0-alpha.11` · Windows / WSL2 Alpha
+> Current version: `0.1.0-alpha.12` · Windows / WSL2 / Linux Alpha
 
 ## What is it for?
 
-- **See DSH status away from the WebUI:** BigFish stays on top of the Windows desktop.
+- **See DSH status away from the WebUI:** BigFish stays on top of the desktop.
 - **React to real Agent events:** it does not inspect the screen or mistake activity in other apps for DSH work.
 - **Show useful, compact context:** the card can display the project, current phase, active step, and real todo progress.
 - **Feel alive without becoming noisy:** thinking, searching, editing, commands, testing, waiting, success, and errors have distinct motion and friendly copy.
@@ -71,13 +71,14 @@ When multiple tasks are active, the status bubble lists them at the same time.
 
 ## Requirements
 
-- Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
+- Windows 10/11 x64, WSL2 (runs the desktop Helper through Windows interop), or a Linux x64 desktop
+- Linux desktops should install `libxcb-cursor0` (Debian/Ubuntu) for X11 always-on-top windows
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - `dsh-dafeiyu@alpha` from npm, or a `.tgz` archive from GitHub Releases
 
-Regular users do **not** need Python or PySide6 and should not launch
-`dsh-dafeiyu-helper.exe` manually. The Windows Helper is bundled in the release archive.
+Regular users do **not** need Python or PySide6 and should not launch the Helper
+manually. The Windows and Linux Helpers are bundled in the corresponding release archive.
 
 The current Alpha build uses Simplified Chinese for the settings UI and desktop status copy.
 
@@ -96,6 +97,12 @@ Open PowerShell in your DSH installation directory, for example:
 cd D:\DSH
 ```
 
+On a Linux desktop, enter the corresponding directory:
+
+```bash
+cd ~/dsh
+```
+
 Install the current Alpha from npm:
 
 ```powershell
@@ -110,8 +117,13 @@ dsh plugin --profile web add dsh-dafeiyu@alpha
 
 When DSH runs inside WSL2, run the same install command in the WSL terminal. The plugin
 launches the bundled Windows Helper through `cmd.exe`; no manual `chmod`, Python, or
-PySide6 installation is required inside WSL. The current target is WSL2 on Windows x64,
-not ordinary Linux, remote Linux, or containers.
+PySide6 installation is required inside WSL.
+
+When DSH runs on an ordinary Linux x64 desktop, the plugin launches the bundled Linux
+Helper. A graphical session is required; on Wayland the helper prefers XWayland (`xcb`)
+so always-on-top and dragging keep working. Debian/Ubuntu desktops should install
+`libxcb-cursor0`. Remote Linux, headless containers, and ARM are not current desktop
+display targets.
 
 ### 3. GitHub Release fallback
 
@@ -279,20 +291,28 @@ DSH to bring it back. To disable it permanently, turn off “Enable BigFish” i
 
 ## Development and tests
 
-```powershell
+```bash
 pnpm install
 npm test
-py -3 -m unittest discover -s runtime/tests -t .
+npm run test:python
 ```
 
 Developers can run the source Helper directly, but regular users should not:
 
-```powershell
-py -3 -m pip install -r requirements.txt
-py -3 runtime\helper.py
+```bash
+python3 -m pip install -r requirements.txt
+python3 runtime/helper.py
 ```
 
-Build the Windows Helper:
+Build the Helper for the current platform:
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+export DSH_DAFEIYU_BUILD_PYTHON="$(pwd)/venv/bin/python"
+npm run build:helper
+```
+
+Windows can also build explicitly:
 
 ```powershell
 python -m pip install -r requirements.txt pyinstaller
@@ -300,12 +320,20 @@ $env:DSH_DAFEIYU_BUILD_PYTHON = (Get-Command python).Source
 npm run build:helper:windows
 ```
 
+Linux x64 desktop:
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+export DSH_DAFEIYU_BUILD_PYTHON="$(pwd)/venv/bin/python"
+npm run build:helper:linux
+```
+
 ## More documentation
 
 - [Product scope and trade-offs](docs/PRODUCT_SCOPE.md)
 - [Execution plan](docs/EXECUTION_PLAN.md)
 - [Compatibility spike](docs/PHASE0.md)
-- [Windows acceptance and performance](docs/ACCEPTANCE.md)
+- [Windows / Linux acceptance and performance](docs/ACCEPTANCE.md)
 - [Update, rollback, and uninstall](docs/UPDATING.md)
 - [Maintainer release workflow](docs/RELEASING.md)
 - [Character asset license](ASSET_LICENSE.md)

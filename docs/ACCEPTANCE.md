@@ -47,3 +47,13 @@ Date: 2026-08-14
   explicit `ready` handshake and allows 60 seconds before treating startup as failed.
 
 These measurements are a local alpha baseline, not a cross-machine performance guarantee.
+
+## Linux x64 packaging
+
+Date: 2026-08-18
+
+- Ubuntu Linux 6.17 x86_64, Node.js 24.5.0, Python 3.12.3, PySide6 6.11.1, PyInstaller 6.22.1
+- `npm run build:helper:linux` produces `runtime/bin/linux-x64/dsh-dafeiyu-helper`
+- Packaged visual smoke test completes a `ready` handshake and writes a snapshot without a system Python
+- Wayland sessions without `libxcb-cursor0` fall back from `xcb` to the Wayland Qt plugin; installing `libxcb-cursor0` is still recommended for always-on-top X11 behavior
+

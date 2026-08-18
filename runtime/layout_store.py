@@ -33,6 +33,9 @@ def default_layout_path() -> Path:
     local_app_data = os.environ.get("LOCALAPPDATA")
     if local_app_data:
         return Path(local_app_data) / "DSH" / "dsh-dafeiyu" / "layout.json"
+    xdg_config = os.environ.get("XDG_CONFIG_HOME")
+    if xdg_config:
+        return Path(xdg_config) / "dsh" / "dsh-dafeiyu" / "layout.json"
     return Path.home() / ".dsh" / "dsh-dafeiyu" / "layout.json"
 
 

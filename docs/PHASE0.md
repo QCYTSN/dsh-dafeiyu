@@ -55,4 +55,4 @@ text so this cannot silently regress.
 ## Remaining limitations
 
 - Waiting-for-approval uses the portable `turn/end: blocked` signal only.
-- The first release targets Windows; code signing and cross-platform package splitting are deferred.
+- The first release targeted Windows; Linux x64 desktop Helper packaging is now included. Code signing and further package splitting remain deferred.

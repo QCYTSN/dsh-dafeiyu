@@ -1,5 +1,5 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
+import { chmodSync, existsSync, readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -12,6 +12,7 @@ import {
 const here = dirname(fileURLToPath(import.meta.url))
 const defaultHelperPath = resolve(here, '..', 'runtime', 'helper.py')
 const bundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'dsh-dafeiyu-helper.exe')
+const linuxBundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'linux-x64', 'dsh-dafeiyu-helper')
 
 function isWsl() {
   if (process.platform !== 'linux') return false
@@ -26,8 +27,25 @@ function isWsl() {
   }
 }
 
+function isBundledHelperCommand(command) {
+  if (!command) return false
+  const base = String(command).replaceAll('\\', '/').split('/').pop()
+  return base === 'dsh-dafeiyu-helper' || base === 'dsh-dafeiyu-helper.exe'
+}
+
+function ensureExecutable(filePath) {
+  try {
+    chmodSync(filePath, 0o755)
+  } catch {
+    // Best-effort: npm packs created on Windows often lack the execute bit.
+  }
+}
+
 function shouldUseBundledHelper() {
-  return (process.platform === 'win32' || isWsl()) && existsSync(bundledHelperPath)
+  if (process.platform === 'win32') return existsSync(bundledHelperPath)
+  if (isWsl()) return existsSync(bundledHelperPath)
+  if (process.platform === 'linux') return existsSync(linuxBundledHelperPath)
+  return false
 }
 
 function toWindowsPath(path) {
@@ -38,6 +56,7 @@ function resolveHelperLaunch({
   platform,
   isWslEnv,
   bundledPath,
+  linuxBundledPath = linuxBundledHelperPath,
   helperPath,
   pythonEnv,
   headless = false,
@@ -57,6 +76,9 @@ function resolveHelperLaunch({
       args: ['/d', '/c', windowsPath(bundledPath)],
     }
   }
+  if (platform === 'linux' && linuxBundledPath && fileExists(linuxBundledPath)) {
+    return { command: linuxBundledPath, args: [] }
+  }
   const command = pythonEnv || (platform === 'win32' ? 'py' : 'python3')
   return { command, args: defaultArgs(command, helperPath) }
 }
@@ -66,6 +88,7 @@ function defaultLaunch(headless = false) {
     platform: process.platform,
     isWslEnv: isWsl(),
     bundledPath: bundledHelperPath,
+    linuxBundledPath: linuxBundledHelperPath,
     helperPath: defaultHelperPath,
     pythonEnv: process.env.DSH_DAFEIYU_PYTHON,
     headless,
@@ -77,7 +100,7 @@ function defaultCommand(headless = false) {
 }
 
 function defaultArgs(command, helperPath) {
-  if (command === bundledHelperPath) return []
+  if (isBundledHelperCommand(command)) return []
   if (process.platform === 'win32' && /(^|[\\/])py(?:\.exe)?$/i.test(command)) {
     return ['-3', helperPath]
   }
@@ -110,6 +133,9 @@ export class HelperProcess {
       : defaultLaunch(headless)
     const command = launch.command
     const args = this.options.args || launch.args
+    if (process.platform !== 'win32' && isBundledHelperCommand(command)) {
+      ensureExecutable(command)
+    }
     const extraArgs = []
     const eventLog = this.options.eventLog || process.env.DSH_DAFEIYU_EVENT_LOG
     const snapshot = this.options.snapshot || process.env.DSH_DAFEIYU_SNAPSHOT
@@ -286,10 +312,12 @@ export class HelperProcess {
 
 export {
   bundledHelperPath,
+  linuxBundledHelperPath,
   defaultHelperPath,
   defaultArgs,
   defaultCommand,
   defaultLaunch,
+  isBundledHelperCommand,
   isWsl,
   resolveHelperLaunch,
   shouldUseBundledHelper,
