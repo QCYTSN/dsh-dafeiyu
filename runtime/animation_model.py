@@ -25,7 +25,12 @@ def crossfade_duration(previous_clip: str, current_clip: str) -> float | None:
     """
     if previous_clip in NON_CROSSFADE_CLIPS or current_clip in NON_CROSSFADE_CLIPS:
         return None
-    return 0.10 if previous_clip != current_clip else 0.045
+    if previous_clip == current_clip:
+        # Crisp in-clip frame cuts: a fade between walk poses (~7.4 fps, 4
+        # frames) reads as smear/flicker on uneven timer ticks, not as
+        # smoothness. Cross-clip transitions keep the 0.10s fade.
+        return None
+    return 0.10
 
 
 @dataclass(frozen=True)
@@ -35,6 +40,7 @@ class Clip:
     frame_ms: int
     loop: bool
     motion: str | None = None
+    scale: float = 1.0
 
 
 class AnimationModel:
@@ -46,6 +52,7 @@ class AnimationModel:
                 frame_ms=int(value["frameMs"]),
                 loop=bool(value["loop"]),
                 motion=value.get("motion"),
+                scale=min(3.0, max(0.5, float(value.get("scale") or 1.0))),
             )
             for name, value in manifest["clips"].items()
         }
@@ -59,9 +66,11 @@ class AnimationModel:
         self.pulse_state: str | None = None
         self.pulse_deadline_ms: int | None = None
         self.pulse_clip_name: str | None = None
+        self.hold_overlay = False
         self.active_clip_name = self.base_clip_name
         self.frame_index = 0
         self.frame_elapsed_ms = 0
+        self.motion_phase = 0.0
 
     @property
     def active_clip(self) -> Clip:
@@ -124,6 +133,9 @@ class AnimationModel:
     def advance(self, elapsed_ms: int, now_ms: int) -> None:
         if elapsed_ms < 0:
             return
+        # Accumulate the procedural-motion phase from tick time instead of a
+        # wall clock, so a late paint can no longer teleport the bob/sway.
+        self.motion_phase += max(0, elapsed_ms) / 1000.0
         if self.pulse_deadline_ms is not None and now_ms >= self.pulse_deadline_ms:
             self.pulse_state = None
             self.pulse_deadline_ms = None
@@ -132,8 +144,8 @@ class AnimationModel:
                 self._activate(self.base_clip_name)
 
         clip = self.active_clip
-        if len(clip.frames) <= 1:
-            return
+        # Single-frame non-looping clips (sweep, question answer, work micro
+        # expressions) still need their frameMs deadline so overlays can end.
         self.frame_elapsed_ms += elapsed_ms
         while self.frame_elapsed_ms >= clip.frame_ms:
             self.frame_elapsed_ms -= clip.frame_ms
@@ -144,8 +156,12 @@ class AnimationModel:
                 self.frame_index = 0
                 continue
             if self.overlay_clip_name is not None:
-                self.overlay_clip_name = None
-                self._activate(self._underlay_clip_name())
+                if self.hold_overlay:
+                    self.frame_index = len(clip.frames) - 1
+                    self.frame_elapsed_ms = 0
+                else:
+                    self.overlay_clip_name = None
+                    self._activate(self._underlay_clip_name())
             else:
                 self.frame_index = len(clip.frames) - 1
             break
@@ -164,3 +180,4 @@ class AnimationModel:
         self.active_clip_name = clip_name
         self.frame_index = 0
         self.frame_elapsed_ms = 0
+        self.motion_phase = 0.0
