@@ -28,6 +28,16 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
+SEARCH_FRAME_MS = 800
+SEARCH_MICRO_CLIPS = ("searching_sigh", "searching_throw", "searching_got_it")
+SEARCH_DONE_PHASES = ("done_starry", "done_happy")
+SEARCH_GRACE_MS = 1200
+SEARCH_EXIT_MIN_MS = 2400
+WORKING_MICRO_CLIPS = ("working_confused", "working_delight", "working_idea", "working_sigh", "working_tired")
+# Avoid a hard computer/seat -> standing-thinking cut when DSH emits a
+# thinking event immediately after a tool result.
+WORKING_MIN_HOLD_MS = 2800
+QUESTION_ANSWER_MS = 2400
 
 
 def bundle_root() -> Path:
@@ -183,6 +193,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             else:
                 self.bubble_states = list(self.layout.get("bubbleStates", ["SUCCESS", "ERROR", "WAITING"]))
             self.model = AnimationModel(manifest)
+            self.asset_scale = int(manifest.get("assetScale", 1))
             self.pixmaps: dict[str, QPixmap] = {}
             for clip in self.model.clips.values():
                 for frame in clip.frames:
@@ -204,6 +215,31 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.overlay_deadline_ms: int | None = None
             self.task = ""
             self.tasks: list[dict[str, Any]] = []
+            self.drag_phase = "none"
+            self.release_start_ms = 0
+            self.landed_start_ms = 0
+            self.cry_start_ms = 0
+            self.leaving = False
+            self.search_phase = "none"
+            self.searching_active = False
+            self.search_phase_ms = 0
+            self.search_micro_next_ms = 0
+            self.search_queued = False
+            self.search_queued_ms = 0
+            self.search_queued_book_base = ""
+            self.search_started_ms = 0
+            self.idle_micro_end_ms = None
+            self.idle_micro_index = 0
+            self.work_phase = "none"
+            self.working_active = False
+            self.work_phase_ms = 0
+            self.work_started_ms = 0
+            self.work_exit_queued = False
+            self.work_micro_next_ms = 0
+            self.question_phase = "none"
+            self.question_phase_ms = 0
+            self.debug_log_path = self._debug_log_path()
+            self._last_animation_log = None
             self.webui_url = os.environ.get("DSH_DAFEIYU_WEBUI_URL", "http://127.0.0.1:3080/")
             self.shake_timer: QTimer | None = None
             self.shake_origin: QPoint | None = None
@@ -217,7 +253,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.fade_from_pixmap: QPixmap | None = None
             self.fade_started = 0.0
             self.fade_duration = 0.15
+            self.card_cache: QPixmap | None = None
+            self.card_cache_key: tuple | None = None
             self.animation_timer = QTimer(self)
+            # PreciseTimer avoids Windows timer coalescing (~15.6 ms system
+            # tick), which made the nominal 50 FPS actually run at irregular
+            # 15.6/31 ms intervals and stuttered multi-frame clips.
+            self.animation_timer.setTimerType(Qt.TimerType.PreciseTimer)
             self.animation_timer.timeout.connect(self._tick)
             self.animation_timer.start(40 if self.reduced_motion else 20)
             self.micro_timer = QTimer(self)
@@ -235,23 +277,31 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
             self._apply_window_size()
             QTimer.singleShot(0, self._restore_visible_position)
+            if "enter" in self.model.clips:
+                self.model.play_overlay("enter")
 
         def apply_message(self, message: dict[str, Any]) -> None:
             recorder.record(message)
             kind = message.get("kind")
+            if kind == "question":
+                self._apply_question(message)
+                self.update()
+                return
             if kind == "shutdown":
-                QApplication.quit()
+                if "leave" in self.model.clips and not self.leaving:
+                    self.leaving = True
+                    self.model.hold_overlay = True
+                    self.model.play_overlay("leave")
+                    clip = self.model.clips["leave"]
+                    QTimer.singleShot(len(clip.frames) * clip.frame_ms + 200, QApplication.quit)
+                else:
+                    QApplication.quit()
                 return
             previous_frame = self.model.frame
             previous_clip = self.model.active_clip_name
             if kind == "task":
                 self.task = str(message.get("task", ""))
-                self._show_status(
-                    str(message.get("message", self.task)),
-                    str(message.get("detail", "")),
-                    self.model.base_state,
-                    None if self.model.base_state in {"THINKING", "WORKING", "WAITING", "ERROR"} else 6000,
-                )
+                self._show_status(str(message.get("message", self.task)), str(message.get("detail", "")), self.model.base_state, None if self.model.base_state in {"THINKING", "WORKING", "WAITING", "ERROR"} else 6000)
             elif kind == "tasks":
                 raw_tasks = message.get("tasks")
                 self.tasks = raw_tasks if isinstance(raw_tasks, list) else []
@@ -264,38 +314,49 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 if kind == "pulse":
                     ttl_ms = max(250, int(message.get("ttlMs", 1800)))
                     resume_state = str(message.get("resumeState", self.model.base_state))
-                    self.model.apply_pulse(
-                        state,
-                        ttl_ms,
-                        self._now_ms(),
-                        resume_state,
-                        message.get("resumeActivity"),
-                    )
-                    self._show_status(
-                        str(message.get("resumeMessage", self.LABELS.get(resume_state, resume_state))),
-                        str(message.get("resumeDetail", "")),
-                        resume_state,
-                        None if resume_state in {"THINKING", "WORKING", "WAITING", "ERROR"} else ttl_ms + 2200,
-                    )
-                    self._show_overlay(
-                        str(message.get("message", self.LABELS.get(state, state))),
-                        str(message.get("detail", "")),
-                        state,
-                        ttl_ms,
-                    )
-                    if state in {"SUCCESS", "ERROR"}:
-                        self._notify_alert(state)
+                    searching_was_active = self.searching_active
+                    working_was_active = self.working_active and self.work_phase != "seat_out"
+                    if state == "SUCCESS" and (searching_was_active or self.search_phase in SEARCH_DONE_PHASES):
+                        if searching_was_active: self._finish_searching()
+                        ttl_ms += self._done_remaining_ms()
+                    if state == "SUCCESS" and working_was_active:
+                        self._finish_working()
+                        ttl_ms += self._work_remaining_ms()
+                    self.model.apply_pulse(state, ttl_ms, self._now_ms(), resume_state, message.get("resumeActivity"))
+                    if searching_was_active and state != "SUCCESS":
+                        self._cancel_searching(); self.model.clear_overlay()
+                    if working_was_active and state != "SUCCESS":
+                        self._cancel_working(); self.model.clear_overlay()
+                    self._show_status(str(message.get("resumeMessage", self.LABELS.get(resume_state, resume_state))), str(message.get("resumeDetail", "")), resume_state, None if resume_state in {"THINKING", "WORKING", "WAITING", "ERROR"} else ttl_ms + 2200)
+                    self._show_overlay(str(message.get("message", self.LABELS.get(state, state))), str(message.get("detail", "")), state, ttl_ms)
+                    if state in {"SUCCESS", "ERROR"}: self._notify_alert(state)
                 else:
                     activity = None if self.reduced_motion else message.get("activity")
+                    is_searching = activity == "searching"
+                    previous_base = self.model.base_clip_name
                     self.model.apply_state(state, activity)
-                    self._clear_overlay()
+                    if self.question_phase == "none":
+                        if state == "WORKING":
+                            if not self.working_active and self.work_phase != "seat_out": self._begin_working()
+                            if is_searching:
+                                if not self.searching_active and self.search_phase not in SEARCH_DONE_PHASES:
+                                    if self.working_active and self.work_phase in {"stay", "micro"} and self.model.overlay_clip_name is None:
+                                        self.search_queued = True; self.search_queued_ms = self._now_ms(); self.search_queued_book_base = previous_base; self.model.base_clip_name = previous_base; self.model._activate(previous_base)
+                                    else: self._begin_searching()
+                            elif self.searching_active:
+                                self._finish_searching()
+                            elif self.search_queued:
+                                self.search_queued = False; self.search_queued_ms = 0
+                        elif self.working_active:
+                            # Do not stand up immediately after a tool result:
+                            # hold the seated computer pose and let _tick start
+                            # the reverse transition after the minimum dwell.
+                            if state in {"THINKING", "IDLE", "DISCONNECTED"}:
+                                self.work_exit_queued = True
+                            else:
+                                self._finish_working()
                     persistent = state in {"THINKING", "WORKING", "WAITING", "ERROR"}
-                    self._show_status(
-                        str(message.get("message", self.LABELS.get(state, state))),
-                        str(message.get("detail", "")),
-                        state,
-                        None if persistent else 4200,
-                    )
+                    self._show_status(str(message.get("message", self.LABELS.get(state, state))), str(message.get("detail", "")), state, None if persistent else 4200)
             self._sync_frame_transition(previous_frame, previous_clip)
             self._sync_bubble_size()
             self.update()
@@ -332,9 +393,147 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self._sync_bubble_size()
             self._save_layout()
 
+        def _begin_searching(self) -> None:
+            """Enter the searching activity: book_ready -> book_reading."""
+            self.searching_active = True
+            self.search_phase = "ready"
+            self.model.play_overlay("searching_ready")
+            self.search_phase_ms = self._now_ms()
+            self.search_started_ms = self._now_ms()
+            self._log_animation("begin_searching")
+
+        def _finish_searching(self) -> None:
+            """Leave searching: starry_face -> book_happy；短查询直接回工作姿态。"""
+            self.searching_active = False
+            if self._now_ms() - self.search_started_ms < SEARCH_EXIT_MIN_MS:
+                # 短暂查询不播星眼/开心收尾，避免工作与查资料频繁快切
+                self.search_phase = "none"
+                self.search_micro_next_ms = 0
+                self.model.clear_overlay()
+                self._log_animation("cancel_searching")
+                return
+            self.search_phase = "done_starry"
+            self.model.play_overlay("searching_starry")
+            self.search_phase_ms = self._now_ms()
+            self._log_animation("finish_searching")
+
+        def _cancel_searching(self) -> None:
+            """Hard interrupt (drag) cancels the whole searching suite."""
+            self.searching_active = False
+            self.search_phase = "none"
+            self.search_micro_next_ms = 0
+            self.search_queued = False
+            self.search_queued_ms = 0
+            self._log_animation("cancel_searching")
+
+        def _begin_working(self) -> None:
+            """Enter working: seat entrance -> seated computer pose."""
+            self.working_active = True
+            self.work_exit_queued = False
+            self.work_started_ms = self._now_ms()
+            self.work_phase = "seat_in"
+            self.model.play_overlay("working_seat_in")
+            self._log_animation("begin_working")
+
+        def _finish_working(self, *, force: bool = False) -> None:
+            """Leave working with a minimum seated dwell and reverse transition."""
+            now_ms = self._now_ms()
+            if not force and now_ms - self.work_started_ms < WORKING_MIN_HOLD_MS:
+                self.work_exit_queued = True
+                self._log_animation("queue_working_exit")
+                return
+            self.work_exit_queued = False
+            if self.work_phase == "seat_in":
+                # Keep the entrance animation intact; _tick will begin the
+                # reverse sequence once it reaches the seated pose.
+                self.work_exit_queued = True
+                self._log_animation("defer_working_exit_until_seated")
+                return
+            if self.work_phase in {"seat_out", "none"}:
+                return
+            self.work_phase = "seat_out"
+            self.work_phase_ms = now_ms
+            self.model.play_overlay("working_seat_out")
+            self._log_animation("finish_working")
+
+        def _cancel_working(self) -> None:
+            """Hard interrupt (drag) cancels the working suite."""
+            self.working_active = False
+            self.work_phase = "none"
+            self.work_exit_queued = False
+            self.work_micro_next_ms = 0
+            self._log_animation("cancel_working")
+
+        def _work_remaining_ms(self) -> int:
+            if self.work_phase != "seat_out":
+                return 0
+            clip = self.model.clips["working_seat_out"]
+            total = len(clip.frames) * clip.frame_ms
+            elapsed = self._now_ms() - self.work_phase_ms
+            return max(0, total - elapsed)
+
+        def _apply_question(self, message: dict[str, Any]) -> None:
+            state = str(message.get("state", "asked"))
+            if state == "asked":
+                self._begin_question(str(message.get("question") or ""))
+            elif state == "answered":
+                self._finish_question()
+
+        def _begin_question(self, question: str) -> None:
+            """提问：打断进行中的进出场动画，播放 question 表情并保持到用户回答。"""
+            self._cancel_working()
+            self._cancel_searching()
+            self.question_phase = "asked"
+            self.question_phase_ms = self._now_ms()
+            self.model.play_overlay("question")
+            if question:
+                # 状态卡字幕显示实际提问的问题
+                self._show_status(question, "等你回答", self.display_state, None)
+            else:
+                self._show_status("问你一个问题", "请回答我", self.display_state, None)
+            self._log_animation("begin_question")
+
+        def _finish_question(self) -> None:
+            """回答：播放 answer 表情一段时间后回到底图。"""
+            self.question_phase = "answered"
+            self.question_phase_ms = self._now_ms()
+            self.model.play_overlay("answer")
+            self._log_animation("finish_question")
+
+        def _cancel_question(self) -> None:
+            """硬打断（拖拽）取消 question/answer 表情。"""
+            self.question_phase = "none"
+            self.question_phase_ms = 0
+            self._log_animation("cancel_question")
+
+        def _debug_log_path(self) -> Path:
+            override = os.environ.get("DSH_DAFEIYU_DEBUG_LOG")
+            return Path(override) if override else default_layout_path().parent / "debug-animation.log"
+
+        def _log_animation(self, event: str) -> None:
+            try:
+                key = (
+                    self.model.active_clip_name,
+                    self.model.frame,
+                    self.search_phase,
+                    self.work_phase,
+                    self.question_phase,
+                    self.model.base_clip_name,
+                    self.model.overlay_clip_name,
+                )
+                if key == getattr(self, "_last_animation_log", None):
+                    return
+                self._last_animation_log = key
+                self.debug_log_path.parent.mkdir(parents=True, exist_ok=True)
+                with self.debug_log_path.open("a", encoding="utf-8") as stream:
+                    stream.write(f"{self._now_ms()}ms {event} clip={key[0]} frame={key[1]} search={key[2]} work={key[3]} question={key[4]} base={key[5]} overlay={key[6]}\\n")
+            except OSError:
+                pass
+
         def _tick(self) -> None:
             now_ms = self._now_ms()
-            elapsed_ms = max(0, now_ms - self.last_tick_ms)
+            budget_ms = 2 * self.animation_timer.interval()
+            elapsed_ms = min(budget_ms, max(0, now_ms - self.last_tick_ms))
             self.last_tick_ms = now_ms
             had_pulse = self.model.pulse_state is not None
             previous_frame = self.model.frame
@@ -342,20 +541,79 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             model_elapsed = 0 if self.reduced_motion and self.model.active_clip.loop else elapsed_ms
             self.model.advance(model_elapsed, now_ms)
             self._sync_frame_transition(previous_frame, previous_clip)
-            if had_pulse and self.model.pulse_state is None:
-                self.display_state = self.model.base_state
-            if self.overlay_deadline_ms is not None and now_ms >= self.overlay_deadline_ms:
-                self._clear_overlay()
-            self.update()
+            if had_pulse and self.model.pulse_state is None: self.display_state = self.model.base_state
+            overlay_expired = self.overlay_deadline_ms is not None and now_ms >= self.overlay_deadline_ms
+            if overlay_expired: self._clear_overlay()
+            # Idle micro-actions have their own deadline. Do not rely only on
+            # AnimationModel's non-loop completion: sweep must always return
+            # to the standing idle base instead of remaining on screen.
+            if self.idle_micro_end_ms is not None:
+                if self.model.overlay_clip_name in {"blink", "glance", "sweep"} and now_ms >= self.idle_micro_end_ms:
+                    self.model.clear_overlay()
+                    self.idle_micro_end_ms = None
+                elif self.model.overlay_clip_name not in {"blink", "glance", "sweep"}:
+                    self.idle_micro_end_ms = None
+            if self.drag_phase == "release" and now_ms - self.release_start_ms >= 250:
+                self.drag_phase = "landed"; self.model.play_overlay("dragging_landed"); self._show_overlay("整理下衣领...", "", self.status_state, 1400); self.landed_start_ms = now_ms
+            elif self.drag_phase == "landed" and now_ms - self.landed_start_ms >= 1000:
+                self.drag_phase = "cry"; self.model.play_overlay("dragging_cry"); self._show_overlay("发型都乱了...", "", self.status_state, 1600); self.cry_start_ms = now_ms
+            elif self.drag_phase == "cry" and now_ms - self.cry_start_ms >= 1000:
+                self.model.clear_overlay(); self.drag_phase = "none"
+            if self.search_queued and now_ms - self.search_queued_ms >= SEARCH_GRACE_MS:
+                self.search_queued = False; self.model.base_clip_name = self.search_queued_book_base; self._begin_searching()
+            if self.search_phase == "ready" and now_ms - self.search_phase_ms >= SEARCH_FRAME_MS:
+                self.search_phase = "reading"; self.model.clear_overlay(); self.search_phase_ms = now_ms; self.search_micro_next_ms = now_ms + random.randint(3500, 8000)
+            elif self.search_phase == "reading" and now_ms >= self.search_micro_next_ms:
+                self.search_phase = "micro"; self.model.play_overlay(random.choice(SEARCH_MICRO_CLIPS)); self.search_phase_ms = now_ms
+            elif self.search_phase == "micro" and now_ms - self.search_phase_ms >= SEARCH_FRAME_MS:
+                self.search_phase = "reading"; self.model.clear_overlay(); self.search_phase_ms = now_ms; self.search_micro_next_ms = now_ms + random.randint(3500, 8000)
+            elif self.search_phase == "done_starry" and now_ms - self.search_phase_ms >= SEARCH_FRAME_MS:
+                self.search_phase = "done_happy"; self.model.play_overlay("searching_happy"); self.search_phase_ms = now_ms
+            elif self.search_phase == "done_happy" and now_ms - self.search_phase_ms >= SEARCH_FRAME_MS:
+                self.search_phase = "none"; self.model.clear_overlay()
+            if self.work_phase == "seat_in" and self.model.overlay_clip_name is None:
+                self.work_phase = "stay"
+                self.work_micro_next_ms = now_ms + random.randint(3500, 8000)
+                if self.work_exit_queued and now_ms - self.work_started_ms >= WORKING_MIN_HOLD_MS:
+                    self._finish_working()
+            elif self.work_phase == "stay" and self.work_exit_queued and now_ms - self.work_started_ms >= WORKING_MIN_HOLD_MS:
+                self._finish_working()
+            elif self.work_phase == "stay" and now_ms >= self.work_micro_next_ms and not self.searching_active and not self.search_queued:
+                self.work_phase = "micro"; self.model.play_overlay(random.choice(WORKING_MICRO_CLIPS)); self.work_phase_ms = now_ms
+            elif self.work_phase == "micro" and now_ms - self.work_phase_ms >= SEARCH_FRAME_MS:
+                self.work_phase = "stay"; self.model.clear_overlay(); self.work_phase_ms = now_ms; self.work_micro_next_ms = now_ms + random.randint(3500, 8000)
+            elif self.work_phase == "seat_out" and self.model.overlay_clip_name is None:
+                self.work_phase = "none"; self.working_active = False
+            if self.question_phase == "answered" and now_ms - self.question_phase_ms >= QUESTION_ANSWER_MS:
+                self.question_phase = "none"
+                if self.model.overlay_clip_name == "answer": self.model.clear_overlay()
+            if self.reduced_motion:
+                frame_changed = (previous_frame, previous_clip) != (self.model.frame, self.model.active_clip_name)
+                if frame_changed or self.fade_from_pixmap is not None or had_pulse or overlay_expired: self.update()
+            else:
+                self.update()
 
         def _play_idle_micro(self) -> None:
             if self.reduced_motion:
                 return
+            # Fixed idle rotation: blink -> glance -> sweep -> repeat.
+            # Every transient clip gets an explicit end time and returns to
+            # the standing idle base instead of leaving sweep on screen.
+            clips = ("blink", "glance", "sweep")
+            clip_name = clips[self.idle_micro_index % len(clips)]
+            self.idle_micro_index = (self.idle_micro_index + 1) % len(clips)
             previous_frame = self.model.frame
             previous_clip = self.model.active_clip_name
-            self.model.play_idle_micro(random.randrange(max(1, len(self.model.idle_micro_clips))))
-            self._sync_frame_transition(previous_frame, previous_clip)
-            self.update()
+            if self.model.base_state == "IDLE" and self.model.overlay_clip_name is None and self.model.play_overlay(clip_name):
+                clip = self.model.clips[clip_name]
+                duration = len(clip.frames) * clip.frame_ms if not clip.loop else clip.frame_ms
+                # Sweep is intentionally capped so one cleanup action cannot
+                # dominate the idle rotation.
+                if clip_name == "sweep":
+                    duration = min(duration, 1800)
+                self.idle_micro_end_ms = self._now_ms() + max(300, duration)
+                self._sync_frame_transition(previous_frame, previous_clip)
+                self.update()
             self._schedule_micro()
 
         def _sync_frame_transition(
@@ -393,28 +651,26 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             return True
 
         def _begin_drag(self) -> None:
-            if self.dragging:
-                return
+            if self.dragging: return
             self.dragging = True
-            self.animation_timer.stop()
-            self.micro_timer.stop()
-            self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+            self.drag_phase = "hold"
+            self.animation_timer.stop(); self.micro_timer.stop()
+            self._cancel_searching(); self._cancel_working(); self._cancel_question()
+            self._play_model_overlay("dragging_hold", allow_fade=False, repaint=False)
+            self._show_overlay("呀——！干什么啦！", "", self.status_state, 2600)
 
         def _finish_drag(self) -> None:
-            if not self.dragging:
-                return
+            if not self.dragging: return
             now_ms = self._now_ms()
-            previous_frame = self.model.frame
-            previous_clip = self.model.active_clip_name
-            # Expire an underlying pulse before revealing it after a long drag.
-            self.model.advance(0, now_ms)
-            self.model.clear_overlay()
+            previous_frame = self.model.frame; previous_clip = self.model.active_clip_name
+            self.model.advance(0, now_ms); self.drag_phase = "release"
+            self.model.play_overlay("dragging_release")
+            self._show_overlay("呜....", "", self.status_state, 1500)
+            self.release_start_ms = now_ms
             self._sync_frame_transition(previous_frame, previous_clip, allow_fade=False)
-            self.dragging = False
-            self.last_tick_ms = now_ms
+            self.dragging = False; self.last_tick_ms = now_ms
             self.animation_timer.start(40 if self.reduced_motion else 20)
-            if not self.reduced_motion:
-                self._schedule_micro()
+            if not self.reduced_motion: self._schedule_micro()
 
         def _schedule_micro(self) -> None:
             if self.reduced_motion:
@@ -753,6 +1009,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         def _shake_window(self) -> None:
             if self.shake_timer is None:
                 self.shake_timer = QTimer(self)
+                self.shake_timer.setTimerType(Qt.TimerType.PreciseTimer)
                 self.shake_timer.timeout.connect(self._shake_tick)
             self.shake_origin = self.pos()
             self.shake_count = 0
@@ -771,74 +1028,150 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.shake_timer.stop()
                 self.move(self.shake_origin)
 
+        def _draw_status_card(
+            self,
+            painter: QPainter,
+            card_x: int,
+            card_y: int,
+            card_width: int,
+            card_height: int,
+            s: float,
+            card: tuple[str, str, str],
+        ) -> None:
+            corner_radius = round(30 * s)
+            self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
+            title, detail, card_state = card
+            icon_center_x = card_x + card_width - round(39 * s)
+            icon_center_y = card_y + card_height // 2
+            painter.save()
+            painter.translate(icon_center_x, icon_center_y)
+            painter.scale(s, s)
+            painter.translate(-icon_center_x, -icon_center_y)
+            self._draw_status_icon(painter, card_state, icon_center_x, icon_center_y)
+            painter.restore()
+
+            text_x = card_x + round(24 * s)
+            text_width = max(40, card_width - round(102 * s))
+            title_font = QFont("Microsoft YaHei UI")
+            title_font.setPointSizeF(max(8.0, 11.0 * s))
+            title_font.setWeight(QFont.Weight.DemiBold)
+            detail_font = QFont("Microsoft YaHei UI")
+            detail_font.setPointSizeF(max(7.0, 9.0 * s))
+            painter.setFont(title_font)
+            painter.setPen(QColor("#25282D"))
+            title_text = QFontMetrics(title_font).elidedText(
+                title,
+                Qt.TextElideMode.ElideRight,
+                text_width,
+            )
+            painter.drawText(
+                text_x,
+                card_y + round(15 * s),
+                text_width,
+                max(12, round(27 * s)),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                title_text,
+            )
+            painter.setFont(detail_font)
+            painter.setPen(QColor("#747981"))
+            detail_text = QFontMetrics(detail_font).elidedText(
+                detail,
+                Qt.TextElideMode.ElideRight,
+                text_width,
+            )
+            painter.drawText(
+                text_x,
+                card_y + round(43 * s),
+                text_width,
+                max(12, round(24 * s)),
+                Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
+                detail_text,
+            )
+
+        def _draw_tasks_card(
+            self,
+            painter: QPainter,
+            card_x: int,
+            card_y: int,
+            card_width: int,
+            card_height: int,
+            s: float,
+        ) -> None:
+            corner_radius = round(30 * s)
+            self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
+            self._draw_multi_task_card(painter, card_x, card_y, card_width, card_height, s)
+
+        def _tasks_card_signature(self) -> tuple:
+            return tuple(
+                (
+                    str(task.get("state", "")),
+                    str(task.get("project", "")),
+                    str(task.get("task", "")),
+                    str(task.get("message", "")),
+                )
+                for task in self.tasks[:3]
+            ) + (len(self.tasks),)
+
+        def _paint_card(self, painter: QPainter) -> int:
+            """Draw the status bubble, cached offscreen so the 50 FPS repaint
+            only blits the card instead of re-running font layout and rounded
+            rects on every tick. Returns the bubble height used to clamp the
+            pet's vertical position."""
+            if not self._bubble_visible():
+                self.card_cache = None
+                self.card_cache_key = None
+                return 12
+            card_x, card_y, card_width, card_height = self._bubble_rect()
+            multi = len(self.tasks) >= 2
+            if multi:
+                key = (
+                    "multi",
+                    card_x, card_y, card_width, card_height,
+                    round(self.bubble_scale, 3),
+                    self._tasks_card_signature(),
+                )
+            else:
+                current = self._current_card()
+                if current is None:
+                    self.card_cache = None
+                    self.card_cache_key = None
+                    return 12
+                key = (
+                    "single",
+                    card_x, card_y, card_width, card_height,
+                    round(self.bubble_scale, 3),
+                    current[0], current[1], current[2],
+                )
+            if self.card_cache is None or self.card_cache_key != key:
+                self.card_cache_key = key
+                cache = QPixmap(card_width, card_height)
+                cache.fill(Qt.GlobalColor.transparent)
+                card_painter = QPainter(cache)
+                card_painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+                card_painter.translate(-card_x, -card_y)
+                if multi:
+                    self._draw_tasks_card(
+                        card_painter, card_x, card_y, card_width, card_height, self.bubble_scale
+                    )
+                else:
+                    self._draw_status_card(
+                        card_painter, card_x, card_y, card_width, card_height, self.bubble_scale, current
+                    )
+                card_painter.end()
+                self.card_cache = cache
+            painter.drawPixmap(card_x, card_y, self.card_cache)
+            return card_y + card_height + 19
+
         def paintEvent(self, _event: Any) -> None:
             painter = QPainter(self)
             painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
             # 平滑缩放：放大/缩小时插值，避免锯齿和模糊
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
-            card = self._current_card() if self._bubble_visible() else None
-            bubble_height = 12
-            card_x, card_y, card_width, card_height = self._bubble_rect()
-            s = self.bubble_scale
-            corner_radius = round(30 * s)
-
-            if len(self.tasks) >= 2 and self._bubble_visible():
-                bubble_height = card_y + card_height + 19
-                self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
-                self._draw_multi_task_card(painter, card_x, card_y, card_width, card_height, s)
-            elif card:
-                title, detail, card_state = card
-                bubble_height = card_y + card_height + 19
-                self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
-                icon_center_x = card_x + card_width - round(39 * s)
-                icon_center_y = card_y + card_height // 2
-                painter.save()
-                painter.translate(icon_center_x, icon_center_y)
-                painter.scale(s, s)
-                painter.translate(-icon_center_x, -icon_center_y)
-                self._draw_status_icon(painter, card_state, icon_center_x, icon_center_y)
-                painter.restore()
-
-                text_x = card_x + round(24 * s)
-                text_width = max(40, card_width - round(102 * s))
-                title_font = QFont("Microsoft YaHei UI")
-                title_font.setPointSizeF(max(8.0, 11.0 * s))
-                title_font.setWeight(QFont.Weight.DemiBold)
-                detail_font = QFont("Microsoft YaHei UI")
-                detail_font.setPointSizeF(max(7.0, 9.0 * s))
-                painter.setFont(title_font)
-                painter.setPen(QColor("#25282D"))
-                title_text = QFontMetrics(title_font).elidedText(
-                    title,
-                    Qt.TextElideMode.ElideRight,
-                    text_width,
-                )
-                painter.drawText(
-                    text_x,
-                    card_y + round(15 * s),
-                    text_width,
-                    max(12, round(27 * s)),
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                    title_text,
-                )
-                painter.setFont(detail_font)
-                painter.setPen(QColor("#747981"))
-                detail_text = QFontMetrics(detail_font).elidedText(
-                    detail,
-                    Qt.TextElideMode.ElideRight,
-                    text_width,
-                )
-                painter.drawText(
-                    text_x,
-                    card_y + round(43 * s),
-                    text_width,
-                    max(12, round(24 * s)),
-                    Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
-                    detail_text,
-                )
+            bubble_height = self._paint_card(painter)
 
             pixmap = self.pixmaps[self.model.frame]
-            phase = time.monotonic()
+            # Phase comes from the tick accumulator so delayed paints do not jump motion.
+            phase = self.model.motion_phase
             motion = self.model.active_clip.motion
             if self.reduced_motion:
                 motion = None
@@ -861,7 +1194,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 offset_y = math.sin(phase * 1.8) * 1
                 angle = math.sin(phase * 1.2) * 0.8
             elif motion == "bounce":
-                offset_y = -abs(math.sin(phase * 5.2)) * 8
+                # (1-cos)/2 has no derivative cusp, unlike -abs(sin): the pet
+                # settles smoothly at the bottom instead of snapping.
+                offset_y = -(1.0 - math.cos(phase * 5.2)) * 4.0
                 scale_extra = 1.0 + 0.02 * math.sin(phase * 5.2)
             elif motion in {"shake", "dizzy"}:
                 offset_x = math.sin(phase * 11.0) * 4
@@ -871,7 +1206,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 angle = math.sin(phase * 1.6) * 1.0
             # Give walking clips a light bob and quick sway without changing frame timing.
             if clip_name in ("working_search", "working_command"):
-                offset_y = -abs(math.sin(phase * 4.5)) * 5
+                offset_y = -(1.0 - math.cos(phase * 4.5)) * 2.5
                 angle = math.sin(phase * 9.0) * 2.5
 
             # Scale procedural offsets with the character while retaining subpixel motion.
@@ -887,8 +1222,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self.fade_from_pixmap = None
 
             def draw_pet(pix: QPixmap, alpha: float) -> None:
-                base_width = pix.width() * self.scale
-                base_height = pix.height() * self.scale
+                clip_scale = self.model.active_clip.scale
+                base_width = (pix.width() / self.asset_scale) * self.scale * clip_scale
+                base_height = (pix.height() / self.asset_scale) * self.scale * clip_scale
                 pw = base_width * scale_extra
                 ph = base_height * scale_extra
                 x = self._pet_offset_x(base_width) + (base_width - pw) / 2 + offset_x
