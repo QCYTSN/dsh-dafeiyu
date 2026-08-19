@@ -129,6 +129,38 @@ dsh plugin --profile web add dsh-dafeiyu
 安装 Python 或 PySide6。当前支持范围是 Windows x64 上的 WSL2；普通 Linux、
 远程 Linux 和容器不是本版本的桌面显示目标。
 
+### macOS 用户（Apple Silicon / Intel，macOS 12.0+）
+
+macOS 的安装方式与 Windows 相同，只是换成「终端」和 macOS 路径。发布包
+内置原生 Helper，**不需要安装 Python、PySide6 或 Xcode**。
+
+在「终端」中进入你的 DSH 安装目录（例如 `~/deepseek-harness`）：
+
+```bash
+cd ~/deepseek-harness
+```
+
+然后从 npm 安装稳定版：
+
+```bash
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
+```
+
+如果系统已经能直接使用全局 `dsh` 命令：
+
+```bash
+dsh plugin --profile web add dsh-dafeiyu
+```
+
+也可以从 [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases)
+下载 `dsh-dafeiyu-<version>.tgz`（不要解压），然后安装：
+
+```bash
+pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+```
+
+装完照常启动 DSH WebUI，大肥鱼会由 DSH 自动拉起；不要手动打开 Helper。
+
 ### 3. GitHub Release 备用安装方式
 
 进入 [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases)，下载最新的：

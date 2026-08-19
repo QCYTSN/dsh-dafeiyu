@@ -132,6 +132,42 @@ launches the bundled Windows Helper through `cmd.exe`; no manual `chmod`, Python
 PySide6 installation is required inside WSL. The current target is WSL2 on Windows x64,
 not ordinary Linux, remote Linux, or containers.
 
+### macOS users (Apple Silicon / Intel, macOS 12.0+)
+
+Installation on macOS is the same as Windows, just in the Terminal with macOS
+paths. The release bundle ships a native Helper — **no Python, PySide6 or Xcode
+required**.
+
+In Terminal, `cd` into your DSH installation directory (for example
+`~/deepseek-harness`):
+
+```bash
+cd ~/deepseek-harness
+```
+
+Install the current stable release from npm:
+
+```bash
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
+```
+
+If `dsh` is already available globally:
+
+```bash
+dsh plugin --profile web add dsh-dafeiyu
+```
+
+Alternatively, download `dsh-dafeiyu-<version>.tgz` from
+[GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) (do not
+extract it) and install it:
+
+```bash
+pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+```
+
+Then launch DSH WebUI normally; BigFish is started automatically. Do not start
+the Helper yourself.
+
 ### 3. GitHub Release fallback
 
 Open [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) and download:
