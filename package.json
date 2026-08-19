@@ -20,6 +20,7 @@
     "runtime/layout_store.py",
     "runtime/__init__.py",
     "runtime/bin/win32-x64/dsh-dafeiyu-helper.exe",
+    "runtime/bin/darwin/",
     "scripts/build-helper.ps1",
     "scripts/test-packaged-helper.mjs",
     "assets/pet/",
@@ -32,9 +33,6 @@
     "CHANGELOG.md",
     "ASSET_LICENSE.md",
     "LICENSE"
-  ],
-  "cpu": [
-    "x64"
   ],
   "engines": {
     "node": ">=22.19"
@@ -50,6 +48,7 @@
     "helper:headless": "py -3 runtime/helper.py --headless",
     "helper:visual": "py -3 runtime/helper.py",
     "build:helper:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-helper.ps1",
+    "build:helper:darwin": "bash native/macos/build.sh",
     "test:helper:packaged": "node scripts/test-packaged-helper.mjs"
   },
   "dsh": {

@@ -11,7 +11,9 @@ import {
 
 const here = dirname(fileURLToPath(import.meta.url))
 const defaultHelperPath = resolve(here, '..', 'runtime', 'helper.py')
-const bundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'dsh-dafeiyu-helper.exe')
+const bundledHelperPath = process.platform === 'darwin'
+  ? resolve(here, '..', 'runtime', 'bin', 'darwin', 'dsh-dafeiyu-helper.app', 'Contents', 'MacOS', 'dsh-dafeiyu-helper')
+  : resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'dsh-dafeiyu-helper.exe')
 
 function isWsl() {
   if (process.platform !== 'linux') return false
@@ -27,7 +29,7 @@ function isWsl() {
 }
 
 function shouldUseBundledHelper() {
-  return (process.platform === 'win32' || isWsl()) && existsSync(bundledHelperPath)
+  return (process.platform === 'win32' || process.platform === 'darwin' || isWsl()) && existsSync(bundledHelperPath)
 }
 
 function toWindowsPath(path) {
@@ -44,7 +46,7 @@ function resolveHelperLaunch({
   fileExists = existsSync,
   windowsPath = toWindowsPath,
 }) {
-  if (platform === 'win32' && fileExists(bundledPath)) {
+  if ((platform === 'win32' || platform === 'darwin') && fileExists(bundledPath)) {
     return { command: bundledPath, args: [] }
   }
   if (platform === 'linux' && isWslEnv && !headless && fileExists(bundledPath)) {

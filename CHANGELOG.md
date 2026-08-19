@@ -1,5 +1,25 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Native macOS Helper: Swift + AppKit universal binary (Apple Silicon arm64 and
+  Intel x86_64, macOS 12.0+), replacing the Qt/PySide6 visual path on macOS.
+  Bundled in `runtime/bin/darwin/dsh-dafeiyu-helper.app` and launched directly,
+  so macOS users no longer need Python / PySide6. Keeps the pet above
+  full-screen apps via `canJoinAllSpaces` + `fullScreenAuxiliary`, uses
+  `UNUserNotificationCenter` for alerts and `AXIsProcessTrusted` for the
+  Accessibility settings shortcut. AI-assisted implementation; see
+  `native/macos/README.md`.
+- `build:helper:darwin` npm script and a macOS build step in the release
+  workflow so published archives include the native Helper.
+
+### Changed
+
+- Removed the `cpu: ["x64"]` restriction so Apple Silicon (arm64) machines can
+  install the package.
+
 ## 0.1.0
 
 Promoted to stable. Same hardened build that shipped as 0.1.0-alpha.15, now the default

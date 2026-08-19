@@ -21,6 +21,32 @@ test('native Windows launches the bundled x64 helper directly', () => {
   assert.deepEqual(resolve({ platform: 'win32' }), { command: bundledPath, args: [] })
 })
 
+test('native macOS launches the bundled universal helper directly', () => {
+  const darwinPath = '/package/runtime/bin/darwin/dsh-dafeiyu-helper.app/Contents/MacOS/dsh-dafeiyu-helper'
+  assert.deepEqual(resolve({ platform: 'darwin', bundledPath: darwinPath }), {
+    command: darwinPath,
+    args: [],
+  })
+})
+
+test('macOS uses Python3 when the bundled helper is missing', () => {
+  assert.deepEqual(resolve({ platform: 'darwin', fileExists: () => false }), {
+    command: 'python3',
+    args: [helperPath],
+  })
+})
+
+test('macOS honours a configured Python override without a bundle', () => {
+  assert.deepEqual(resolve({
+    platform: 'darwin',
+    fileExists: () => false,
+    pythonEnv: '/opt/dsh/python',
+  }), {
+    command: '/opt/dsh/python',
+    args: [helperPath],
+  })
+})
+
 test('WSL visual mode uses cmd.exe so npm file modes cannot block the helper', () => {
   assert.deepEqual(resolve({ isWslEnv: true }), {
     command: 'cmd.exe',
