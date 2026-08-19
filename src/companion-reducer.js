@@ -81,6 +81,25 @@ function isUserQuestionTool(name) {
   return hasUserNoun || hasNounFromUser || hasAsk || strong
 }
 
+/** 从 ask_user_question 的 tool/call 参数提取问题摘要（问题文本 + 选项数）。 */
+function questionSummaryOf(event) {
+  let questions = []
+  try {
+    const args = typeof event?.data?.arguments === 'string'
+      ? JSON.parse(event.data.arguments)
+      : (event?.data?.arguments ?? {})
+    questions = Array.isArray(args?.questions) ? args.questions : []
+  } catch {
+    questions = []
+  }
+  const first = questions[0]
+  const questionText = String(first?.question ?? first?.header ?? '').trim().slice(0, 50)
+  const optionCount = Array.isArray(first?.options) ? first.options.length : 0
+  if (questionText) return questionText
+  if (optionCount > 0) return `有 ${optionCount} 个选项等你选`
+  return '有几个选项等你选'
+}
+
 function sessionIdOf(session) {
   return String(session?.header?.id ?? session?.id ?? 'unknown-session')
 }
@@ -214,7 +233,17 @@ export class CompanionReducer {
             toolName: name,
             message: statusCopy('waiting', event.seq),
           })
-          return this.#render()
+          // 选择题提示：桌宠播动画 + 气泡，让用户注意到有选项要选
+          const summary = questionSummaryOf(event)
+          return [...this.#render(), createMessage(CompanionMessageKind.ATTENTION, {
+            sessionId: record.id,
+            sourceSeq: event.seq,
+            state: CompanionState.WAITING,
+            attention: 'approve',
+            message: statusCopy('needAnswer', event.seq),
+            detail: summary,
+            ttlMs: 6000,
+          })]
         }
         const activity = toolActivity(name)
         this.#update(record, CompanionState.WORKING, {
@@ -249,7 +278,18 @@ export class CompanionReducer {
           toolName,
           message: statusCopy('approval', event.seq),
         })
-        return this.#render()
+        // 需要同意提示：桌宠播动画 + 气泡，让用户注意到要批准
+        const reason = String(event.data?.reason ?? '').trim().slice(0, 60)
+          || (toolName ? `使用 ${toolName} 需要你同意` : '需要你同意')
+        return [...this.#render(), createMessage(CompanionMessageKind.ATTENTION, {
+          sessionId: record.id,
+          sourceSeq: event.seq,
+          state: CompanionState.WAITING,
+          attention: 'approve',
+          message: statusCopy('approval', event.seq),
+          detail: reason,
+          ttlMs: 6000,
+        })]
       }
 
       case 'approval/decided':
@@ -275,10 +315,20 @@ export class CompanionReducer {
   }
 
   #userMessage(record, event) {
-    if (!record.waitingCallId) return []
+    // 新消息提示：桌宠抬头示意（无论是否在等待选择）
+    const attention = createMessage(CompanionMessageKind.ATTENTION, {
+      sessionId: record.id,
+      sourceSeq: event.seq,
+      state: CompanionState.IDLE,
+      attention: 'user-said',
+      message: statusCopy('userSaid', event.seq),
+      detail: '有新消息进来啦~',
+      ttlMs: 2500,
+    })
+    if (!record.waitingCallId) return [attention]
     record.openTools.delete(record.waitingCallId)
     record.waitingCallId = undefined
-    return this.#resumeAfterTool(record, event)
+    return [...this.#resumeAfterTool(record, event), attention]
   }
 
 
@@ -286,7 +336,19 @@ export class CompanionReducer {
     const id = String(event.data?.id ?? '')
     if (!record.waitingApprovalId || id !== record.waitingApprovalId) return []
     record.waitingApprovalId = undefined
-    return this.#resumeAfterTool(record, event)
+    const outcome = String(event.data?.outcome ?? '')
+    const approved = outcome !== 'rejected' && outcome !== 'denied'
+    const attention = approved ? createMessage(CompanionMessageKind.ATTENTION, {
+      sessionId: record.id,
+      sourceSeq: event.seq,
+      state: CompanionState.SUCCESS,
+      attention: 'approved',
+      message: statusCopy('approved', event.seq),
+      detail: '已确认，继续干活~',
+      ttlMs: 2500,
+    }) : null
+    const base = this.#resumeAfterTool(record, event)
+    return attention ? [...base, attention] : base
   }
 
   #resumeAfterTool(record, event) {
