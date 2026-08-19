@@ -86,6 +86,8 @@ When multiple tasks are active, the status bubble lists them at the same time.
 ## Requirements
 
 - Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
+- macOS 12.0+ (Apple Silicon or Intel) — the native Helper is bundled in the
+  release, no Python / PySide6 required
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - the stable `dsh-dafeiyu` from npm (or `dsh-dafeiyu@alpha` to try prereleases early), or a `.tgz` archive from GitHub Releases
@@ -296,6 +298,45 @@ DSH to bring it back. To disable it permanently, turn off “Enable BigFish” i
 - Does not monitor keyboard input or other app activity
 - Does not open a new network port; the settings card reuses DSH's local Web service
 - Follows the most recently active top-level DSH session by default
+
+## Native macOS port (AI-assisted)
+
+> **Note**: the native macOS helper (`runtime/bin/darwin/dsh-dafeiyu-helper.app`)
+> and the Swift sources under `native/macos/` were **generated with AI
+> assistance**, reviewed and debugged by a human before being merged. They
+> replace the original Qt/PySide6 and PyObjC prototypes, which were unstable
+> and crash-prone on macOS.
+
+What was redone:
+
+- **Runtime rewrite**: the Qt/PySide6 window (the visual path of
+  `runtime/helper.py`) and the PyObjC native-window prototype were rewritten as
+  a **pure Swift + AppKit** implementation. Python, PySide6, PyObjC and
+  conda environments are no longer required.
+- **Animation engine port**: the pure logic of `runtime/animation_model.py`
+  (clips, pulse, overlay, idle micro-motions, crossfade, procedural motion)
+  was ported line-by-line to Swift with behavior parity with the Windows/Qt
+  version.
+- **Above-fullscreen window**: Apple's official window capabilities
+  (`canJoinAllSpaces` + `fullScreenAuxiliary` + `.floating` level), re-asserted
+  every 2 seconds so the pet stays in front of full-screen apps.
+- **Permissions**: notifications via `UNUserNotificationCenter` (SUCCESS/ERROR
+  alerts, falling back to beep + shake when denied); Accessibility via
+  `AXIsProcessTrustedWithOptions` with a System Settings deep link in the
+  context menu.
+- **Stability fixes**: EPIPE guards on the helper's stdin/stdout/stderr so a
+  helper crash only restarts the helper itself, never the dsh server.
+- **Rendering/interaction fixes**: fixed the upside-down image in the flipped
+  view, made dragging track the cursor 1:1 with absolute coordinates, and kept
+  the character and the status bubble in sync while dragging.
+- **Layout migration**: on first launch the old Qt top-left coordinates are
+  migrated to AppKit bottom-left, still reading/writing the same `layout.json`.
+
+Compatibility:
+
+- **Architecture**: Universal binary (Apple Silicon arm64 + Intel x86_64)
+- **System**: macOS 12.0+
+- Build and install instructions: [native/macos/README.md](native/macos/README.md)
 
 ## Development and tests
 

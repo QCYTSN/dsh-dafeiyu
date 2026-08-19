@@ -38,9 +38,6 @@
     "ASSET_LICENSE.md",
     "LICENSE"
   ],
-  "cpu": [
-    "x64"
-  ],
   "engines": {
     "node": ">=22.19"
   },

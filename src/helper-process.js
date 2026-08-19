@@ -81,7 +81,7 @@ function resolveHelperLaunch({
   windowsPath = toWindowsPath,
   cmdExe = defaultCmdExe,
 }) {
-  if (platform === 'win32' && fileExists(bundledPath)) {
+  if ((platform === 'win32' || platform === 'darwin') && fileExists(bundledPath)) {
     return { command: bundledPath, args: [] }
   }
   if (platform === 'linux' && isWslEnv && !headless && fileExists(bundledPath)) {

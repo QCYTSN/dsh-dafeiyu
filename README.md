@@ -85,6 +85,8 @@ stateDiagram-v2
 ## 系统要求
 
 - Windows 10/11 x64，或 WSL2（通过 Windows interop 运行桌面 Helper）
+- macOS 12.0+（Apple Silicon 或 Intel）——发布包内置原生 Helper，
+  无需安装 Python / PySide6
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的稳定版 `dsh-dafeiyu`（或抢先测试的 `dsh-dafeiyu@alpha`），或 GitHub Release 中的 `.tgz` 安装包
@@ -293,6 +295,39 @@ DSH 后会恢复。若想永久关闭，请在 DSH 设置中取消“启用大�
 - 不监听键盘输入或其他应用行为
 - 不新开网络端口；设置卡复用 DSH 的本地 Web 服务
 - 默认只跟随最近活跃的顶层 DSH Session
+
+## macOS 原生适配（AI 辅助生成）
+
+> **说明**：本仓库的 macOS 原生 Helper（`runtime/bin/darwin/dsh-dafeiyu-helper.app`）
+> 及 `native/macos/` 下的 Swift 源码由 **AI 辅助生成**，经人工 review 与调试后合入，
+> 用于替代原 Qt/PySide6 与 PyObjC 原型在 macOS 上不稳定、易崩溃的问题。
+
+### 重做了哪些地方
+
+- **运行时重写**：Qt/PySide6 桌面窗口（`runtime/helper.py` 的可视路径）与
+  PyObjC 原生窗口原型，重写为 **Swift + 纯 AppKit** 原生实现，不再依赖
+  Python、PySide6、PyObjC 或 anaconda 环境。
+- **动画内核移植**：`runtime/animation_model.py` 的纯逻辑（clips、pulse、
+  overlay、idle 微动作、crossfade、程序化 motion）逐行移植为 Swift，行为与
+  Windows/Qt 版一致。
+- **全屏置顶**：使用 Apple 官方窗口能力（`canJoinAllSpaces` +
+  `fullScreenAuxiliary` + `.floating` 层级），每 2 秒重新断言层级，全屏 App
+  下依然保持在前端。
+- **权限处理**：通知走 `UNUserNotificationCenter`（SUCCESS/ERROR 提示，
+  被拒时回退 beep + 抖动）；辅助功能走 `AXIsProcessTrustedWithOptions`，
+  右键菜单可直达系统设置。
+- **稳定性修复**：helper 的 stdin/stdout/stderr 增加 EPIPE 兜底，helper
+  崩溃只重启自身，不再拖垮 dsh 服务器。
+- **渲染与交互修复**：修复 flipped 视图下图片倒置；拖拽改为绝对坐标 1:1
+  跟手；拖拽时人物与气泡位置同步。
+- **布局迁移**：首次启动自动把旧 Qt 版 top-left 坐标迁移到 AppKit
+  bottom-left 坐标，继续读写同一个 `layout.json`。
+
+### 兼容性
+
+- **架构**：Universal binary（Apple Silicon arm64 + Intel x86_64）
+- **系统**：macOS 12.0+
+- 构建与安装说明见 [native/macos/README.md](native/macos/README.md)
 
 ## 开发与测试
 
