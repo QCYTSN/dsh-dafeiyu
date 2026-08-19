@@ -55,9 +55,26 @@ PyObjC 在 macOS 26 上崩溃 → EPIPE 未捕获 → 整个 dsh 服务器退出
 native/macos/build.sh
 ```
 
-产物：`runtime/bin/darwin-arm64/dsh-dafeiyu-helper.app`（arm64 薄二进制，
-ad-hoc 签名，素材打进 `Contents/Resources/assets`）。要求 Xcode Command Line
-Tools（`swiftc`）。
+产物：`runtime/bin/darwin/dsh-dafeiyu-helper.app`（Universal 二进制
+arm64 + x86_64，最低 macOS 12.0，ad-hoc 签名，素材打进
+`Contents/Resources/assets`）。要求 Xcode Command Line Tools（`swiftc`）。
+
+## 用户安装（macOS 端用户）
+
+普通用户**不需要**自行构建或运行本目录的源码。直接用 DSH 的插件命令安装
+发布包即可（发布包已内置 macOS 原生 Helper）：
+
+```bash
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
+```
+
+或从 GitHub Releases 下载 `dsh-dafeiyu-<version>.tgz` 后安装：
+
+```bash
+pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+```
+
+完整安装步骤见主 README 的「macOS 用户」小节。
 
 ## 接入
 
