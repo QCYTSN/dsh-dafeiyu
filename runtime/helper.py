@@ -152,7 +152,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.layout = load_layout(self.layout_path)
             configured_scale = os.environ.get("DSH_DAFEIYU_SCALE")
             try:
-                self.scale = min(1.4, max(0.7, float(configured_scale))) if configured_scale else self.layout["scale"]
+                self.scale = min(1.4, max(0.55, float(configured_scale))) if configured_scale else self.layout["scale"]
             except ValueError:
                 self.scale = self.layout["scale"]
             configured_bubble_scale = os.environ.get("DSH_DAFEIYU_BUBBLE_SCALE")
@@ -225,6 +225,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.micro_timer.timeout.connect(self._play_idle_micro)
             if not self.reduced_motion:
                 self._schedule_micro()
+            # ---- 随机行走（增强）：空闲时偶尔在窗口内左右走动 ----
+            self.walk_timer = QTimer(self)
+            self.walk_timer.timeout.connect(self._walk_step)
+            self.walking = False
+            self.walk_dir = 1  # 1 右 / -1 左
+            self.walk_px = 0   # 当前横向偏移（相对默认位置）
+            self.walk_step_px = 3  # 每 tick 移动像素
+            self.walk_ticks = 0
+            self.walk_total_ticks = 0
             self.snapshot_saved = False
             self.setWindowTitle("DSH 大肥鱼")
             self.setWindowFlags(
@@ -256,6 +265,22 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 raw_tasks = message.get("tasks")
                 self.tasks = raw_tasks if isinstance(raw_tasks, list) else []
                 self._sync_bubble_size()
+            elif kind == "attention":
+                # 需要用户操作（同意授权/选择/新消息）：停止行走，播放提示动画+气泡
+                if self.walking:
+                    self._stop_walk()
+                notice = str(message.get("message", "需要你操作一下哦~"))
+                detail = str(message.get("detail", ""))
+                ttl = max(2000, int(message.get("ttlMs", 5000)))
+                attention_kind = str(message.get("attention", ""))
+                clip = "head_pat" if attention_kind == "approve" else "happy"
+                self._play_model_overlay(clip, allow_fade=False)
+                self._show_overlay(notice, detail, "WAITING" if attention_kind == "approve" else self.model.base_state, ttl)
+                if attention_kind == "approve":
+                    # 等待用户操作：状态浮窗永久显示，直到新状态消息覆盖
+                    self._show_status(notice, detail, "WAITING", None)
+                else:
+                    self._show_status(notice, detail, self.model.base_state, ttl + 800)
             elif kind == "config":
                 self._apply_config(message)
             elif kind in {"state", "pulse"}:
@@ -306,7 +331,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             """Apply a live CONFIG message without restarting the window."""
             scale = message.get("scale")
             if isinstance(scale, (int, float)) and not isinstance(scale, bool):
-                self.scale = min(1.4, max(0.7, float(scale)))
+                self.scale = min(1.4, max(0.55, float(scale)))
             bubble_scale = message.get("bubbleScale")
             if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
                 self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
@@ -346,10 +371,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.display_state = self.model.base_state
             if self.overlay_deadline_ms is not None and now_ms >= self.overlay_deadline_ms:
                 self._clear_overlay()
+            # 运行中（思考/干活/等待/出错）浮窗永久显示：状态卡不因 ttl 消失
+            if self.model.base_state in {"THINKING", "WORKING", "WAITING", "ERROR"}:
+                self.status_deadline_ms = None
             self.update()
 
         def _play_idle_micro(self) -> None:
             if self.reduced_motion:
+                return
+            # 约 30% 概率改为随机走动（增强），其余播多种微动画
+            if random.random() < 0.30 and not self.walking:
+                self._start_walk()
+                self._schedule_micro()
                 return
             previous_frame = self.model.frame
             previous_clip = self.model.active_clip_name
@@ -357,6 +390,60 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self._sync_frame_transition(previous_frame, previous_clip)
             self.update()
             self._schedule_micro()
+
+        # ---- 随机行走（增强）----
+        def _start_walk(self) -> None:
+            # 仅空闲且未在走动/拖拽时开始
+            if self.dragging or self.walking or self.display_state != "IDLE":
+                return
+            self.walking = True
+            # 随机方向与距离（20~45 tick）
+            self.walk_dir = 1 if random.random() < 0.5 else -1
+            self.walk_total_ticks = random.randint(20, 45)
+            self.walk_ticks = 0
+            # 播放起步动画，随后 _walk_step 里切到循环行走帧
+            start_clip = "walk_start_left" if self.walk_dir < 0 else "walk_start_right"
+            self._play_model_overlay(start_clip, allow_fade=False)
+            self.walk_timer.start(50)  # 20fps 走动
+
+        def _walk_step(self) -> None:
+            if not self.walking:
+                self.walk_timer.stop()
+                return
+            # 到达屏幕边缘就停下（不再回头折返）
+            geometry = self._screen_geometry_at(self.pet_x, self.pet_y)
+            if geometry is not None:
+                pet_width, _ = self._pet_size()
+                if (self.walk_dir > 0 and self.pet_x + pet_width >= geometry.right() - 4) or (
+                    self.walk_dir < 0 and self.pet_x <= geometry.left() + 4
+                ):
+                    self._stop_walk()
+                    return
+            self.walk_ticks += 1
+            self.walk_px += self.walk_dir * self.walk_step_px
+            # 移动宠物位置（保持垂直不变，横向平移）
+            self._move_to_pet(self.pet_x + self.walk_dir * self.walk_step_px, self.pet_y)
+            # 走动中保持循环行走帧。注意：walk_side_right 素材腿部几乎不动（质心 0.2px），
+            # 而 walk_side 有正常迈步（4.7px）。因此两个方向都用 walk_side 帧，
+            # 右走时在 paintEvent 里水平镜像绘制即可呈现向右迈步。
+            clip_name = "walk_side"
+            try:
+                if self.model.overlay_clip_name != clip_name:
+                    self._play_model_overlay(clip_name, allow_fade=False)
+                # 走路期间 overlay 永不过期，避免帧被重置
+                self.overlay_deadline_ms = None
+            except Exception:
+                pass
+            if self.walk_ticks >= self.walk_total_ticks:
+                self._stop_walk()
+
+        def _stop_walk(self) -> None:
+            self.walk_timer.stop()
+            self.walking = False
+            self.walk_px = 0
+            # 播放收尾动画
+            stop_clip = "walk_stop_left" if self.walk_dir < 0 else "walk_stop_right"
+            self._play_model_overlay(stop_clip, allow_fade=False)
 
         def _sync_frame_transition(
             self,
@@ -421,9 +508,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.micro_timer.stop()
                 return
             intervals = {
-                "quiet": (12000, 24000),
-                "normal": (6500, 12500),
-                "lively": (3500, 8000),
+                "quiet": (5000, 10000),
+                "normal": (2500, 5000),
+                "lively": (1500, 3500),
             }
             lower, upper = intervals.get(self.activity_level, intervals["normal"])
             self.micro_timer.start(random.randint(lower, upper))
@@ -902,7 +989,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.translate(cx, cy)
                 painter.rotate(angle)
                 painter.translate(-cx, -cy)
-                painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
+                if self.walking and self.walk_dir > 0:
+                    # 右走镜像：walk_side_right 素材腿几乎不动，统一用 walk_side 帧并水平翻转
+                    painter.translate(x + pw, y)
+                    painter.scale(-1, 1)
+                    painter.drawPixmap(QRectF(0, 0, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
+                else:
+                    painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
                 painter.restore()
 
             if fade_alpha < 1.0 and self.fade_from_pixmap is not None:
@@ -930,10 +1023,37 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self._move_to_pet(self.pet_x, self.pet_y)
                     self._save_layout()
                 else:
+                    # 单击（非拖拽）：互动动画 + 把 EAC 主窗口带回前台
                     self._play_click_interaction(event.position().x(), event.position().y())
+                    self._focus_host_window()
             self.drag_origin = None
             self.pet_origin = None
             self.dragging = False
+
+        def _focus_host_window(self) -> None:
+            # 左键点击大肥鱼时，把 DeepSeek Harness EAC 主窗口带回前台。
+            # 直接走 Win32 API，不依赖 Electron IPC，最稳。
+            try:
+                import ctypes
+                from ctypes import wintypes
+                user32 = ctypes.windll.user32
+                found = []
+                @ctypes.WINFUNCTYPE(wintypes.BOOL, wintypes.HWND, wintypes.LPARAM)
+                def _enum_cb(hwnd, _lparam):
+                    length = user32.GetWindowTextLengthW(hwnd)
+                    if length > 0:
+                        buf = ctypes.create_unicode_buffer(length + 1)
+                        user32.GetWindowTextW(hwnd, buf, length + 1)
+                        if buf.value == "Deepseek Harness EAC":
+                            found.append(hwnd)
+                    return True
+                user32.EnumWindows(_enum_cb, 0)
+                for hwnd in found:
+                    if user32.IsIconic(hwnd):
+                        user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+                    user32.SetForegroundWindow(hwnd)
+            except Exception:
+                pass  # 聚焦失败不影响其它功能
 
         def _play_click_interaction(self, x: float, y: float) -> None:
             pet_x, pet_y, pet_width, pet_height = self._pet_rect()
@@ -958,7 +1078,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             menu = QMenu(self)
             size_menu = menu.addMenu("大小")
             size_actions = {}
-            for label, scale in (("小", 0.8), ("标准", 1.0), ("大", 1.25)):
+            for label, scale in (("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)):
                 action = size_menu.addAction(label)
                 action.setCheckable(True)
                 action.setChecked(abs(self.scale - scale) < 0.05)
