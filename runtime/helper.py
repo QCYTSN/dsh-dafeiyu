@@ -423,11 +423,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.walk_px += self.walk_dir * self.walk_step_px
             # 移动宠物位置（保持垂直不变，横向平移）
             self._move_to_pet(self.pet_x + self.walk_dir * self.walk_step_px, self.pet_y)
-            # 走动中循环播放 walk_side 行走帧（方向左→walk_side，右→walk_side_right）。
-            clip_name = "walk_side_right" if self.walk_dir > 0 else "walk_side"
+            # 走动中保持循环行走帧。注意：walk_side_right 素材腿部几乎不动（质心 0.2px），
+            # 而 walk_side 有正常迈步（4.7px）。因此两个方向都用 walk_side 帧，
+            # 右走时在 paintEvent 里水平镜像绘制即可呈现向右迈步。
+            clip_name = "walk_side"
             try:
                 if self.model.overlay_clip_name != clip_name:
                     self._play_model_overlay(clip_name, allow_fade=False)
+                # 走路期间 overlay 永不过期，避免帧被重置
+                self.overlay_deadline_ms = None
             except Exception:
                 pass
             if self.walk_ticks >= self.walk_total_ticks:
@@ -985,7 +989,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.translate(cx, cy)
                 painter.rotate(angle)
                 painter.translate(-cx, -cy)
-                painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
+                if self.walking and self.walk_dir > 0:
+                    # 右走镜像：walk_side_right 素材腿几乎不动，统一用 walk_side 帧并水平翻转
+                    painter.translate(x + pw, y)
+                    painter.scale(-1, 1)
+                    painter.drawPixmap(QRectF(0, 0, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
+                else:
+                    painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
                 painter.restore()
 
             if fade_alpha < 1.0 and self.fade_from_pixmap is not None:
