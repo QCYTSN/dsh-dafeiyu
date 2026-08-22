@@ -19,6 +19,19 @@ generated for this repository by `scripts/generate_notification_sounds.py`.
 They contain no third-party recordings and are covered by the repository's MIT
 license.
 
+The glove status cursors `assets/cursor_grab.cur` and `assets/cursor_grabbing.cur`
+(32x32 Windows cursors used for the hover/press cursor feedback) are derived
+works from the Windows 98 style cursor sources in
+[phillbush/retrosmart-xcursor](https://github.com/phillbush/retrosmart-xcursor),
+which is GPL-3.0 licensed. They are **not covered by the MIT code license**.
+
+The corresponding source is bundled with the plugin in `assets/cursors/`: the
+modified XPM sources (`openhand.32.xpm`, `closedhand.32.xpm` with the shipped
+palette baked in), the conversion script (`xpm2cur.py`), a note on what was
+modified and how to rebuild (`README.md`), and the upstream GPL-3.0 text
+(`GPL-3.0.txt`). `xpm2cur.py` reproduces the shipped .cur files byte-for-byte
+(covered by the tests).
+
 This is an unofficial fan-made project and is not affiliated with or endorsed
 by DeepSeek. Names, marks, and character-related rights belong to their
 respective owners.
