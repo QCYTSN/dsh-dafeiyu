@@ -89,7 +89,7 @@ Do not place a long-lived npm token in WSL merely to perform this promotion.
 
 ## Failure and retry behavior
 
-- A test or Windows build failure stops the release before npm publishing.
+- A test or Helper build failure (Windows, Linux x64, or macOS) stops the release before npm publishing.
 - If npm already contains an identical archive, a retry skips npm and repairs or creates the GitHub
   Release.
 - If npm contains the same version with different archive contents, the workflow stops. Increase the
