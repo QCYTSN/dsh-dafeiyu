@@ -25,8 +25,8 @@ editing, testing, waiting, or finished while working in VS Code, a browser, or F
 
 - The latest version always matches npm [`latest`](https://www.npmjs.com/package/dsh-dafeiyu) and [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) (which also carry the `.tgz` archives); the badges above update automatically.
 - **Starring is just a bookmark — GitHub will not notify you of updates.** To get notified about what changed:
-  1. Open the repo and choose **Watch → Custom → Releases**;
-  2. or subscribe to the Releases feed: <https://github.com/QCYTSN/dsh-dafeiyu/releases.atom>
+    1. Open the repo and choose **Watch → Custom → Releases**;
+    2. or subscribe to the Releases feed: <https://github.com/QCYTSN/dsh-dafeiyu/releases.atom>
 - To upgrade an installed copy: fully exit DSH, then run
   ```powershell
   dsh plugin --profile web update dsh-dafeiyu
@@ -86,8 +86,8 @@ When multiple tasks are active, the status bubble lists them at the same time.
 ## Requirements
 
 - Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
-- Linux x64 desktop (native X11, or XWayland)
-- macOS 12.0+ (Apple Silicon or Intel, experimental support)
+- Linux x64 desktop (glibc ≥ 2.35; desktop verified only on Ubuntu 24.04 / glibc 2.39)
+- macOS 12.0+ (Apple Silicon or Intel)
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - the stable `dsh-dafeiyu` from npm (or `dsh-dafeiyu@alpha` to try prereleases early), or a `.tgz` archive from GitHub Releases
@@ -104,7 +104,9 @@ The current Alpha build uses Simplified Chinese for the settings UI and desktop 
 Stop the DSH Host, not only the browser tab. An old Helper should not remain active during
 installation or upgrade.
 
-### 2. Install with one command
+### 2. Install
+
+### Windows users
 
 Open PowerShell in your DSH installation directory, for example:
 
@@ -127,22 +129,62 @@ dsh plugin --profile web add dsh-dafeiyu
 To try new features before they are stable, install from the `@alpha` tag instead:
 `pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha`.
 
-When DSH runs inside WSL2, run the same install command in the WSL terminal. The plugin
-launches the bundled Windows Helper through `cmd.exe`; no manual `chmod`, Python, or
-PySide6 installation is required inside WSL. The current WSL target is Windows x64.
+When DSH runs inside WSL2, run the same install command in the WSL terminal. In
+visual mode the plugin launches the bundled **Windows** Helper through
+`cmd.exe`; no manual `chmod`, Python, or PySide6 installation is required
+inside WSL. Native Linux desktops use the bundled Linux Helper instead of the
+Windows `.exe` — see the next section.
 
-Regular Linux x64 desktop users run the same install command. Version `0.1.4` bundles
-the Linux Helper with no system Python requirement. A graphical desktop session is
-required; native X11 and XWayland are supported. Headless remote Linux and containers
-are not display targets for this release.
+### Linux users (x64 desktop, glibc ≥ 2.35)
+
+Installation on Linux is the same as Windows, just in a terminal with Linux
+paths. The release bundle ships a prebuilt Helper — **no Python or PySide6
+required**.
+
+Requirements:
+
+- An x86_64 desktop distro with **glibc ≥ 2.35** (the official binary is built
+  on Ubuntu 22.04).
+- **Desktop use has been verified only on Ubuntu 24.04 (glibc 2.39).** Ubuntu
+  22.04 and other distros have not had a real desktop acceptance pass; CI only
+  builds and smoke-tests on Ubuntu 22.04 under Xvfb.
+- A graphical session (`DISPLAY` or `WAYLAND_DISPLAY`). The Helper prefers
+  X11 / XWayland (`xcb`), then Wayland.
+- Debian / Ubuntu desktops usually also need `libxcb-cursor0`.
+- ARM, headless SSH, containers, and server-only environments are not desktop
+  display targets for this version.
+
+In a terminal, `cd` into your DSH installation directory (for example
+`~/deepseek-harness`):
+
+```bash
+cd ~/deepseek-harness
+```
+
+Install the current stable release from npm:
+
+```bash
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
+```
+
+If `dsh` is already available globally:
+
+```bash
+dsh plugin --profile web add dsh-dafeiyu
+```
+
+Alternatively, download `dsh-dafeiyu-<version>.tgz` from
+[GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) (do not
+extract it) and install it:
+
+```bash
+pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+```
+
+Then launch DSH WebUI normally; BigFish is started automatically. Do not start
+the Helper yourself.
 
 ### macOS users (Apple Silicon / Intel, macOS 12.0+)
-
-> Version `0.1.4` introduces the native macOS Helper as experimental support.
-> CI verifies its universal architecture, AppKit rendering, and process lifecycle;
-> Apple Silicon experience will continue to be validated through user feedback.
-> The app currently has an ad-hoc signature, not a Developer ID signature or
-> notarization, so Gatekeeper may block browser-downloaded archives.
 
 Installation on macOS is the same as Windows, just in the Terminal with macOS
 paths. The release bundle ships a native Helper — **no Python, PySide6 or Xcode
@@ -276,7 +318,7 @@ old version:
 pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-version>.tgz"
 ```
 
-All three paths replace the plugin and bundled Windows Helper while retaining settings saved
+All three paths replace the plugin and bundled Helper while retaining settings saved
 by DSH. See [Update and rollback](docs/UPDATING.md) for details.
 
 ## Roll back
@@ -308,7 +350,9 @@ an inactive copy of historical settings; it does not start a process or open a p
 1. Confirm that you installed into `--profile web`.
 2. Fully stop and restart the DSH Host.
 3. Open “Settings → Plugins → Plugin configuration” and confirm that BigFish is enabled.
-4. Use the Windows x64 release archive. A source-only clone may not contain the prebuilt Helper.
+4. Use a release archive that contains the prebuilt Helper for your platform, not a
+   source-only clone. Windows / WSL2 needs `runtime/bin/win32-x64`; native Linux
+   desktops need `runtime/bin/linux-x64`; macOS needs `runtime/bin/darwin`.
 
 </details>
 
@@ -406,6 +450,17 @@ python -m pip install -r requirements.txt pyinstaller
 $env:DSH_DAFEIYU_BUILD_PYTHON = (Get-Command python).Source
 npm run build:helper:windows
 ```
+
+Build the Linux Helper (Linux x86_64 required; official releases are built on
+Ubuntu 22.04 to keep the glibc 2.35 baseline):
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+export DSH_DAFEIYU_BUILD_PYTHON="$(command -v python3)"
+npm run build:helper:linux
+```
+
+macOS native Helper build instructions: [native/macos/README.md](native/macos/README.md).
 
 ## More documentation
 
