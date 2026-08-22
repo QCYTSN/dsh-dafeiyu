@@ -1,11 +1,12 @@
 # Publishing releases
 
 The repository publishes one cross-platform package through GitHub Actions and npm trusted
-publishing. Windows and Linux x64 Helpers are built and visually smoke-tested on their native
-GitHub-hosted runners. A Linux assembly job then combines both artifacts, checks their final npm
-archive paths and executable modes, and smoke-tests the Linux Helper from the extracted `.tgz`.
-That exact archive is published using short-lived OIDC credentials. No npm password or long-lived
-publish token is stored in GitHub, Windows, or WSL.
+publishing. Windows, Linux x64, and macOS universal Helpers are built and visually smoke-tested on
+their native GitHub-hosted runners. A Linux assembly job combines all three artifacts, checks their
+final npm archive paths and executable modes, and smoke-tests the Linux Helper from the extracted
+`.tgz`. A macOS runner then verifies both Mach-O architectures, the ad-hoc signature, AppKit
+rendering, and stdin lifecycle from that exact final archive before OIDC publishing. No npm
+password or long-lived publish token is stored in GitHub, Windows, or WSL.
 
 ## One-time npm setup
 

@@ -1,5 +1,8 @@
 import AppKit
+import Darwin
 import QuartzCore
+
+signal(SIGPIPE, SIG_IGN)
 
 /// Serialized stdout writer for the newline-delimited JSON protocol.
 final class ProtocolIO {
@@ -10,14 +13,14 @@ final class ProtocolIO {
         lock.lock()
         defer { lock.unlock() }
         guard let data = try? JSONSerialization.data(withJSONObject: object) else { return }
-        FileHandle.standardOutput.write(data)
-        FileHandle.standardOutput.write(Data("\n".utf8))
+        try? FileHandle.standardOutput.write(contentsOf: data)
+        try? FileHandle.standardOutput.write(contentsOf: Data("\n".utf8))
         try? FileHandle.standardOutput.synchronize()
     }
 }
 
 private func currentTimestamp() -> Int {
-    Int(CACurrentMediaTime() * 1000)
+    Int(Date().timeIntervalSince1970 * 1000)
 }
 
 private func loadManifest(at root: URL) -> [String: Any]? {
@@ -106,7 +109,8 @@ if headless {
     while let line = readLine() {
         guard !line.isEmpty else { continue }
         guard let data = line.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (object["protocolVersion"] as? Int) == 1 else {
             ProtocolIO.shared.write([
                 "protocolVersion": 1,
                 "kind": "error",
@@ -151,7 +155,8 @@ stdinQueue.async {
     while let line = readLine() {
         guard !line.isEmpty else { continue }
         guard let data = line.data(using: .utf8),
-              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+              let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              (object["protocolVersion"] as? Int) == 1 else {
             ProtocolIO.shared.write([
                 "protocolVersion": 1,
                 "kind": "error",
@@ -169,6 +174,9 @@ stdinQueue.async {
         DispatchQueue.main.async {
             controller.apply(object)
         }
+    }
+    DispatchQueue.main.async {
+        controller.quit(reason: "stdin-eof", reportClosed: false)
     }
 }
 

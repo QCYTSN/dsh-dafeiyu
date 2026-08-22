@@ -91,3 +91,54 @@ jobs:
           test -x .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
           xvfb-run --auto-servernum node scripts/test-packaged-helper.mjs \
             --executable .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
+
+  macos-helper:
+    name: Build and smoke-test macOS universal Helper
+    runs-on: macos-15
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install pnpm
+        run: npm install --global pnpm@11.21.0
+
+      - name: Install JavaScript dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run JavaScript tests
+        run: npm test
+
+      - name: Run Python tests
+        run: python3 -m unittest discover -s runtime/tests -t .
+
+      - name: Build and visually smoke-test macOS Helper
+        run: |
+          npm run build:helper:darwin
+          node scripts/test-packaged-helper.mjs
+
+      - name: Verify universal architecture and ad-hoc signature
+        run: |
+          app=runtime/bin/darwin/dsh-dafeiyu-helper.app
+          binary="$app/Contents/MacOS/dsh-dafeiyu-helper"
+          lipo -verify_arch arm64 x86_64 "$binary"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$(node -p "require('./package.json').version")"
+
+      - name: Verify macOS Helper survives npm packaging
+        run: |
+          archive=$(npm pack --silent)
+          mkdir -p .build/package-check
+          tar -xzf "$archive" -C .build/package-check
+          app=.build/package-check/package/runtime/bin/darwin/dsh-dafeiyu-helper.app
+          binary="$app/Contents/MacOS/dsh-dafeiyu-helper"
+          test -x "$binary"
+          lipo -verify_arch arm64 x86_64 "$binary"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          node scripts/test-packaged-helper.mjs --executable "$binary"

@@ -20,6 +20,7 @@
     "runtime/layout_store.py",
     "runtime/__init__.py",
     "runtime/bin/",
+    "native/macos/",
     "scripts/build-helper.ps1",
     "scripts/build-helper.sh",
     "scripts/build-helper.mjs",
@@ -54,6 +55,7 @@
     "build:helper": "node scripts/build-helper.mjs",
     "build:helper:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/build-helper.ps1",
     "build:helper:linux": "bash scripts/build-helper.sh",
+    "build:helper:darwin": "bash native/macos/build.sh",
     "test:helper:packaged": "node scripts/test-packaged-helper.mjs"
   },
   "dsh": {

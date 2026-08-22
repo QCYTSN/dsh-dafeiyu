@@ -6,6 +6,12 @@
 
 - Linux x64 desktop support with a bundled, Python-free Helper, XDG layout persistence, and X11/Wayland platform selection.
 - Linux Helper build, visual smoke test, and final npm-archive validation in CI and the trusted release workflow.
+- Native macOS Helper built with Swift and AppKit as a universal arm64/x86_64 app for macOS 12+, with no Python runtime requirement.
+- Native macOS build, AppKit screenshot/lifecycle smoke tests, universal-architecture and code-signature checks, plus validation of the final assembled npm archive on a macOS runner.
+
+### Changed
+
+- Removed the npm x64-only installation restriction so Apple Silicon Macs can install the universal package.
 
 ## 0.1.3
 

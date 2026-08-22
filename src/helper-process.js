@@ -13,6 +13,17 @@ const here = dirname(fileURLToPath(import.meta.url))
 const defaultHelperPath = resolve(here, '..', 'runtime', 'helper.py')
 const bundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'win32-x64', 'dsh-dafeiyu-helper.exe')
 const linuxBundledHelperPath = resolve(here, '..', 'runtime', 'bin', 'linux-x64', 'dsh-dafeiyu-helper')
+const darwinBundledHelperPath = resolve(
+  here,
+  '..',
+  'runtime',
+  'bin',
+  'darwin',
+  'dsh-dafeiyu-helper.app',
+  'Contents',
+  'MacOS',
+  'dsh-dafeiyu-helper',
+)
 
 function isWsl() {
   if (process.platform !== 'linux') return false
@@ -29,7 +40,8 @@ function isWsl() {
 
 function shouldUseBundledHelper() {
   if (process.platform === 'win32' || isWsl()) return existsSync(bundledHelperPath)
-  return process.platform === 'linux' && existsSync(linuxBundledHelperPath)
+  if (process.platform === 'linux') return existsSync(linuxBundledHelperPath)
+  return process.platform === 'darwin' && existsSync(darwinBundledHelperPath)
 }
 
 function isBundledHelperCommand(command) {
@@ -74,6 +86,7 @@ function resolveHelperLaunch({
   isWslEnv,
   bundledPath,
   linuxBundledPath = linuxBundledHelperPath,
+  darwinBundledPath = darwinBundledHelperPath,
   helperPath,
   pythonEnv,
   headless = false,
@@ -81,8 +94,11 @@ function resolveHelperLaunch({
   windowsPath = toWindowsPath,
   cmdExe = defaultCmdExe,
 }) {
-  if ((platform === 'win32' || platform === 'darwin') && fileExists(bundledPath)) {
+  if (platform === 'win32' && fileExists(bundledPath)) {
     return { command: bundledPath, args: [] }
+  }
+  if (platform === 'darwin' && fileExists(darwinBundledPath)) {
+    return { command: darwinBundledPath, args: [] }
   }
   if (platform === 'linux' && isWslEnv && !headless && fileExists(bundledPath)) {
     // npm archives created on Windows store ordinary files as 0644. Launching
@@ -107,6 +123,7 @@ function defaultLaunch(headless = false) {
     isWslEnv: isWsl(),
     bundledPath: bundledHelperPath,
     linuxBundledPath: linuxBundledHelperPath,
+    darwinBundledPath: darwinBundledHelperPath,
     helperPath: defaultHelperPath,
     pythonEnv: process.env.DSH_DAFEIYU_PYTHON,
     headless,
@@ -383,6 +400,7 @@ export class HelperProcess {
 
 export {
   bundledHelperPath,
+  darwinBundledHelperPath,
   linuxBundledHelperPath,
   defaultHelperPath,
   defaultArgs,

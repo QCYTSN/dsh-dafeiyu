@@ -10,6 +10,8 @@ const launch = process.platform === 'win32'
     }
   : process.platform === 'linux'
     ? { command: 'bash', args: [resolve(root, 'scripts', 'build-helper.sh')] }
+    : process.platform === 'darwin'
+      ? { command: 'bash', args: [resolve(root, 'native', 'macos', 'build.sh')] }
     : undefined
 
 if (!launch) {

@@ -4,6 +4,7 @@ import { defaultCmdExe, resolveHelperLaunch } from '../src/helper-process.js'
 
 const bundledPath = '/package/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe'
 const linuxBundledPath = '/package/runtime/bin/linux-x64/dsh-dafeiyu-helper'
+const darwinBundledPath = '/package/runtime/bin/darwin/dsh-dafeiyu-helper.app/Contents/MacOS/dsh-dafeiyu-helper'
 const helperPath = '/package/runtime/helper.py'
 
 function resolve(overrides = {}) {
@@ -12,6 +13,7 @@ function resolve(overrides = {}) {
     isWslEnv: false,
     bundledPath,
     linuxBundledPath,
+    darwinBundledPath,
     helperPath,
     fileExists: () => true,
     windowsPath: () => 'C:\\package\\runtime\\bin\\win32-x64\\dsh-dafeiyu-helper.exe',
@@ -21,6 +23,24 @@ function resolve(overrides = {}) {
 
 test('native Windows launches the bundled x64 helper directly', () => {
   assert.deepEqual(resolve({ platform: 'win32' }), { command: bundledPath, args: [] })
+})
+
+test('native macOS launches the bundled universal helper directly', () => {
+  assert.deepEqual(resolve({ platform: 'darwin' }), {
+    command: darwinBundledPath,
+    args: [],
+  })
+})
+
+test('macOS falls back to configured Python when its bundle is absent', () => {
+  assert.deepEqual(resolve({
+    platform: 'darwin',
+    fileExists: () => false,
+    pythonEnv: '/opt/dsh/python',
+  }), {
+    command: '/opt/dsh/python',
+    args: [helperPath],
+  })
 })
 
 test('WSL visual mode uses an absolute cmd.exe path, not the bare name on PATH', () => {

@@ -58,6 +58,9 @@ final class PetController: NSObject {
     var bubbleScale: Double
     var reducedMotion: Bool
     var activityLevel: String
+    var soundEnabled: Bool
+    var bubbleMode: String
+    var bubbleStates: [String]
 
     // Durable status
     var displayState = "IDLE"
@@ -126,6 +129,14 @@ final class PetController: NSObject {
             self.reducedMotion = layout.reducedMotion
         }
         self.activityLevel = env["DSH_DAFEIYU_ACTIVITY_LEVEL"] ?? "normal"
+        self.soundEnabled = env["DSH_DAFEIYU_SOUND_ENABLED"] != "0"
+        let configuredBubbleMode = env["DSH_DAFEIYU_BUBBLE_MODE"]
+        self.bubbleMode = ["always", "hidden", "custom"].contains(configuredBubbleMode ?? "")
+            ? configuredBubbleMode!
+            : layout.bubbleMode
+        self.bubbleStates = env["DSH_DAFEIYU_BUBBLE_STATES"]
+            .map { $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } }
+            ?? layout.bubbleStates
         self.lastTickMs = Self.nowMs()
         super.init()
 
@@ -253,6 +264,8 @@ final class PetController: NSObject {
         layout.scale = scale
         layout.bubbleScale = bubbleScale
         layout.reducedMotion = reducedMotion
+        layout.bubbleMode = bubbleMode
+        layout.bubbleStates = bubbleStates
         layout.save(to: layoutURL)
     }
 
@@ -449,7 +462,7 @@ final class PetController: NSObject {
         let menu = NSMenu(title: "DSH 大肥鱼")
 
         let sizeMenu = NSMenu(title: "大小")
-        for (label, value) in [("小", 0.8), ("标准", 1.0), ("大", 1.25)] {
+        for (label, value) in [("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)] {
             let item = NSMenuItem(title: label, action: #selector(changeSize(_:)), keyEquivalent: "")
             item.target = self
             item.tag = Int(value * 100)
@@ -502,12 +515,14 @@ final class PetController: NSObject {
         scale = Self.clampedScale(Double(sender.tag) / 100.0)
         resizeAndReposition()
         saveLayout()
+        reportSettings(["scale": scale])
     }
 
     @objc private func changeBubbleScale(_ sender: NSMenuItem) {
         bubbleScale = Self.clampedBubbleScale(Double(sender.tag) / 100.0)
         resizeAndReposition()
         saveLayout()
+        reportSettings(["bubbleScale": bubbleScale])
     }
 
     @objc private func toggleReducedMotion(_ sender: NSMenuItem) {
@@ -519,6 +534,7 @@ final class PetController: NSObject {
             scheduleMicro()
         }
         saveLayout()
+        reportSettings(["reducedMotion": reducedMotion])
         contentView?.needsDisplay = true
     }
 
@@ -642,11 +658,22 @@ final class PetController: NSObject {
             }
             changed = true
         }
+        if let value = message["soundEnabled"] as? Bool {
+            soundEnabled = value
+        }
         if let value = message["activityLevel"] as? String, ["quiet", "normal", "lively"].contains(value) {
             activityLevel = value
             if !reducedMotion {
                 scheduleMicro()
             }
+        }
+        if let value = message["bubbleMode"] as? String, ["always", "hidden", "custom"].contains(value) {
+            bubbleMode = value
+            changed = true
+        }
+        if let value = message["bubbleStates"] as? [String] {
+            bubbleStates = value
+            changed = true
         }
         if changed {
             resizeAndReposition()
@@ -654,7 +681,7 @@ final class PetController: NSObject {
         }
     }
 
-    func quit(reason: String) {
+    func quit(reason: String, reportClosed: Bool = true) {
         guard !quitting else { return }
         quitting = true
         saveLayout()
@@ -662,12 +689,14 @@ final class PetController: NSObject {
         keepFrontTimer?.invalidate()
         microTimer?.invalidate()
         shakeTimer?.invalidate()
-        ProtocolIO.shared.write([
-            "protocolVersion": 1,
-            "kind": "closed",
-            "reason": reason,
-            "timestamp": Self.nowMs(),
-        ])
+        if reportClosed {
+            ProtocolIO.shared.write([
+                "protocolVersion": 1,
+                "kind": "closed",
+                "reason": reason,
+                "timestamp": Self.nowMs(),
+            ])
+        }
         panel?.close()
         NSApp.terminate(nil)
     }
@@ -706,15 +735,34 @@ final class PetController: NSObject {
         return nil
     }
 
+    private func bubbleVisible() -> Bool {
+        if bubbleMode == "hidden" { return false }
+        if bubbleMode == "always" { return true }
+        if tasks.count >= 2 {
+            return tasks.contains { task in
+                guard let state = task["state"] as? String else { return false }
+                return bubbleStates.contains(state)
+            }
+        }
+        return bubbleStates.contains(overlayState ?? statusState)
+    }
+
     private func notifyAlert(_ state: String) {
-        NSSound.beep()
+        if soundEnabled {
+            let filename = state == "SUCCESS" ? "success" : "error"
+            if let url = Bundle.main.resourceURL?
+                .appendingPathComponent("assets/sounds/\(filename).wav"),
+               let sound = NSSound(contentsOf: url, byReference: true) {
+                sound.play()
+            }
+        }
         shakeWindow()
         Permissions.requestNotificationAuthorizationIfNeeded()
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
         content.title = state == "SUCCESS" ? "任务完成" : "任务出错"
         content.body = state == "SUCCESS" ? "DSH 任务已完成" : "DSH 任务遇到问题"
-        content.sound = .default
+        content.sound = soundEnabled ? .default : nil
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
@@ -863,6 +911,7 @@ final class PetController: NSObject {
     }
 
     func drawCard(in view: NSView) {
+        guard bubbleVisible() else { return }
         let rect = bubbleRect()
         if tasks.count >= 2 {
             drawTaskCard(rect: rect)
@@ -1058,7 +1107,7 @@ final class PetController: NSObject {
     }
 
     static func clampedScale(_ value: Double) -> Double {
-        min(1.4, max(0.7, value))
+        min(1.4, max(0.55, value))
     }
 
     static func clampedBubbleScale(_ value: Double) -> Double {
@@ -1086,7 +1135,15 @@ final class PetController: NSObject {
     }
 
     private static func nowMs() -> Int {
-        Int(CACurrentMediaTime() * 1000)
+        Int(Date().timeIntervalSince1970 * 1000)
+    }
+
+    private func reportSettings(_ values: [String: Any]) {
+        ProtocolIO.shared.write([
+            "protocolVersion": 1,
+            "kind": "settings",
+            "timestamp": Self.nowMs(),
+        ].merging(values) { _, new in new })
     }
 
     private static func hex(_ hex: String) -> NSColor {

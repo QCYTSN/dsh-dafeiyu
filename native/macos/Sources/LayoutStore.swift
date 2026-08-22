@@ -12,6 +12,8 @@ struct PetLayout {
     var scale: Double = 1.0
     var bubbleScale: Double = 1.0
     var reducedMotion: Bool = false
+    var bubbleMode: String = "always"
+    var bubbleStates: [String] = ["SUCCESS", "ERROR", "WAITING"]
     /// Set once the native helper has written the file. Lets us migrate the
     /// old Qt helper's top-left coordinates to AppKit's bottom-left origin.
     var coordinateSpace: String?
@@ -37,11 +39,15 @@ struct PetLayout {
         if let v = json["y"] as? Int { layout.y = v }
         if let v = json["petX"] as? Int { layout.petX = v }
         if let v = json["petY"] as? Int { layout.petY = v }
-        if let d = json["scale"] as? Double { layout.scale = min(1.4, max(0.7, d)) }
-        else if let i = json["scale"] as? Int { layout.scale = min(1.4, max(0.7, Double(i))) }
+        if let d = json["scale"] as? Double { layout.scale = min(1.4, max(0.55, d)) }
+        else if let i = json["scale"] as? Int { layout.scale = min(1.4, max(0.55, Double(i))) }
         if let d = json["bubbleScale"] as? Double { layout.bubbleScale = min(1.2, max(0.8, d)) }
         else if let i = json["bubbleScale"] as? Int { layout.bubbleScale = min(1.2, max(0.8, Double(i))) }
         if let b = json["reducedMotion"] as? Bool { layout.reducedMotion = b }
+        if let mode = json["bubbleMode"] as? String, ["always", "hidden", "custom"].contains(mode) {
+            layout.bubbleMode = mode
+        }
+        if let states = json["bubbleStates"] as? [String] { layout.bubbleStates = states }
         if let s = json["coordinateSpace"] as? String { layout.coordinateSpace = s }
         return layout
     }
@@ -56,6 +62,8 @@ struct PetLayout {
             "scale": scale,
             "bubbleScale": bubbleScale,
             "reducedMotion": reducedMotion,
+            "bubbleMode": bubbleMode,
+            "bubbleStates": bubbleStates,
             "coordinateSpace": "appkit-bottom-left",
         ]
         guard let data = try? JSONSerialization.data(withJSONObject: dict, options: [.prettyPrinted, .sortedKeys]) else {
