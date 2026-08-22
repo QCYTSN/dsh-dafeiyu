@@ -89,6 +89,87 @@ def emit_reply(kind: str, **payload: Any) -> None:
     )
 
 
+# ---- Glove cursor (native Win32 .cur) ----
+def load_native_cursor(path: Path) -> Any:
+    """Load a .cur cursor with LoadCursorFromFileW.
+
+    Windows scales the .cur by DPI itself, so the result has the same size and
+    sharpness as the system cursors. Returns None outside Windows or on
+    failure; callers then fall back to the Qt default cursor.
+    """
+    if sys.platform != "win32":
+        return None
+    try:
+        import ctypes
+
+        handle = ctypes.windll.user32.LoadCursorFromFileW(str(path))
+        return handle or None
+    except Exception:
+        return None
+
+
+def set_native_cursor(handle: Any) -> None:
+    """Set the current cursor immediately (bypasses Qt's cursor pipeline)."""
+    try:
+        import ctypes
+
+        ctypes.windll.user32.SetCursor(handle)
+    except Exception:
+        pass
+
+
+def reset_native_cursor() -> None:
+    """Restore the default arrow cursor."""
+    try:
+        import ctypes
+
+        ctypes.windll.user32.SetCursor(ctypes.windll.user32.LoadCursorW(None, 32512))  # IDC_ARROW
+    except Exception:
+        pass
+
+
+class GloveCursorController:
+    """Pure state machine for the glove cursor; no Qt or Win32 dependencies.
+
+    ``open_h`` / ``closed_h`` may be None (non-Windows, or the .cur assets are
+    missing): every query then returns None, so callers simply fall back to the
+    default cursor. This keeps all cursor-state decisions testable.
+    """
+
+    WM_LBUTTONDOWN = 0x0201
+
+    def __init__(self, open_h: Any, closed_h: Any) -> None:
+        self.open_h = open_h
+        self.closed_h = closed_h
+        self.pressed = False
+
+    def handle_for(self, closed: bool) -> Any:
+        return self.closed_h if closed else self.open_h
+
+    def on_enter(self) -> Any:
+        """Pointer entered the pet window: show the open hand."""
+        return self.open_h
+
+    def on_leave(self) -> None:
+        """Pointer left the pet window: clear the pressed flag, reset to arrow."""
+        self.pressed = False
+        return None
+
+    def on_press(self) -> Any:
+        """Left button pressed: show the closed fist."""
+        self.pressed = True
+        return self.closed_h
+
+    def on_release(self, inside: bool) -> Any:
+        """Left button released: open hand when still inside, otherwise None."""
+        self.pressed = False
+        return self.open_h if inside else None
+
+    def on_wm_setcursor(self, mouse_msg: int) -> Any:
+        """WM_SETCURSOR decision: closed on WM_LBUTTONDOWN (or while pressed)."""
+        return self.handle_for(mouse_msg == self.WM_LBUTTONDOWN or self.pressed)
+
+
 class EventRecorder:
     def __init__(self, path: Path | None) -> None:
         self.path = path
@@ -133,7 +214,7 @@ def run_headless(recorder: EventRecorder) -> int:
 def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> int:
     configure_qt_platform()
     try:
-        from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
+        from PySide6.QtCore import QAbstractNativeEventFilter, QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
         from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
         from PySide6.QtWidgets import QApplication, QMenu, QWidget
     except ImportError:
@@ -156,6 +237,49 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         print(f"Unable to load BigFish asset manifest: {error}", file=sys.stderr)
         recorder.close()
         return 2
+
+    class GloveCursorFilter(QAbstractNativeEventFilter):
+        """Owns WM_SETCURSOR while the pointer is over the pet window.
+
+        The pet shows a glove hand cursor: an open hand on hover and a closed
+        fist while the left button is held. Native .cur cursors are loaded with
+        LoadCursorFromFileW so Windows does the DPI scaling (same size and
+        sharpness as system cursors), and the message is consumed immediately
+        instead of going through Qt's QCursor bitmaps, which are re-scaled a
+        second time by Qt and only take effect on the next cursor update cycle.
+        """
+
+        def __init__(self, widget: Any, open_h: Any, closed_h: Any) -> None:
+            super().__init__()
+            self.widget = widget
+            self.open_h = open_h
+            self.closed_h = closed_h
+
+        def nativeEventFilter(self, event_type: bytes, message: Any):
+            try:
+                if event_type != b"windows_generic_MSG":
+                    return False, 0
+                import ctypes
+                from ctypes import wintypes
+
+                msg = wintypes.MSG.from_address(int(message))
+                if msg.message != 0x0020:  # WM_SETCURSOR
+                    return False, 0
+                hwnd = int(msg.hWnd) if msg.hWnd else 0
+                if hwnd and hwnd != int(self.widget.winId()):
+                    # Leave popups (context menu, …) to Qt's default cursor.
+                    return False, 0
+                hit_test = msg.lParam & 0xFFFF
+                if hit_test != 1:  # HTCLIENT
+                    return False, 0
+                mouse_msg = (msg.lParam >> 16) & 0xFFFF
+                handle = self.widget.glove.on_wm_setcursor(mouse_msg)
+                if handle:
+                    ctypes.windll.user32.SetCursor(handle)
+                    return True, 0
+            except Exception:
+                pass
+            return False, 0
 
     class CompanionWindow(QWidget):
         LABELS = {
@@ -222,6 +346,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.status_message = "我在这儿等新任务哦"
             self.status_detail = "DSH · 等待下一次任务"
             self.status_deadline_ms: int | None = self._now_ms() + 4200
+            # Glove cursor: native .cur handles (Windows scales them by DPI).
+            self.glove_open_h = load_native_cursor(asset_root.parent / "cursor_grab.cur")
+            self.glove_closed_h = load_native_cursor(asset_root.parent / "cursor_grabbing.cur")
+            self.glove = GloveCursorController(self.glove_open_h, self.glove_closed_h)
             self.overlay_state: str | None = None
             self.overlay_message = ""
             self.overlay_detail = ""
@@ -363,6 +491,26 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.bubble_states = [str(state) for state in bubble_states if isinstance(state, str)]
             self._sync_bubble_size()
             self._save_layout()
+
+        def _apply_glove(self, closed: bool) -> None:
+            """Closed fist while the button is held, open hand otherwise.
+
+            Sets the cursor directly so feedback is immediate instead of
+            waiting for the next WM_SETCURSOR pass.
+            """
+            self.glove.pressed = closed
+            handle = self.glove.handle_for(closed)
+            if handle:
+                set_native_cursor(handle)
+
+        def enterEvent(self, event: Any) -> None:
+            self._apply_glove(False)
+            super().enterEvent(event)
+
+        def leaveEvent(self, event: Any) -> None:
+            self.glove.pressed = False
+            reset_native_cursor()
+            super().leaveEvent(event)
 
         def _tick(self) -> None:
             now_ms = self._now_ms()
@@ -1001,6 +1149,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def mousePressEvent(self, event: QMouseEvent) -> None:
             if event.button() == Qt.MouseButton.LeftButton:
+                self._apply_glove(True)
                 self.drag_origin = event.globalPosition().toPoint()
                 self.pet_origin = QPoint(self.pet_x, self.pet_y)
                 self.dragging = False
@@ -1023,6 +1172,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.drag_origin = None
             self.pet_origin = None
             self.dragging = False
+            # The button state is authoritative: restore the open hand if the
+            # pointer is still over the pet, or the default arrow otherwise.
+            self.glove.pressed = False
+            if self.rect().contains(event.position().toPoint()):
+                self._apply_glove(False)
+            else:
+                reset_native_cursor()
 
         def _play_click_interaction(self, x: float, y: float) -> None:
             pet_x, pet_y, pet_width, pet_height = self._pet_rect()
@@ -1097,6 +1253,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     application.setQuitOnLastWindowClosed(False)
     inbox = Inbox()
     window = CompanionWindow()
+    glove_filter = GloveCursorFilter(window, window.glove_open_h, window.glove_closed_h)
+    application.installNativeEventFilter(glove_filter)
     inbox.message.connect(window.apply_message)
     inbox.closed.connect(application.quit)
 
