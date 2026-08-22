@@ -185,7 +185,7 @@ DSH Agent events can change its work state.
 | Setting | Purpose |
 | --- | --- |
 | Enable BigFish | Show or stop the desktop companion immediately |
-| Character size | Scale the character from 70% to 140% |
+| Character size | Scale the character from 55% to 140%; the context menu includes a 60% mini preset |
 | Bubble size | Scale the status bubble from 80% to 120% while keeping status text readable |
 | Bubble visibility | Always show, hide completely, or choose which states show the bubble |
 | Activity level | Control the frequency of idle blinks and micro-animations |

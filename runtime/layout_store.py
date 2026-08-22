@@ -46,7 +46,7 @@ def normalise_layout(value: Any) -> dict[str, Any]:
             layout[key] = coordinate
     scale = value.get("scale")
     if isinstance(scale, (int, float)) and not isinstance(scale, bool):
-        layout["scale"] = min(1.4, max(0.7, float(scale)))
+        layout["scale"] = min(1.4, max(0.55, float(scale)))
     bubble_scale = value.get("bubbleScale")
     if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
         layout["bubbleScale"] = min(1.2, max(0.8, float(bubble_scale)))

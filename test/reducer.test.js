@@ -105,6 +105,32 @@ test('question tools show waiting and resume on result or user response', () => 
   assert.equal(resumedFromUser.state, CompanionState.THINKING)
 })
 
+test('exit_plan_mode waits for plan approval without matching ordinary planning tools', () => {
+  const reducer = new CompanionReducer()
+  reducer.handle(session, event('turn/start', { turn: 1 }, 1))
+
+  const [planning] = reducer.handle(session, event('tool/call', {
+    callId: 'plan-enter',
+    name: 'enter_plan_mode',
+  }, 2))
+  assert.equal(planning.state, CompanionState.WORKING)
+  reducer.handle(session, event('tool/result', {
+    message: { source: { callId: 'plan-enter' } },
+  }, 3))
+
+  const [waiting] = reducer.handle(session, event('tool/call', {
+    callId: 'plan-exit',
+    name: 'exit_plan_mode',
+  }, 4))
+  assert.equal(waiting.state, CompanionState.WAITING)
+  assert.equal(waiting.stage, '等待确认')
+
+  const [resumed] = reducer.handle(session, event('tool/result', {
+    message: { source: { callId: 'plan-exit' } },
+  }, 5))
+  assert.equal(resumed.state, CompanionState.THINKING)
+})
+
 test('tool failure pulses error without losing the underlying work state', () => {
   const reducer = new CompanionReducer()
   reducer.handle(session, event('turn/start', { turn: 1 }, 1))

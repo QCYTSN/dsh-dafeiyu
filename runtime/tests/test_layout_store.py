@@ -46,6 +46,10 @@ class LayoutStoreTests(unittest.TestCase):
         self.assertEqual(normalise_layout({"bubbleScale": 0.1})["bubbleScale"], 0.8)
         self.assertEqual(normalise_layout({})["bubbleScale"], 1.0)
 
+    def test_character_scale_supports_the_mini_range(self) -> None:
+        self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.55)
+        self.assertEqual(normalise_layout({"scale": 0.6})["scale"], 0.6)
+
 
 if __name__ == "__main__":
     unittest.main()

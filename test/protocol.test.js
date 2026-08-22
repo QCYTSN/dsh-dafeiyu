@@ -45,3 +45,12 @@ test('protocol creates and encodes a live config message', () => {
   assert.equal(assertCompanionMessage(message), message)
   assert.deepEqual(JSON.parse(encodeMessage(message)), message)
 })
+
+test('protocol accepts settings reported by the desktop helper', () => {
+  const message = createMessage(CompanionMessageKind.SETTINGS, {
+    scale: 0.6,
+    reducedMotion: true,
+  })
+  assert.equal(assertCompanionMessage(message), message)
+  assert.deepEqual(JSON.parse(encodeMessage(message)), message)
+})

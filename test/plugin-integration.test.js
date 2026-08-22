@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict'
 import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { createRequire } from 'node:module'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import { apply, inject } from '../src/index.js'
 
@@ -148,4 +149,63 @@ test('live settings keep the active project state without restarting the helper'
   assert.equal(working.project, 'active-project')
   assert.equal(working.task, '继续保留这个任务')
   await rm(directory, { recursive: true, force: true })
+})
+
+test('helper context-menu changes persist through the DSH settings service', async () => {
+  const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'settings-helper.js')
+  const listeners = new Map()
+  let dispose
+  let settingsListener
+  let persisted
+  let settingsValue = {
+    enabled: true,
+    scale: 1,
+    bubbleScale: 1,
+    activityLevel: 'normal',
+    reducedMotion: false,
+    bubbleMode: 'always',
+    bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
+    includeSubagents: false,
+  }
+  const settings = {
+    get: () => ({ ...settingsValue }),
+    watch(callback) {
+      settingsListener = callback
+      return () => { settingsListener = undefined }
+    },
+    async update(patch) {
+      persisted = patch
+      settingsValue = { ...settingsValue, ...patch }
+      settingsListener?.({ ...settingsValue })
+    },
+  }
+  const ctx = {
+    settings: { register: () => settings },
+    logger: { debug() {}, info() {}, warn() {}, error() {} },
+    on(name, callback) {
+      listeners.set(name, callback)
+    },
+    effect(setup) {
+      dispose = setup()
+    },
+  }
+
+  apply(ctx, {
+    helper: {
+      command: process.execPath,
+      args: [fixture],
+      headless: false,
+      heartbeatMs: 0,
+    },
+  })
+  await waitFor(() => persisted !== undefined)
+  assert.deepEqual(persisted, {
+    scale: 0.6,
+    bubbleScale: 0.9,
+    reducedMotion: true,
+  })
+  assert.equal(settingsValue.scale, 0.6)
+  assert.equal(settingsValue.bubbleScale, 0.9)
+  assert.equal(settingsValue.reducedMotion, true)
+  dispose()
 })

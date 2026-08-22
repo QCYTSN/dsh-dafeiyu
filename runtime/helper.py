@@ -152,7 +152,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.layout = load_layout(self.layout_path)
             configured_scale = os.environ.get("DSH_DAFEIYU_SCALE")
             try:
-                self.scale = min(1.4, max(0.7, float(configured_scale))) if configured_scale else self.layout["scale"]
+                self.scale = min(1.4, max(0.55, float(configured_scale))) if configured_scale else self.layout["scale"]
             except ValueError:
                 self.scale = self.layout["scale"]
             configured_bubble_scale = os.environ.get("DSH_DAFEIYU_BUBBLE_SCALE")
@@ -306,7 +306,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             """Apply a live CONFIG message without restarting the window."""
             scale = message.get("scale")
             if isinstance(scale, (int, float)) and not isinstance(scale, bool):
-                self.scale = min(1.4, max(0.7, float(scale)))
+                self.scale = min(1.4, max(0.55, float(scale)))
             bubble_scale = message.get("bubbleScale")
             if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
                 self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
@@ -958,7 +958,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             menu = QMenu(self)
             size_menu = menu.addMenu("大小")
             size_actions = {}
-            for label, scale in (("小", 0.8), ("标准", 1.0), ("大", 1.25)):
+            for label, scale in (("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)):
                 action = size_menu.addAction(label)
                 action.setCheckable(True)
                 action.setChecked(abs(self.scale - scale) < 0.05)
@@ -983,11 +983,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._apply_window_size()
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
+                emit_reply("settings", scale=self.scale)
             elif selected in bubble_size_actions:
                 self.bubble_scale = bubble_size_actions[selected]
                 self._apply_window_size()
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
+                emit_reply("settings", bubbleScale=self.bubble_scale)
             elif selected == reduced_action:
                 self.reduced_motion = reduced_action.isChecked()
                 self.animation_timer.setInterval(40 if self.reduced_motion else 20)
@@ -996,6 +998,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 else:
                     self._schedule_micro()
                 self._save_layout()
+                emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()
             elif selected == open_webui_action:
                 QDesktopServices.openUrl(QUrl(self.webui_url))

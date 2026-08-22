@@ -1,5 +1,16 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Plan mode's `exit_plan_mode` approval step now shows the waiting state instead of working.
+- Character size, bubble size, and reduced-motion changes made from the desktop context menu now sync back to DSH settings and survive a restart.
+
+### Changed
+
+- Character scaling now supports 55% to 140%, with a 60% mini preset in the desktop context menu.
+
 ## 0.1.2
 
 Fixes for WSL reliability and project renames.

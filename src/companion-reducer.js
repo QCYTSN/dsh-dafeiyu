@@ -78,7 +78,14 @@ function isUserQuestionTool(name) {
   const strong = tokens.some((token) =>
     token === 'authorize' || token === 'authorise' || token === 'consent'
   )
-  return hasUserNoun || hasNounFromUser || hasAsk || strong
+  // Plan mode submits its completed plan through exit_plan_mode and then
+  // blocks until the user approves or rejects it. Treat only that exact token
+  // sequence as a question so enter_plan_mode and ordinary planning tools do
+  // not produce false waiting states.
+  const submitsPlanForApproval = tokens.some((token, index) =>
+    token === 'exit' && tokens[index + 1] === 'plan' && tokens[index + 2] === 'mode'
+  )
+  return hasUserNoun || hasNounFromUser || hasAsk || strong || submitsPlanForApproval
 }
 
 function sessionIdOf(session) {
