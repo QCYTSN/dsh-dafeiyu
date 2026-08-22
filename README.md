@@ -85,8 +85,8 @@ stateDiagram-v2
 ## 系统要求
 
 - Windows 10/11 x64，或 WSL2（通过 Windows interop 运行桌面 Helper）
-- macOS 12.0+（Apple Silicon 或 Intel）——发布包内置原生 Helper，
-  无需安装 Python / PySide6
+- macOS 12.0+（Apple Silicon 或 Intel）——下个发布包将内置原生 Helper，
+  无需安装 Python / PySide6（当前 npm 0.1.3 尚未包含）
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的稳定版 `dsh-dafeiyu`（或抢先测试的 `dsh-dafeiyu@alpha`），或 GitHub Release 中的 `.tgz` 安装包
@@ -130,6 +130,9 @@ dsh plugin --profile web add dsh-dafeiyu
 远程 Linux 和容器不是本版本的桌面显示目标。
 
 ### macOS 用户（Apple Silicon / Intel，macOS 12.0+）
+
+> 发布状态：原生 macOS Helper 当前位于 `main` 的 **Unreleased**；已经发布的
+> npm `latest` 0.1.3 尚不包含它。下面的普通用户安装命令从下一版本发布后生效。
 
 macOS 的安装方式与 Windows 相同，只是换成「终端」和 macOS 路径。发布包
 内置原生 Helper，**不需要安装 Python、PySide6 或 Xcode**。

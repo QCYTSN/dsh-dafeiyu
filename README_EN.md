@@ -86,8 +86,8 @@ When multiple tasks are active, the status bubble lists them at the same time.
 ## Requirements
 
 - Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
-- macOS 12.0+ (Apple Silicon or Intel) — the native Helper is bundled in the
-  release, no Python / PySide6 required
+- macOS 12.0+ (Apple Silicon or Intel) — the next release will bundle the
+  native Helper with no Python / PySide6 requirement (npm 0.1.3 does not yet)
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - the stable `dsh-dafeiyu` from npm (or `dsh-dafeiyu@alpha` to try prereleases early), or a `.tgz` archive from GitHub Releases
@@ -133,6 +133,10 @@ PySide6 installation is required inside WSL. The current target is WSL2 on Windo
 not ordinary Linux, remote Linux, or containers.
 
 ### macOS users (Apple Silicon / Intel, macOS 12.0+)
+
+> Release status: the native macOS Helper is currently **Unreleased** on
+> `main`; npm `latest` 0.1.3 does not contain it. The regular-user install
+> commands below apply after the next release is published.
 
 Installation on macOS is the same as Windows, just in the Terminal with macOS
 paths. The release bundle ships a native Helper — **no Python, PySide6 or Xcode

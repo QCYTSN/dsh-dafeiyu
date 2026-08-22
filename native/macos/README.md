@@ -59,10 +59,18 @@ native/macos/build.sh
 arm64 + x86_64，最低 macOS 12.0，ad-hoc 签名，素材打进
 `Contents/Resources/assets`）。要求 Xcode Command Line Tools（`swiftc`）。
 
+## 签名与 Gatekeeper 边界
+
+自动构建会执行 ad-hoc 签名，并用 `codesign --verify --deep --strict` 检查应用包
+完整性；这不等同于 Apple Developer ID 签名或公证。当前 Alpha 集成没有仓库可用的
+Developer ID / Notary 凭据，因此浏览器下载并带有隔离属性的包仍可能被 Gatekeeper
+拦截。正式签名与公证继续在 #24 跟踪，不能把 ad-hoc 签名描述为正式分发签名。
+
 ## 用户安装（macOS 端用户）
 
-普通用户**不需要**自行构建或运行本目录的源码。直接用 DSH 的插件命令安装
-发布包即可（发布包已内置 macOS 原生 Helper）：
+原生 Helper 当前仍在 `main` 的 Unreleased 阶段，npm `latest` 0.1.3 尚未包含。
+下一版本发布后，普通用户**不需要**自行构建或运行本目录的源码，直接用 DSH 的
+插件命令安装即可：
 
 ```bash
 pnpm exec dsh plugin --profile web add dsh-dafeiyu
