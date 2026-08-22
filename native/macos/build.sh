@@ -42,7 +42,7 @@ swiftc -O -swift-version 5 -target x86_64-apple-macosx12.0 \
 lipo -create "$WORK/helper-arm64" "$WORK/helper-x86_64" -output "$BIN"
 chmod 0755 "$BIN"
 codesign --force --deep --sign - --timestamp=none "$APP"
-lipo -verify_arch arm64 x86_64 "$BIN"
+lipo "$BIN" -verify_arch arm64 x86_64
 plutil -lint "$APP/Contents/Info.plist"
 codesign --verify --deep --strict --verbose=2 "$APP"
 

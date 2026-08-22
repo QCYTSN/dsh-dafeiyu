@@ -127,7 +127,7 @@ jobs:
         run: |
           app=runtime/bin/darwin/dsh-dafeiyu-helper.app
           binary="$app/Contents/MacOS/dsh-dafeiyu-helper"
-          lipo -verify_arch arm64 x86_64 "$binary"
+          lipo "$binary" -verify_arch arm64 x86_64
           codesign --verify --deep --strict --verbose=2 "$app"
           test "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$app/Contents/Info.plist")" = "$(node -p "require('./package.json').version")"
 
@@ -139,6 +139,6 @@ jobs:
           app=.build/package-check/package/runtime/bin/darwin/dsh-dafeiyu-helper.app
           binary="$app/Contents/MacOS/dsh-dafeiyu-helper"
           test -x "$binary"
-          lipo -verify_arch arm64 x86_64 "$binary"
+          lipo "$binary" -verify_arch arm64 x86_64
           codesign --verify --deep --strict --verbose=2 "$app"
           node scripts/test-packaged-helper.mjs --executable "$binary"
