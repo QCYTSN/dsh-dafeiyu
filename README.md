@@ -18,14 +18,14 @@ DSH 大肥鱼不是一个需要单独启动的桌宠应用。它由 DSH 插件�
 一起启动和退出，并以透明、无边框、始终置顶的原生窗口显示在桌面上。即使切换到
 VS Code、浏览器或文件管理器，也能知道 DSH 当前在思考、修改、测试、等待还是已经完成。
 
-> 当前版本：`0.1.4` · Windows / WSL2 / Linux x64 · macOS 实验性支持
+> 当前版本：`0.1.4` · Windows / WSL2 / Linux x64 / macOS 支持
 
 ## 关注最新进展
 
 - 最新版本永远以 [npm `latest`](https://www.npmjs.com/package/dsh-dafeiyu) 和 [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) 为准（Releases 里同时提供 `.tgz` 安装包）；顶部的版本徽章会自动更新。
 - 给仓库 **Star 只是收藏，不会收到更新通知**。想第一时间知道「更新了什么」：
-  1. 打开仓库点 **Watch → Custom → Releases**，只订阅 Release 通知；
-  2. 或直接订阅 Releases 的 feed：<https://github.com/QCYTSN/dsh-dafeiyu/releases.atom>
+    1. 打开仓库点 **Watch → Custom → Releases**，只订阅 Release 通知；
+    2. 或直接订阅 Releases 的 feed：<https://github.com/QCYTSN/dsh-dafeiyu/releases.atom>
 - 已安装用户升级：完全退出 DSH 后执行
   ```powershell
   dsh plugin --profile web update dsh-dafeiyu
@@ -85,8 +85,8 @@ stateDiagram-v2
 ## 系统要求
 
 - Windows 10/11 x64，或 WSL2（通过 Windows interop 运行桌面 Helper）
-- Linux x64 桌面环境（原生 X11，或通过 XWayland 运行）
-- macOS 12.0+（Apple Silicon 或 Intel，实验性支持）
+- Linux x64 桌面（glibc ≥ 2.35；桌面实机仅在 Ubuntu 24.04 / glibc 2.39 验证）
+- macOS 12.0+（Apple Silicon 或 Intel）
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的稳定版 `dsh-dafeiyu`（或抢先测试的 `dsh-dafeiyu@alpha`），或 GitHub Release 中的 `.tgz` 安装包
@@ -102,7 +102,9 @@ x64 和 macOS 的 Helper 都已经包含在发布包里。
 
 先关闭 DSH Host，而不只是关闭浏览器标签页。安装或更新时不要让旧版插件继续运行。
 
-### 2. 一行命令安装
+### 2. 命令安装
+
+### Windows 用户
 
 在 PowerShell 中进入你的 DSH 安装目录，例如：
 
@@ -124,20 +126,54 @@ dsh plugin --profile web add dsh-dafeiyu
 
 想抢先试用新功能（`@alpha` 测试版）的用户，把命令里的包名换成 `dsh-dafeiyu@alpha` 即可。
 
-如果 DSH 运行在 WSL2，请在 WSL 终端执行同一条安装命令。插件会自动通过
-`cmd.exe` 启动包内的 Windows Helper，不需要手动 `chmod`，也不需要在 WSL
-安装 Python 或 PySide6。当前支持范围是 Windows x64 上的 WSL2。
+如果 DSH 运行在 WSL2，请在 WSL 终端执行同一条安装命令。可视模式下插件会
+自动通过 `cmd.exe` 启动包内的 **Windows** Helper，不需要手动 `chmod`，
+也不需要在 WSL 安装 Python 或 PySide6。原生 Linux 桌面请看下一节，使用
+随包的 Linux Helper，而不是 Windows 的 `.exe`。
 
-普通 Linux x64 桌面用户也执行同一条安装命令。`0.1.4` 已内置 Linux Helper，
-无需系统 Python；需要可用的图形桌面会话，原生支持 X11，并可通过 XWayland
-运行。远程无桌面 Linux 和容器不是本版本的显示目标。
+### Linux 用户（x64 桌面，glibc ≥ 2.35）
+
+Linux 桌面的安装方式与 Windows 相同，只是换成终端和 Linux 路径。发布包
+内置预构建 Helper，**不需要安装 Python 或 PySide6**。
+
+系统要求：
+
+- x86_64 桌面发行版，**glibc ≥ 2.35**（官方二进制在 Ubuntu 22.04 上构建）。
+- **桌面实机目前只在 Ubuntu 24.04（glibc 2.39）上验证过。** Ubuntu 22.04 及其他发行版
+  尚未做桌面验收；CI 只在 Ubuntu 22.04 上用 Xvfb 做构建与烟测。
+- 需要图形会话（`DISPLAY` 或 `WAYLAND_DISPLAY`）。Helper 优先走 X11 / XWayland
+  （`xcb`），其次才是 Wayland。
+- Debian / Ubuntu 桌面通常还需要 `libxcb-cursor0`。
+- ARM、无显示器的远程 SSH、容器和纯服务器环境不是本版本的桌面显示目标。
+
+在终端中进入你的 DSH 安装目录（例如 `~/deepseek-harness`）：
+
+```bash
+cd ~/deepseek-harness
+```
+
+然后从 npm 安装稳定版：
+
+```bash
+pnpm exec dsh plugin --profile web add dsh-dafeiyu
+```
+
+如果系统已经能直接使用全局 `dsh` 命令：
+
+```bash
+dsh plugin --profile web add dsh-dafeiyu
+```
+
+也可以从 [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases)
+下载 `dsh-dafeiyu-<version>.tgz`（不要解压），然后安装：
+
+```bash
+pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+```
+
+装完照常启动 DSH WebUI，大肥鱼会由 DSH 自动拉起；不需要手动打开 Helper。
 
 ### macOS 用户（Apple Silicon / Intel，macOS 12.0+）
-
-> `0.1.4` 首次提供实验性的原生 macOS Helper。CI 已验证 Universal 架构、
-> AppKit 渲染和进程生命周期；Apple Silicon 实机体验将继续通过用户反馈验证。
-> 当前应用只有 ad-hoc 签名，尚未 Developer ID 签名或公证，浏览器下载的包可能
-> 被 Gatekeeper 拦截。
 
 macOS 的安装方式与 Windows 相同，只是换成「终端」和 macOS 路径。发布包
 内置原生 Helper，**不需要安装 Python、PySide6 或 Xcode**。
@@ -267,7 +303,7 @@ pnpm exec dsh plugin --profile web add dsh-dafeiyu
 pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-version>.tgz"
 ```
 
-以上方式都会替换插件及随包携带的 Windows Helper，并保留 DSH 已保存的设置。详细
+以上方式都会替换插件及随包携带的 Helper，并保留 DSH 已保存的设置。详细
 说明见 [插件更新与回退](docs/UPDATING.md)。
 
 ## 回退到旧版本
@@ -299,7 +335,9 @@ pnpm exec dsh plugin --profile web remove dsh-dafeiyu
 1. 确认安装使用的是 `--profile web`。
 2. 完全退出并重新启动 DSH Host。
 3. 进入“设置 → 插件 → 插件配置”确认“启用大肥鱼”已经勾选。
-4. 确认使用 Windows x64 发布包，而不是只克隆了缺少预构建 Helper 的源码。
+4. 确认使用包含对应平台预构建 Helper 的发布包，而不是只克隆了缺少预构建 Helper 的源码。
+   Windows / WSL2 需要 `runtime/bin/win32-x64`；原生 Linux 桌面需要
+   `runtime/bin/linux-x64`；macOS 需要 `runtime/bin/darwin`。
 
 </details>
 
@@ -391,6 +429,17 @@ python -m pip install -r requirements.txt pyinstaller
 $env:DSH_DAFEIYU_BUILD_PYTHON = (Get-Command python).Source
 npm run build:helper:windows
 ```
+
+构建 Linux Helper（需在 Linux x86_64 上；官方发布在 Ubuntu 22.04 上构建，
+以保证 glibc 2.35 基线）：
+
+```bash
+python3 -m pip install -r requirements.txt pyinstaller
+export DSH_DAFEIYU_BUILD_PYTHON="$(command -v python3)"
+npm run build:helper:linux
+```
+
+macOS 原生 Helper 的构建说明见 [native/macos/README.md](native/macos/README.md)。
 
 ## 更多文档
 
