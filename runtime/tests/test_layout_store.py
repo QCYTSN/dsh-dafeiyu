@@ -1,9 +1,11 @@
 import json
+import os
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
-from runtime.layout_store import DEFAULT_LAYOUT, load_layout, normalise_layout, save_layout
+from runtime.layout_store import DEFAULT_LAYOUT, default_layout_path, load_layout, normalise_layout, save_layout
 
 
 class LayoutStoreTests(unittest.TestCase):
@@ -45,6 +47,14 @@ class LayoutStoreTests(unittest.TestCase):
         self.assertEqual(normalise_layout({"bubbleScale": 9})["bubbleScale"], 1.2)
         self.assertEqual(normalise_layout({"bubbleScale": 0.1})["bubbleScale"], 0.8)
         self.assertEqual(normalise_layout({})["bubbleScale"], 1.0)
+
+    def test_xdg_config_home_is_used_on_linux(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.dict(os.environ, {"XDG_CONFIG_HOME": directory}, clear=True):
+                self.assertEqual(
+                    default_layout_path(),
+                    Path(directory) / "dsh" / "dsh-dafeiyu" / "layout.json",
+                )
 
     def test_character_scale_supports_the_mini_range(self) -> None:
         self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.55)

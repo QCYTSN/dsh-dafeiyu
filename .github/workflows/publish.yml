@@ -20,8 +20,8 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build-windows-package:
-    name: Build and verify Windows package
+  build-windows-helper:
+    name: Build and verify Windows Helper
     runs-on: windows-latest
     permissions:
       contents: read
@@ -62,8 +62,107 @@ jobs:
           $env:DSH_DAFEIYU_BUILD_PYTHON = (Get-Command python).Source
           npm run build:helper:windows
 
-      - name: Create npm archive
-        run: npm pack
+      - name: Upload Windows Helper
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-helper
+          path: runtime/bin/win32-x64/dsh-dafeiyu-helper.exe
+          if-no-files-found: error
+          retention-days: 14
+
+  build-linux-helper:
+    name: Build and verify Linux x64 Helper
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+
+      - name: Install Linux display libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb libdbus-1-3 libegl1 libgl1 libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0
+
+      - name: Install Helper build dependencies
+        run: python -m pip install --disable-pip-version-check -r requirements.txt pyinstaller
+
+      - name: Run Python tests
+        run: python -m unittest discover -s runtime/tests -t .
+
+      - name: Build and smoke-test Linux Helper
+        env:
+          DSH_DAFEIYU_BUILD_PYTHON: ${{ env.pythonLocation }}/bin/python
+        run: xvfb-run --auto-servernum npm run build:helper:linux
+
+      - name: Upload Linux Helper
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-helper
+          path: runtime/bin/linux-x64/dsh-dafeiyu-helper
+          if-no-files-found: error
+          retention-days: 14
+
+  assemble-package:
+    name: Assemble and verify cross-platform package
+    needs:
+      - build-windows-helper
+      - build-linux-helper
+    runs-on: ubuntu-22.04
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: "24"
+          package-manager-cache: false
+
+      - name: Install Linux display libraries
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes xvfb libdbus-1-3 libegl1 libgl1 libxcb-cursor0 libxcb-xinerama0 libxkbcommon-x11-0
+
+      - name: Download Windows Helper
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-helper
+          path: runtime/bin/win32-x64
+
+      - name: Download Linux Helper
+        uses: actions/download-artifact@v4
+        with:
+          name: linux-helper
+          path: runtime/bin/linux-x64
+
+      - name: Create and verify npm archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          chmod 0755 runtime/bin/linux-x64/dsh-dafeiyu-helper
+          archive=$(npm pack --silent)
+          mkdir -p .build/package-check
+          tar -xzf "$archive" -C .build/package-check
+          test -f .build/package-check/package/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe
+          test -x .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
+          xvfb-run --auto-servernum node scripts/test-packaged-helper.mjs \
+            --executable .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
 
       - name: Upload verified archive
         uses: actions/upload-artifact@v4
@@ -75,7 +174,7 @@ jobs:
 
   publish:
     name: Publish with npm trusted publishing
-    needs: build-windows-package
+    needs: assemble-package
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -92,7 +191,7 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
 
-      - name: Download verified Windows package
+      - name: Download verified cross-platform package
         uses: actions/download-artifact@v4
         with:
           name: npm-package

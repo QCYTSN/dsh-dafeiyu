@@ -1,9 +1,11 @@
 # Publishing releases
 
-The repository publishes the Windows package through GitHub Actions and npm trusted publishing.
-The Windows Helper is built and visually smoke-tested on a GitHub-hosted Windows runner. The exact
-resulting `.tgz` archive is then published from a GitHub-hosted Linux runner using short-lived OIDC
-credentials. No npm password or long-lived publish token is stored in GitHub, Windows, or WSL.
+The repository publishes one cross-platform package through GitHub Actions and npm trusted
+publishing. Windows and Linux x64 Helpers are built and visually smoke-tested on their native
+GitHub-hosted runners. A Linux assembly job then combines both artifacts, checks their final npm
+archive paths and executable modes, and smoke-tests the Linux Helper from the extracted `.tgz`.
+That exact archive is published using short-lived OIDC credentials. No npm password or long-lived
+publish token is stored in GitHub, Windows, or WSL.
 
 ## One-time npm setup
 

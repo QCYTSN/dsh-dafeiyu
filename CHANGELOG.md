@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Added
+
+- Linux x64 desktop support with a bundled, Python-free Helper, XDG layout persistence, and X11/Wayland platform selection.
+- Linux Helper build, visual smoke test, and final npm-archive validation in CI and the trusted release workflow.
+
 ## 0.1.3
 
 ### Fixed
