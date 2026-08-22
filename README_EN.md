@@ -190,6 +190,7 @@ DSH Agent events can change its work state.
 | Bubble visibility | Always show, hide completely, or choose which states show the bubble |
 | Activity level | Control the frequency of idle blinks and micro-animations |
 | Reduced motion | Reduce walking, looping frames, and procedural movement |
+| Notification sound | Play or mute BigFish's original sound when a task succeeds or fails |
 | Include subagents | Allow subagent sessions to participate in status priority; off by default |
 
 DSH persists these settings, so a normal plugin update does not require reconfiguration.

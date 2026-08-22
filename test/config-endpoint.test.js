@@ -5,7 +5,7 @@ import test from 'node:test'
 import { createConfigHandler } from '../src/index.js'
 
 function settingsFixture() {
-  let value = { enabled: true, scale: 1, bubbleScale: 1, activityLevel: 'normal', reducedMotion: false, includeSubagents: false }
+  let value = { enabled: true, scale: 1, bubbleScale: 1, activityLevel: 'normal', reducedMotion: false, soundEnabled: true, includeSubagents: false }
   return {
     get: () => ({ ...value }),
     update: async (patch) => { value = { ...value, ...patch } },
@@ -36,13 +36,14 @@ test('local config endpoint reads and persists an allowed patch', async () => {
 
   const changed = await request(handler, {
     method: 'PATCH',
-    body: JSON.stringify({ enabled: false, scale: 0.8, bubbleScale: 0.8 }),
+    body: JSON.stringify({ enabled: false, scale: 0.8, bubbleScale: 0.8, soundEnabled: false }),
     origin: 'http://127.0.0.1:2026',
   })
   assert.equal(changed.status, 200)
   assert.equal(changed.body.enabled, false)
   assert.equal(changed.body.scale, 0.8)
   assert.equal(changed.body.bubbleScale, 0.8)
+  assert.equal(changed.body.soundEnabled, false)
 })
 
 test('local config endpoint rejects remote, cross-origin, and unknown writes', async () => {

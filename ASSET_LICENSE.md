@@ -14,6 +14,11 @@ The plugin does not include source references, paid pose references, candidate
 sheets, or original working material. Only the explicitly allowlisted runtime
 frames required by the DSH companion are bundled.
 
+The notification sounds under `assets/sounds/` are original procedural audio
+generated for this repository by `scripts/generate_notification_sounds.py`.
+They contain no third-party recordings and are covered by the repository's MIT
+license.
+
 This is an unofficial fan-made project and is not affiliated with or endorsed
 by DeepSeek. Names, marks, and character-related rights belong to their
 respective owners.

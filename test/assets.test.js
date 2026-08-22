@@ -77,3 +77,14 @@ test('dragging uses one stable frame without procedural motion', async () => {
   assert.deepEqual(manifest.clips.dragging.frames, ['dragging/dragging_238.png'])
   assert.equal(manifest.clips.dragging.motion, undefined)
 })
+
+test('original notification sounds are valid short mono WAV files', async () => {
+  for (const name of ['success.wav', 'error.wav']) {
+    const bytes = await readFile(join(repositoryRoot, 'assets', 'sounds', name))
+    assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF')
+    assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WAVE')
+    assert.equal(bytes.readUInt16LE(22), 1, `${name} must stay mono`)
+    assert.equal(bytes.readUInt32LE(24), 44100, `${name} sample rate drifted`)
+    assert.ok(bytes.length > 20_000 && bytes.length < 50_000, `${name} should remain a short lightweight alert`)
+  }
+})

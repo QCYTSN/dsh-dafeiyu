@@ -10,6 +10,7 @@
 ### Changed
 
 - Character scaling now supports 55% to 140%, with a 60% mini preset in the desktop context menu.
+- Replaced the generic system beep with original, quieter success and error chimes and added a notification-sound setting.
 
 ## 0.1.2
 

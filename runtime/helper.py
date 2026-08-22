@@ -170,6 +170,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 if configured_reduced_motion is not None
                 else self.layout["reducedMotion"]
             )
+            configured_sound_enabled = os.environ.get("DSH_DAFEIYU_SOUND_ENABLED")
+            self.sound_enabled = configured_sound_enabled != "0"
             self.activity_level = os.environ.get("DSH_DAFEIYU_ACTIVITY_LEVEL", "normal")
             configured_bubble_mode = os.environ.get("DSH_DAFEIYU_BUBBLE_MODE")
             self.bubble_mode = (
@@ -318,6 +320,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self.micro_timer.stop()
                 else:
                     self._schedule_micro()
+            sound_enabled = message.get("soundEnabled")
+            if isinstance(sound_enabled, bool):
+                self.sound_enabled = sound_enabled
             activity_level = message.get("activityLevel")
             if activity_level in {"quiet", "normal", "lively"}:
                 self.activity_level = activity_level
@@ -744,10 +749,26 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 )
 
         def _notify_alert(self, state: str) -> None:
-            try:
-                QApplication.beep()
-            except Exception:
-                pass
+            if self.sound_enabled:
+                played = False
+                if sys.platform == "win32":
+                    try:
+                        import winsound
+
+                        sound_name = "success.wav" if state == "SUCCESS" else "error.wav"
+                        sound_path = bundle_root() / "assets" / "sounds" / sound_name
+                        winsound.PlaySound(
+                            str(sound_path),
+                            winsound.SND_FILENAME | winsound.SND_ASYNC | winsound.SND_NODEFAULT,
+                        )
+                        played = True
+                    except (ImportError, OSError, RuntimeError):
+                        pass
+                if not played:
+                    try:
+                        QApplication.beep()
+                    except Exception:
+                        pass
             self._shake_window()
 
         def _shake_window(self) -> None:

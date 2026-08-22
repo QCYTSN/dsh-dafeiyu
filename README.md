@@ -188,6 +188,7 @@ pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<vers
 | 气泡显示 | 常驻显示、完全隐藏，或自定义哪些状态显示气泡 |
 | 活跃程度 | 控制空闲时眨眼、观察等微动作频率 |
 | 减少动态效果 | 减少走动、循环帧和程序化晃动 |
+| 提示音 | 控制任务完成或出错时的大肥鱼提示音 |
 | 响应子 Agent | 允许子 Agent 状态参与优先级选择；默认关闭 |
 
 设置由 DSH 保存，更新插件后通常不需要重新配置。
