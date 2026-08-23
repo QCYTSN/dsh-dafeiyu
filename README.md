@@ -21,9 +21,9 @@
 | 文件 | 姿势 | 角色高 | manifest clip |
 |------|------|--------|---------------|
 | `dragging_238_01.png` | 被持稳定帧 | 243 | `dragging`（按住期间显示） |
-| `dragging_238_03.png` | 松手弹开 | 243 | `dragging_release` |
-| `dragging_238_04.png` | 晕乎乎 | 243 | `dragging_dizzy` |
-| `dragging_238_05.png` | 抗议 | 219（刻意缩小一圈） | `dragging_protest` |
+| `dragging_238_02.png` | 松手弹开 | 243 | `dragging_release` |
+| `dragging_238_03.png` | 晕乎乎 | 243 | `dragging_dizzy` |
+| `dragging_238_04.png` | 抗议 | 219（刻意缩小一圈） | `dragging_protest` |
 
 来源：`@Serendipity-wu02` AI 辅助原创，等比缩放处理，声明见 `ASSET_LICENSE.md`。
 
