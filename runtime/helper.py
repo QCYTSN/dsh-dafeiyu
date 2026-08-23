@@ -28,12 +28,9 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
-DRAG_LIFT_MS = 220
-DRAG_RELEASE_MS = 240
-DRAG_DIZZY_MS = 760
-DRAG_PROTEST_MS = 320
-DRAG_FAST_ENTER_PX_PER_MS = 2.4
-DRAG_FAST_EXIT_PX_PER_MS = 1.2
+DRAG_RELEASE_MS = 300
+DRAG_DIZZY_MS = 960
+DRAG_PROTEST_MS = 240
 
 
 def bundle_root() -> Path:
@@ -235,9 +232,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.pet_x = 0
             self.pet_y = 0
             self.dragging = False
-            self.drag_fast = False
-            self.drag_last_pos: QPoint | None = None
-            self.drag_last_ms: int | None = None
             self.drag_chain_id = 0
             self.last_tick_ms = self._now_ms()
             self.fade_from_pixmap: QPixmap | None = None
@@ -425,31 +419,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if self.dragging:
                 return
             self.dragging = True
-            self.drag_fast = False
-            self.drag_last_pos = None
-            self.drag_last_ms = None
             self.drag_chain_id += 1
             self.animation_timer.stop()
             self.micro_timer.stop()
-            if self._play_model_overlay("dragging_lift", allow_fade=False, repaint=False):
-                token = self.drag_chain_id
-
-                def enter_hold() -> None:
-                    if token != self.drag_chain_id or not self.dragging or self.drag_fast:
-                        return
-                    self._play_model_overlay("dragging", allow_fade=False)
-
-                QTimer.singleShot(DRAG_LIFT_MS, enter_hold)
-            else:
-                self._play_model_overlay("dragging", allow_fade=False, repaint=False)
-
-        def _update_drag_speed(self, speed: float) -> None:
-            if speed >= DRAG_FAST_ENTER_PX_PER_MS and not self.drag_fast:
-                self.drag_fast = True
-                self._play_model_overlay("dragging_fast", allow_fade=False)
-            elif self.drag_fast and speed <= DRAG_FAST_EXIT_PX_PER_MS:
-                self.drag_fast = False
-                self._play_model_overlay("dragging", allow_fade=False)
+            self._play_model_overlay("dragging", allow_fade=False, repaint=False)
 
         def _finish_drag(self) -> None:
             if not self.dragging:
@@ -462,9 +435,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.model.clear_overlay()
             self._sync_frame_transition(previous_frame, previous_clip, allow_fade=False)
             self.dragging = False
-            self.drag_fast = False
-            self.drag_last_pos = None
-            self.drag_last_ms = None
             self.last_tick_ms = now_ms
             self.animation_timer.start(40 if self.reduced_motion else 20)
             if not self.reduced_motion:
@@ -1025,18 +995,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def mouseMoveEvent(self, event: QMouseEvent) -> None:
             if self.drag_origin is not None and self.pet_origin is not None:
-                position = event.globalPosition().toPoint()
-                if not self.dragging and (position - self.drag_origin).manhattanLength() > 5:
+                if not self.dragging and (event.globalPosition().toPoint() - self.drag_origin).manhattanLength() > 5:
                     self._begin_drag()
-                now_ms = self._now_ms()
-                if self.dragging and not self.reduced_motion:
-                    if self.drag_last_pos is not None and self.drag_last_ms is not None:
-                        elapsed = max(1, now_ms - self.drag_last_ms)
-                        speed = (position - self.drag_last_pos).manhattanLength() / elapsed
-                        self._update_drag_speed(speed)
-                    self.drag_last_pos = position
-                    self.drag_last_ms = now_ms
-                delta = position - self.drag_origin
+                delta = event.globalPosition().toPoint() - self.drag_origin
                 self._move_to_pet(self.pet_origin.x() + delta.x(), self.pet_origin.y() + delta.y())
 
         def mouseReleaseEvent(self, event: QMouseEvent) -> None:
