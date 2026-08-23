@@ -12,7 +12,7 @@
 | `feat/drag-behavior` | 素材之上叠加拖拽阶段接线（本分支） | 另行评估 |
 
 上游要求（PR #23 关评）：只提交素材、`pet-manifest.json`、`ASSET_LICENSE.md`
-与必要测试；运行时行为改动单独评估。因此发上游 PR 请使用 `feat/pet-actions`。
+与必要测试；运行时行为改动单独评估。
 
 ## 拖拽素材（assets/pet/dragging/）
 
