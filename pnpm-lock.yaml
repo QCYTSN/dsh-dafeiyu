@@ -8,9 +8,15 @@ importers:
 
   .:
     dependencies:
+      '@deepseek-ai/cosmokit':
+        specifier: 1.8.2
+        version: 1.8.2
       '@deepseek-ai/schemastery':
-        specifier: ^3.18.1
+        specifier: 3.18.1
         version: 3.18.1
+      '@standard-schema/spec':
+        specifier: 1.1.0
+        version: 1.1.0
     devDependencies:
       playwright-core:
         specifier: ^1.62.1

@@ -17,6 +17,11 @@ test('package metadata exposes the DSH web client bundle', () => {
   const metadata = require('dsh-dafeiyu/package.json')
   assert.equal(metadata.exports['./client'], './lib/client.js')
   assert.equal(metadata.dsh.client.platform, 'web')
+  assert.deepEqual(metadata.bundleDependencies, [
+    '@deepseek-ai/cosmokit',
+    '@deepseek-ai/schemastery',
+    '@standard-schema/spec',
+  ])
 })
 
 async function waitFor(predicate, timeoutMs = 5000) {

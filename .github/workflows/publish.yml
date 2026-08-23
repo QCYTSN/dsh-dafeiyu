@@ -175,6 +175,9 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
+      - name: Install bundled runtime dependencies
+        run: npm install --ignore-scripts --no-package-lock --omit=dev
+
       - name: Install Linux display libraries
         run: |
           sudo apt-get update
@@ -214,6 +217,7 @@ jobs:
           test -f .build/package-check/package/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe
           test -x .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
           test -x .build/package-check/package/runtime/bin/darwin/dsh-dafeiyu-helper.app/Contents/MacOS/dsh-dafeiyu-helper
+          node scripts/test-linked-package.mjs .build/package-check/package
           xvfb-run --auto-servernum node scripts/test-packaged-helper.mjs \
             --executable .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
 

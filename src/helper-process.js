@@ -24,6 +24,17 @@ const darwinBundledHelperPath = resolve(
   'MacOS',
   'dsh-dafeiyu-helper',
 )
+const snapshotMessageKinds = new Set([
+  CompanionMessageKind.HELLO,
+  CompanionMessageKind.STATE,
+  CompanionMessageKind.TASK,
+  CompanionMessageKind.TASKS,
+  CompanionMessageKind.CONFIG,
+])
+const coalescibleMessageKinds = new Set([
+  ...snapshotMessageKinds,
+  CompanionMessageKind.PULSE,
+])
 
 function isWsl() {
   if (process.platform !== 'linux') return false
@@ -158,6 +169,9 @@ export class HelperProcess {
     this.heartbeatTimer = undefined
     this.startupTimer = undefined
     this.lastPongAt = 0
+    this.readyAt = 0
+    this.writeBlocked = false
+    this.queueDropWarned = false
   }
 
   start() {
@@ -220,6 +234,8 @@ export class HelperProcess {
       if (this.child !== child) return
       this.child = undefined
       this.spawned = false
+      this.readyAt = 0
+      this.writeBlocked = false
       this.#clearHeartbeat()
       this.#clearStartupTimer()
       if (!this.stopping && !this.restartSuppressed) {
@@ -230,7 +246,10 @@ export class HelperProcess {
       if (this.child !== child) return
       this.child = undefined
       const wasReady = this.spawned
+      const readyAt = this.readyAt
       this.spawned = false
+      this.readyAt = 0
+      this.writeBlocked = false
       this.#clearHeartbeat()
       this.#clearStartupTimer()
       if (!this.stopping && !this.restartSuppressed) {
@@ -241,6 +260,13 @@ export class HelperProcess {
           this.#countStartFailure(`exited before ready (code=${String(code)}, signal=${String(signal)})`)
           return
         }
+        const stableRuntimeMs = this.options.stableRuntimeMs ?? 30000
+        const runtimeMs = readyAt > 0 ? Date.now() - readyAt : 0
+        if (runtimeMs < stableRuntimeMs) {
+          this.#countStartFailure(`exited ${runtimeMs}ms after ready (code=${String(code)}, signal=${String(signal)})`)
+          return
+        }
+        this.startFailures = 0
         this.logger.warn?.(`dsh-dafeiyu helper exited (code=${String(code)}, signal=${String(signal)}); restarting`)
         this.#scheduleRestart()
       }
@@ -257,12 +283,16 @@ export class HelperProcess {
     const line = encodeMessage(message)
     if (!this.child || !this.spawned || !this.child.stdin.writable || this.child.stdin.destroyed) {
       if (!this.hasEverSpawned
-        || ![CompanionMessageKind.HELLO, CompanionMessageKind.STATE, CompanionMessageKind.TASK, CompanionMessageKind.TASKS, CompanionMessageKind.PULSE, CompanionMessageKind.CONFIG].includes(message.kind)) {
-        this.queue.push(line)
+        || !coalescibleMessageKinds.has(message.kind)) {
+        this.#enqueue(message.kind, line)
       }
       return
     }
-    this.child.stdin.write(line)
+    if (this.writeBlocked) {
+      this.#enqueue(message.kind, line)
+      return
+    }
+    this.#writePayload(this.child, line)
   }
 
   stop(reason = 'plugin-disposed') {
@@ -272,7 +302,10 @@ export class HelperProcess {
     this.restartTimer = undefined
     const child = this.child
     if (!child) return
-    this.queue.push(encodeMessage(createMessage(CompanionMessageKind.SHUTDOWN, { reason })))
+    this.#enqueue(
+      CompanionMessageKind.SHUTDOWN,
+      encodeMessage(createMessage(CompanionMessageKind.SHUTDOWN, { reason })),
+    )
     if (this.spawned) {
       this.#flushQueue()
       this.#endInput(child)
@@ -293,16 +326,44 @@ export class HelperProcess {
 
   #flushSnapshot() {
     const child = this.child
-    if (!this.spawned || !child?.stdin.writable || child.stdin.destroyed) return
+    if (this.writeBlocked || !this.spawned || !child?.stdin.writable || child.stdin.destroyed) return
     const payload = [...this.snapshot.values()].join('')
-    if (payload) child.stdin.write(payload)
+    if (payload) this.#writePayload(child, payload)
   }
 
   #flushQueue() {
     const child = this.child
-    if (!this.spawned || !child?.stdin.writable || child.stdin.destroyed) return
-    const payload = this.queue.splice(0).join('')
-    if (payload) child.stdin.write(payload)
+    if (this.writeBlocked || !this.spawned || !child?.stdin.writable || child.stdin.destroyed) return
+    const payload = this.queue.splice(0).map((item) => item.line).join('')
+    if (payload) this.#writePayload(child, payload)
+  }
+
+  #enqueue(kind, line) {
+    if (kind === CompanionMessageKind.PING) return
+    const maxPendingMessages = Math.max(1, this.options.maxPendingMessages ?? 128)
+    if (this.queue.length >= maxPendingMessages) {
+      const sameKind = coalescibleMessageKinds.has(kind)
+        ? this.queue.findIndex((item) => item.kind === kind)
+        : -1
+      this.queue.splice(sameKind >= 0 ? sameKind : 0, 1)
+      if (!this.queueDropWarned) {
+        this.queueDropWarned = true
+        this.logger.warn?.(`dsh-dafeiyu helper message queue reached ${maxPendingMessages}; dropping stale updates`)
+      }
+    }
+    this.queue.push({ kind, line })
+  }
+
+  #writePayload(child, payload) {
+    if (!payload || this.child !== child || !child.stdin.writable || child.stdin.destroyed) return
+    if (child.stdin.write(payload)) return
+    this.writeBlocked = true
+    child.stdin.once('drain', () => {
+      if (this.child !== child || !this.spawned) return
+      this.writeBlocked = false
+      this.queueDropWarned = false
+      this.#flushQueue()
+    })
   }
 
   #handleReply(line) {
@@ -314,7 +375,7 @@ export class HelperProcess {
         const firstSpawn = !this.hasEverSpawned
         this.hasEverSpawned = true
         this.spawned = true
-        this.startFailures = 0
+        this.readyAt = Date.now()
         this.lastPongAt = Date.now()
         this.#clearStartupTimer()
         if (firstSpawn) this.#flushQueue()

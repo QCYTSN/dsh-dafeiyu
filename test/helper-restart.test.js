@@ -10,6 +10,8 @@ import { CompanionMessageKind, CompanionState, createMessage } from '../src/prot
 const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'restart-helper.js')
 const closedFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'closed-helper.js')
 const crashBeforeReadyFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'crash-before-ready.js')
+const crashAfterReadyFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'crash-after-ready.js')
+const blockedInputFixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'blocked-input-helper.js')
 
 async function waitFor(predicate, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs
@@ -161,4 +163,58 @@ test('a launch that throws synchronously cannot crash the host and is bounded', 
   assert.equal(bridge.startFailures, afterGiveUp)
   assert.equal(bridge.child, undefined)
   bridge.stop('launch-throw-test-complete')
+})
+
+test('helper that repeatedly crashes just after READY is bounded', async () => {
+  const logger = { debug() {}, info() {}, warn() {}, error() {} }
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    args: [crashAfterReadyFixture],
+    headless: false,
+    heartbeatMs: 0,
+    restartDelayMs: 15,
+    stableRuntimeMs: 1000,
+    maxStartFailures: 3,
+  }, logger)
+  bridge.start()
+
+  await waitFor(() => bridge.restartSuppressed === true)
+  await waitFor(() => bridge.child === undefined)
+  assert.equal(bridge.startFailures, 3)
+  await new Promise((resolve) => setTimeout(resolve, 120))
+  assert.equal(bridge.child, undefined)
+  bridge.stop('crash-after-ready-test-complete')
+})
+
+test('helper input backpressure keeps the pending queue bounded', async () => {
+  const warnings = []
+  const logger = { debug() {}, info() {}, warn(message) { warnings.push(message) }, error() {} }
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    args: [blockedInputFixture],
+    headless: false,
+    heartbeatMs: 0,
+    maxPendingMessages: 8,
+    shutdownTimeoutMs: 50,
+  }, logger)
+  bridge.start()
+  try {
+    await waitFor(() => bridge.spawned === true)
+
+    const detail = 'x'.repeat(64 * 1024)
+    for (let index = 0; index < 200 && !bridge.writeBlocked; index += 1) {
+      bridge.send(createMessage(CompanionMessageKind.PULSE, { state: CompanionState.WORKING, pulse: 'working', detail: `${index}:${detail}` }))
+    }
+    await waitFor(() => bridge.writeBlocked === true)
+    for (let index = 0; index < 32; index += 1) {
+      bridge.send(createMessage(CompanionMessageKind.PULSE, { state: CompanionState.WORKING, pulse: 'working', detail: `${index}:${detail}` }))
+    }
+
+    assert.ok(bridge.queue.length <= 8)
+    assert.ok(warnings.some((message) => String(message).includes('message queue reached 8')))
+    assert.match(JSON.parse(bridge.queue.at(-1).line).detail, /^31:/)
+  } finally {
+    bridge.stop('backpressure-test-complete')
+    await waitFor(() => bridge.child === undefined)
+  }
 })

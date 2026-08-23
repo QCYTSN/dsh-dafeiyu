@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+### Fixed
+
+- Bundled the plugin's runtime schema dependencies so DSH profiles can load installs whose package directory is linked from outside the profile tree.
+- Bounded Helper IPC buffering under write backpressure and stopped repeated post-readiness crashes after a finite retry budget, preventing stalled Helpers from causing unbounded memory or process churn.
+
 ## 0.1.4
 
 ### Added
