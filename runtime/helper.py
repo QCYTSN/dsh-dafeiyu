@@ -28,6 +28,12 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
+DRAG_LIFT_MS = 220
+DRAG_RELEASE_MS = 240
+DRAG_DIZZY_MS = 760
+DRAG_PROTEST_MS = 320
+DRAG_FAST_ENTER_PX_PER_MS = 2.4
+DRAG_FAST_EXIT_PX_PER_MS = 1.2
 
 
 def bundle_root() -> Path:
@@ -229,6 +235,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.pet_x = 0
             self.pet_y = 0
             self.dragging = False
+            self.drag_fast = False
+            self.drag_last_pos: QPoint | None = None
+            self.drag_last_ms: int | None = None
+            self.drag_chain_id = 0
             self.last_tick_ms = self._now_ms()
             self.fade_from_pixmap: QPixmap | None = None
             self.fade_started = 0.0
@@ -415,9 +425,31 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if self.dragging:
                 return
             self.dragging = True
+            self.drag_fast = False
+            self.drag_last_pos = None
+            self.drag_last_ms = None
+            self.drag_chain_id += 1
             self.animation_timer.stop()
             self.micro_timer.stop()
-            self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+            if self._play_model_overlay("dragging_lift", allow_fade=False, repaint=False):
+                token = self.drag_chain_id
+
+                def enter_hold() -> None:
+                    if token != self.drag_chain_id or not self.dragging or self.drag_fast:
+                        return
+                    self._play_model_overlay("dragging", allow_fade=False)
+
+                QTimer.singleShot(DRAG_LIFT_MS, enter_hold)
+            else:
+                self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+
+        def _update_drag_speed(self, speed: float) -> None:
+            if speed >= DRAG_FAST_ENTER_PX_PER_MS and not self.drag_fast:
+                self.drag_fast = True
+                self._play_model_overlay("dragging_fast", allow_fade=False)
+            elif self.drag_fast and speed <= DRAG_FAST_EXIT_PX_PER_MS:
+                self.drag_fast = False
+                self._play_model_overlay("dragging", allow_fade=False)
 
         def _finish_drag(self) -> None:
             if not self.dragging:
@@ -430,10 +462,50 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.model.clear_overlay()
             self._sync_frame_transition(previous_frame, previous_clip, allow_fade=False)
             self.dragging = False
+            self.drag_fast = False
+            self.drag_last_pos = None
+            self.drag_last_ms = None
             self.last_tick_ms = now_ms
             self.animation_timer.start(40 if self.reduced_motion else 20)
             if not self.reduced_motion:
                 self._schedule_micro()
+                self._run_drag_release_chain()
+
+        def _run_drag_release_chain(self) -> None:
+            """Play release -> dizzy -> protest, then hand back to the base state.
+
+            Every stage is a single-frame clip, so the chain is driven by timers;
+            any new grab (or a manifest without the stage clips) aborts quietly.
+            """
+            stages = (
+                ("dragging_release", DRAG_RELEASE_MS),
+                ("dragging_dizzy", DRAG_DIZZY_MS),
+                ("dragging_protest", DRAG_PROTEST_MS),
+            )
+            self.drag_chain_id += 1
+            token = self.drag_chain_id
+
+            def play(index: int) -> None:
+                if token != self.drag_chain_id or self.dragging:
+                    return
+                if index >= len(stages):
+                    self._clear_drag_overlay()
+                    return
+                clip_name, hold_ms = stages[index]
+                if not self._play_model_overlay(clip_name, allow_fade=False):
+                    return
+                QTimer.singleShot(hold_ms, lambda: play(index + 1))
+
+            QTimer.singleShot(0, lambda: play(0))
+
+        def _clear_drag_overlay(self) -> None:
+            if self.dragging:
+                return
+            previous_frame = self.model.frame
+            previous_clip = self.model.active_clip_name
+            self.model.clear_overlay()
+            self._sync_frame_transition(previous_frame, previous_clip)
+            self.update()
 
         def _schedule_micro(self) -> None:
             if self.reduced_motion:
@@ -953,9 +1025,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def mouseMoveEvent(self, event: QMouseEvent) -> None:
             if self.drag_origin is not None and self.pet_origin is not None:
-                if not self.dragging and (event.globalPosition().toPoint() - self.drag_origin).manhattanLength() > 5:
+                position = event.globalPosition().toPoint()
+                if not self.dragging and (position - self.drag_origin).manhattanLength() > 5:
                     self._begin_drag()
-                delta = event.globalPosition().toPoint() - self.drag_origin
+                now_ms = self._now_ms()
+                if self.dragging and not self.reduced_motion:
+                    if self.drag_last_pos is not None and self.drag_last_ms is not None:
+                        elapsed = max(1, now_ms - self.drag_last_ms)
+                        speed = (position - self.drag_last_pos).manhattanLength() / elapsed
+                        self._update_drag_speed(speed)
+                    self.drag_last_pos = position
+                    self.drag_last_ms = now_ms
+                delta = position - self.drag_origin
                 self._move_to_pet(self.pet_origin.x() + delta.x(), self.pet_origin.y() + delta.y())
 
         def mouseReleaseEvent(self, event: QMouseEvent) -> None:

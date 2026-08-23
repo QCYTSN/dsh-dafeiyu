@@ -55,8 +55,36 @@ class AnimationModelTests(unittest.TestCase):
         self.assertIsNone(crossfade_duration("idle", "dragging"))
         self.assertIsNone(crossfade_duration("dragging", "thinking"))
         self.assertIsNone(crossfade_duration("blink", "idle"))
+        for stage in ("dragging_lift", "dragging_fast", "dragging_release", "dragging_dizzy", "dragging_protest"):
+            self.assertIsNone(crossfade_duration("idle", stage), stage)
+            self.assertIsNone(crossfade_duration(stage, "idle"), stage)
         self.assertEqual(crossfade_duration("thinking", "working"), 0.10)
         self.assertEqual(crossfade_duration("working_search", "working_search"), 0.045)
+
+    def test_drag_stage_clips_are_single_frame_and_registered(self) -> None:
+        stages = {
+            "dragging_lift": False,
+            "dragging_fast": True,
+            "dragging_release": False,
+            "dragging_dizzy": True,
+            "dragging_protest": False,
+        }
+        model = AnimationModel(MANIFEST)
+        for name, loop in stages.items():
+            clip = MANIFEST["clips"][name]
+            self.assertEqual(len(clip["frames"]), 1, name)
+            self.assertIs(clip["loop"], loop, name)
+            self.assertTrue(model.play_overlay(name), name)
+
+    def test_single_frame_drag_stage_survives_advance_until_cleared(self) -> None:
+        model = AnimationModel(MANIFEST)
+        model.apply_state("IDLE")
+        model.play_overlay("dragging_dizzy")
+        for tick in range(10):
+            model.advance(260, tick * 260)
+        self.assertEqual(model.active_clip_name, "dragging_dizzy")
+        model.clear_overlay()
+        self.assertEqual(model.active_clip_name, "idle")
 
 
 if __name__ == "__main__":
