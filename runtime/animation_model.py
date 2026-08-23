@@ -16,8 +16,6 @@ NON_CROSSFADE_CLIPS = {
     "blink",
     "glance",
     "dragging",
-    "dragging_lift",
-    "dragging_fast",
     "dragging_release",
     "dragging_dizzy",
     "dragging_protest",

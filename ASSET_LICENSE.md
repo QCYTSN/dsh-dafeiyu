@@ -30,14 +30,14 @@ Source provenance and the fuller notice are documented in:
 
 ## Community-contributed dragging frames
 
-The six frames under `assets/pet/dragging/` (`dragging_238_00.png` through
-`dragging_238_05.png`: lifted, held, fast-dragged, released, dizzy, and
-protest poses) were contributed to this repository by `@Serendipity-wu02`.
-They are original AI-assisted artwork created for the BigFish companion; no
-third-party, paid, or scraped material is included. The uploaded source
-images were uniformly rescaled and letterboxed onto the 238x260 runtime
-canvas by automated processing only, which does not change rights in the
-underlying artwork.
+The four frames under `assets/pet/dragging/` (`dragging_238_01.png`,
+`dragging_238_03.png`, `dragging_238_04.png`, and `dragging_238_05.png`: held,
+released, dizzy, and protest poses) were contributed to this repository by
+`@Serendipity-wu02`. They are original AI-assisted artwork created for the
+BigFish companion; no third-party, paid, or scraped material is included. The
+uploaded source images were uniformly rescaled and letterboxed onto the
+238x260 runtime canvas by automated processing only, which does not change
+rights in the underlying artwork.
 
 These frames replace the previous single `dragging/dragging_238.png` frame
 and are distributed under the same terms as the other visual assets above:
