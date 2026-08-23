@@ -27,3 +27,21 @@ Source provenance and the fuller notice are documented in:
 
 - https://github.com/QCYTSN/ds-local-pet/blob/main/ASSET_LICENSE.md
 - https://github.com/1190fasheqi/dafeiyu-pet
+
+## Community-contributed dragging frames
+
+The six frames under `assets/pet/dragging/` (`dragging_238_00.png` through
+`dragging_238_05.png`: lifted, held, fast-dragged, released, dizzy, and
+protest poses) were contributed to this repository by `@Serendipity-wu02`.
+They are original AI-assisted artwork created for the BigFish companion; no
+third-party, paid, or scraped material is included. The uploaded source
+images were uniformly rescaled and letterboxed onto the 238x260 runtime
+canvas by automated processing only, which does not change rights in the
+underlying artwork.
+
+These frames replace the previous single `dragging/dragging_238.png` frame
+and are distributed under the same terms as the other visual assets above:
+they are bundled solely for use with this fan-made companion plugin, carry
+no separate warranty, and remain excluded from the MIT code license.
+Redistribution outside this repository requires permission from the
+respective rights holders.

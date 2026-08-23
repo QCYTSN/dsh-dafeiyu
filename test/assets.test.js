@@ -72,10 +72,29 @@ test('multi-frame clips keep the mildly accelerated motion timing', async () => 
   }
 })
 
-test('dragging uses one stable frame without procedural motion', async () => {
+test('dragging keeps a stable held frame without procedural motion', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  assert.deepEqual(manifest.clips.dragging.frames, ['dragging/dragging_238.png'])
+  assert.deepEqual(manifest.clips.dragging.frames, ['dragging/dragging_238_01.png'])
   assert.equal(manifest.clips.dragging.motion, undefined)
+})
+
+test('drag phase clips cover lift, fast drag, release, daze, and protest', async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const expected = {
+    dragging_lift: { frame: 'dragging/dragging_238_00.png', frameMs: 220, loop: false },
+    dragging_fast: { frame: 'dragging/dragging_238_02.png', frameMs: 120, loop: true },
+    dragging_release: { frame: 'dragging/dragging_238_03.png', frameMs: 200, loop: false },
+    dragging_dizzy: { frame: 'dragging/dragging_238_04.png', frameMs: 260, loop: true },
+    dragging_protest: { frame: 'dragging/dragging_238_05.png', frameMs: 260, loop: false },
+  }
+
+  for (const [clipName, expectation] of Object.entries(expected)) {
+    const clip = manifest.clips[clipName]
+    assert.ok(clip, `${clipName} must stay registered in the manifest`)
+    assert.deepEqual(clip.frames, [expectation.frame], `${clipName} frame drifted`)
+    assert.equal(clip.frameMs, expectation.frameMs, `${clipName} timing drifted`)
+    assert.equal(clip.loop, expectation.loop, `${clipName} looping drifted`)
+  }
 })
 
 test('original notification sounds are valid short mono WAV files', async () => {

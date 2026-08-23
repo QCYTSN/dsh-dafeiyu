@@ -20,7 +20,12 @@
     "success": { "frames": ["happy/happy_238.png"], "frameMs": 180, "loop": true, "motion": "bounce" },
     "error": { "frames": ["angry/angry_238.png"], "frameMs": 180, "loop": true, "motion": "shake" },
     "error_dizzy": { "frames": ["dizzy/dizzy_238.png"], "frameMs": 180, "loop": true, "motion": "dizzy" },
-    "dragging": { "frames": ["dragging/dragging_238.png"], "frameMs": 180, "loop": true },
+    "dragging": { "frames": ["dragging/dragging_238_01.png"], "frameMs": 180, "loop": true },
+    "dragging_lift": { "frames": ["dragging/dragging_238_00.png"], "frameMs": 220, "loop": false },
+    "dragging_fast": { "frames": ["dragging/dragging_238_02.png"], "frameMs": 120, "loop": true },
+    "dragging_release": { "frames": ["dragging/dragging_238_03.png"], "frameMs": 200, "loop": false },
+    "dragging_dizzy": { "frames": ["dragging/dragging_238_04.png"], "frameMs": 260, "loop": true },
+    "dragging_protest": { "frames": ["dragging/dragging_238_05.png"], "frameMs": 260, "loop": false },
     "head_pat": { "frames": ["head_pat/head_pat_238_00.png", "head_pat/head_pat_238_01.png", "head_pat/head_pat_238_02.png", "head_pat/head_pat_238_03.png", "head_pat/head_pat_238_04.png", "head_pat/head_pat_238_05.png"], "frameMs": 180, "loop": false },
     "poke": { "frames": ["poke_react/poke_react_238_00.png", "poke_react/poke_react_238_01.png", "poke_react/poke_react_238_02.png", "poke_react/poke_react_238_03.png"], "frameMs": 170, "loop": false },
     "tail": { "frames": ["tail_react/tail_react_238_00.png", "tail_react/tail_react_238_01.png", "tail_react/tail_react_238_02.png", "tail_react/tail_react_238_03.png"], "frameMs": 220, "loop": false }
