@@ -31,7 +31,7 @@ Source provenance and the fuller notice are documented in:
 ## Community-contributed dragging frames
 
 The four frames under `assets/pet/dragging/` (`dragging_238_01.png`,
-`dragging_238_03.png`, `dragging_238_04.png`, and `dragging_238_05.png`: held,
+`dragging_238_02.png`, `dragging_238_03.png`, and `dragging_238_04.png`: held,
 released, dizzy, and protest poses) were contributed to this repository by
 `@Serendipity-wu02`. They are original AI-assisted artwork created for the
 BigFish companion; no third-party, paid, or scraped material is included. The
