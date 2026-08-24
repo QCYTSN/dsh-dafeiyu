@@ -115,7 +115,7 @@ cd D:\DSH
 然后从 npm 安装稳定版：
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 如果你的系统已经能直接使用全局 `dsh` 命令，只需要：
@@ -155,20 +155,14 @@ cd ~/deepseek-harness
 然后从 npm 安装稳定版：
 
 ```bash
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
-```
-
-如果系统已经能直接使用全局 `dsh` 命令：
-
-```bash
-dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 也可以从 [GitHub Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases)
 下载 `dsh-dafeiyu-<version>.tgz`（不要解压），然后安装：
 
 ```bash
-pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+pnpm dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
 ```
 
 装完照常启动 DSH WebUI，大肥鱼会由 DSH 自动拉起；不需要手动打开 Helper。
@@ -187,7 +181,7 @@ cd ~/deepseek-harness
 然后从 npm 安装稳定版：
 
 ```bash
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 如果系统已经能直接使用全局 `dsh` 命令：
@@ -200,7 +194,7 @@ dsh plugin --profile web add dsh-dafeiyu
 下载 `dsh-dafeiyu-<version>.tgz`（不要解压），然后安装：
 
 ```bash
-pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+pnpm dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
 ```
 
 装完照常启动 DSH WebUI，大肥鱼会由 DSH 自动拉起；不要手动打开 Helper。
@@ -218,7 +212,7 @@ dsh-dafeiyu-<version>.tgz
 不解压，在 DSH 目录中直接安装下载的插件包：
 
 ```powershell
-pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<version>.tgz"
+pnpm dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<version>.tgz"
 ```
 
 ### 4. 启动 DSH
@@ -286,13 +280,13 @@ DSH，然后更新 npm 稳定版包：
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web update dsh-dafeiyu
+pnpm dsh plugin --profile web update dsh-dafeiyu
 ```
 
 也可以再次执行安装命令，它会解析 npm `latest` 标签指向的新版本：
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 使用 `@alpha` 测试版的用户，把更新命令里的包名换成 `dsh-dafeiyu@alpha` 即可。
@@ -300,7 +294,7 @@ pnpm exec dsh plugin --profile web add dsh-dafeiyu
 使用 GitHub Release 安装的用户，可以下载新 `.tgz` 后覆盖安装：
 
 ```powershell
-pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-version>.tgz"
+pnpm dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-version>.tgz"
 ```
 
 以上方式都会替换插件及随包携带的 Helper，并保留 DSH 已保存的设置。详细
@@ -312,7 +306,7 @@ pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<old-version>.tgz"
+pnpm dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<old-version>.tgz"
 ```
 
 ## 卸载插件
@@ -321,7 +315,7 @@ pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<old-
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web remove dsh-dafeiyu
+pnpm dsh plugin --profile web remove dsh-dafeiyu
 ```
 
 然后重新启动 DSH。插件代码和 Helper 会从 `web` profile 中移除。DSH 可能保留一份

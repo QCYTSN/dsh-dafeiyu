@@ -117,7 +117,7 @@ cd D:\DSH
 Install the current stable release from npm:
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 If `dsh` is already available globally, the command is simply:
@@ -127,7 +127,7 @@ dsh plugin --profile web add dsh-dafeiyu
 ```
 
 To try new features before they are stable, install from the `@alpha` tag instead:
-`pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha`.
+`pnpm dsh plugin --profile web add dsh-dafeiyu@alpha`.
 
 When DSH runs inside WSL2, run the same install command in the WSL terminal. In
 visual mode the plugin launches the bundled **Windows** Helper through
@@ -164,13 +164,7 @@ cd ~/deepseek-harness
 Install the current stable release from npm:
 
 ```bash
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
-```
-
-If `dsh` is already available globally:
-
-```bash
-dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 Alternatively, download `dsh-dafeiyu-<version>.tgz` from
@@ -178,7 +172,7 @@ Alternatively, download `dsh-dafeiyu-<version>.tgz` from
 extract it) and install it:
 
 ```bash
-pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+pnpm dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
 ```
 
 Then launch DSH WebUI normally; BigFish is started automatically. Do not start
@@ -200,7 +194,7 @@ cd ~/deepseek-harness
 Install the current stable release from npm:
 
 ```bash
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 If `dsh` is already available globally:
@@ -214,7 +208,7 @@ Alternatively, download `dsh-dafeiyu-<version>.tgz` from
 extract it) and install it:
 
 ```bash
-pnpm exec dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
+pnpm dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
 ```
 
 Then launch DSH WebUI normally; BigFish is started automatically. Do not start
@@ -231,7 +225,7 @@ dsh-dafeiyu-<version>.tgz
 Do not extract it. Install the downloaded archive from the DSH directory:
 
 ```powershell
-pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<version>.tgz"
+pnpm dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<version>.tgz"
 ```
 
 ### 4. Start DSH
@@ -300,13 +294,13 @@ is published, fully exit DSH and update the npm stable package:
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web update dsh-dafeiyu
+pnpm dsh plugin --profile web update dsh-dafeiyu
 ```
 
 Running the install command again also resolves the newest version behind the npm `latest` tag:
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu
 ```
 
 Users who opted into `@alpha` can run the same commands with the package name `dsh-dafeiyu@alpha` instead.
@@ -315,7 +309,7 @@ Users who installed from GitHub Releases can download the new `.tgz` and install
 old version:
 
 ```powershell
-pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-version>.tgz"
+pnpm dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<new-version>.tgz"
 ```
 
 All three paths replace the plugin and bundled Helper while retaining settings saved
@@ -327,7 +321,7 @@ Fully exit DSH and install a previously saved release archive with the same `add
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<old-version>.tgz"
+pnpm dsh plugin --profile web add "C:\Users\you\Downloads\dsh-dafeiyu-<old-version>.tgz"
 ```
 
 ## Uninstall
@@ -336,7 +330,7 @@ Fully exit DSH, then run:
 
 ```powershell
 cd D:\DSH
-pnpm exec dsh plugin --profile web remove dsh-dafeiyu
+pnpm dsh plugin --profile web remove dsh-dafeiyu
 ```
 
 Restart DSH afterward. The plugin and Helper are removed from the `web` profile. DSH may keep
