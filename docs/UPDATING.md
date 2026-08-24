@@ -9,13 +9,13 @@
 2. 在 DSH 安装目录运行：
 
 ```powershell
-pnpm exec dsh plugin --profile web update dsh-dafeiyu@alpha
+pnpm dsh plugin --profile web update dsh-dafeiyu@alpha
 ```
 
 也可以重新执行安装命令：
 
 ```powershell
-pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha
+pnpm dsh plugin --profile web add dsh-dafeiyu@alpha
 ```
 
 ## 从 GitHub Release 安装包更新
@@ -25,7 +25,7 @@ pnpm exec dsh plugin --profile web add dsh-dafeiyu@alpha
 3. 在 DSH 安装目录运行：
 
 ```powershell
-pnpm exec dsh plugin --profile web add "C:\下载目录\dsh-dafeiyu-<version>.tgz"
+pnpm dsh plugin --profile web add "C:\下载目录\dsh-dafeiyu-<version>.tgz"
 ```
 
 `add` 会把 `web` profile 中原来的大肥鱼依赖替换为新安装包。重新启动 DSH 后，
@@ -37,13 +37,13 @@ pnpm exec dsh plugin --profile web add "C:\下载目录\dsh-dafeiyu-<version>.tg
 保留上一个可用版本的 `.tgz`，完全退出 DSH 后，用同一条 `add` 命令重新安装旧包：
 
 ```powershell
-pnpm exec dsh plugin --profile web add "C:\下载目录\dsh-dafeiyu-<old-version>.tgz"
+pnpm dsh plugin --profile web add "C:\下载目录\dsh-dafeiyu-<old-version>.tgz"
 ```
 
 ## 卸载
 
 ```powershell
-pnpm exec dsh plugin --profile web remove dsh-dafeiyu
+pnpm dsh plugin --profile web remove dsh-dafeiyu
 ```
 
 当前 Alpha 包尚未提供自动更新检查，因此 GitHub 仓库出现新提交不会自动改变已经

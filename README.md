@@ -86,7 +86,7 @@ stateDiagram-v2
 
 - Windows 10/11 x64，或 WSL2（通过 Windows interop 运行桌面 Helper）
 - Linux x64 桌面（glibc ≥ 2.35；桌面实机仅在 Ubuntu 24.04 / glibc 2.39 验证）
-- macOS 12.0+（Apple Silicon 或 Intel）
+- macOS 12.0+（Apple Silicon 或 Intel，实验性支持）
 - 已安装并能正常运行的 DeepSeek Harness WebUI
 - DSH CLI 中可以使用 `plugin --profile web` 命令
 - npm 上的稳定版 `dsh-dafeiyu`（或抢先测试的 `dsh-dafeiyu@alpha`），或 GitHub Release 中的 `.tgz` 安装包
@@ -168,6 +168,11 @@ pnpm dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
 装完照常启动 DSH WebUI，大肥鱼会由 DSH 自动拉起；不需要手动打开 Helper。
 
 ### macOS 用户（Apple Silicon / Intel，macOS 12.0+）
+
+> `0.1.4` 首次提供实验性的原生 macOS Helper。CI 已验证 Universal 架构、
+> AppKit 渲染和进程生命周期；Apple Silicon 实机体验将继续通过用户反馈验证。
+> 当前应用只有 ad-hoc 签名，尚未 Developer ID 签名或公证，浏览器下载的包可能
+> 被 Gatekeeper 拦截。
 
 macOS 的安装方式与 Windows 相同，只是换成「终端」和 macOS 路径。发布包
 内置原生 Helper，**不需要安装 Python、PySide6 或 Xcode**。

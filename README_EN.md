@@ -87,7 +87,7 @@ When multiple tasks are active, the status bubble lists them at the same time.
 
 - Windows 10/11 x64, or WSL2 (runs the desktop Helper through Windows interop)
 - Linux x64 desktop (glibc ≥ 2.35; desktop verified only on Ubuntu 24.04 / glibc 2.39)
-- macOS 12.0+ (Apple Silicon or Intel)
+- macOS 12.0+ (Apple Silicon or Intel, experimental support)
 - A working DeepSeek Harness WebUI installation
 - A DSH CLI that supports `plugin --profile web`
 - the stable `dsh-dafeiyu` from npm (or `dsh-dafeiyu@alpha` to try prereleases early), or a `.tgz` archive from GitHub Releases
@@ -179,6 +179,12 @@ Then launch DSH WebUI normally; BigFish is started automatically. Do not start
 the Helper yourself.
 
 ### macOS users (Apple Silicon / Intel, macOS 12.0+)
+
+> Version `0.1.4` introduces the native macOS Helper as experimental support.
+> CI verifies its universal architecture, AppKit rendering, and process lifecycle;
+> Apple Silicon experience will continue to be validated through user feedback.
+> The app currently has an ad-hoc signature, not a Developer ID signature or
+> notarization, so Gatekeeper may block browser-downloaded archives.
 
 Installation on macOS is the same as Windows, just in the Terminal with macOS
 paths. The release bundle ships a native Helper — **no Python, PySide6 or Xcode
