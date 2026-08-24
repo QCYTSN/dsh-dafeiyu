@@ -56,6 +56,53 @@ test('assistant chunks keep one stable thinking message within the same phase', 
   }, 4)), [])
 })
 
+test('request headers show the effective reasoning effort across later states', () => {
+  const reducer = new CompanionReducer()
+  reducer.handle(session, event('turn/start', { turn: 1 }, 1))
+
+  const [withEffort] = reducer.handle(session, event('request/header', {
+    header: {
+      config: {
+        provider: 'deepseek',
+        model: 'deepseek-chat',
+        reasoningEffort: 'high',
+      },
+      adapterDefaults: { reasoningEffort: true },
+    },
+    reason: 'initial',
+  }, 2))
+  assert.equal(withEffort.reasoningEffort, 'high')
+  assert.match(withEffort.detail, /推理 high/u)
+
+  const [working] = reducer.handle(session, event('tool/call', {
+    callId: 'reasoning-work',
+    name: 'apply_patch',
+  }, 3))
+  assert.equal(working.reasoningEffort, 'high')
+  assert.match(working.detail, /推理 high/u)
+
+  assert.deepEqual(reducer.handle(session, event('request/header', {
+    header: { config: { provider: 'deepseek', model: 'deepseek-chat', reasoningEffort: 'high' } },
+    reason: 'change',
+  }, 4)), [])
+})
+
+test('request headers clear the reasoning label for models without an effort', () => {
+  const reducer = new CompanionReducer()
+  reducer.handle(session, event('turn/start', { turn: 1 }, 1))
+  reducer.handle(session, event('request/header', {
+    header: { config: { provider: 'deepseek', model: 'deepseek-chat', reasoningEffort: 'max' } },
+    reason: 'initial',
+  }, 2))
+
+  const [withoutEffort] = reducer.handle(session, event('request/header', {
+    header: { config: { provider: 'mock', model: 'no-reasoning' } },
+    reason: 'change',
+  }, 3))
+  assert.equal(withoutEffort.reasoningEffort, undefined)
+  assert.doesNotMatch(withoutEffort.detail, /推理/u)
+})
+
 test('real DSH tool result callId paths clear completed tools', () => {
   const reducer = new CompanionReducer()
   reducer.handle(session, event('turn/start', { turn: 1 }, 1))

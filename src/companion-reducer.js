@@ -139,9 +139,16 @@ function progressOf(todos) {
   }
 }
 
+function reasoningEffortOf(event) {
+  const value = event?.data?.header?.config?.reasoningEffort
+  if (typeof value !== 'string') return undefined
+  return value.trim().replace(/\s+/gu, ' ').slice(0, 24) || undefined
+}
+
 function detailFor(record, stage = record.payload.stage) {
   const parts = []
   if (record.project) parts.push(record.project)
+  if (record.reasoningEffort) parts.push(`推理 ${record.reasoningEffort}`)
   if (record.progress?.total) parts.push(`已完成 ${record.progress.completed}/${record.progress.total} 步`)
   if (record.task) parts.push(record.task)
   else if (stage) parts.push(stage)
@@ -208,6 +215,14 @@ export class CompanionReducer {
           message: statusCopy('thinking', event.seq),
         })
         return this.#render()
+
+      case 'request/header': {
+        const reasoningEffort = reasoningEffortOf(event)
+        if (reasoningEffort === record.reasoningEffort) return []
+        record.reasoningEffort = reasoningEffort
+        record.updatedAt = ++this.clock
+        return this.#render()
+      }
 
       case 'tool/call': {
         const callId = toolCallIdOf(event, `seq-${String(event.seq ?? 'unknown')}`)
@@ -439,6 +454,7 @@ export class CompanionReducer {
       task: undefined,
       progress: undefined,
       project: undefined,
+      reasoningEffort: undefined,
       subagent: false,
       lastSeq: -1,
       updatedAt: ++this.clock,
@@ -498,6 +514,7 @@ export class CompanionReducer {
         task: selection.record.task,
         progress: selection.record.progress,
         project: selection.record.project,
+        reasoningEffort: selection.record.reasoningEffort,
         detail: detailFor(selection.record),
       }))
     }
@@ -539,6 +556,7 @@ export class CompanionReducer {
         state: record.state,
         project: record.project,
         task: record.task,
+        reasoningEffort: record.reasoningEffort,
         message: record.payload.message,
         detail: detailFor(record),
       }))
@@ -564,6 +582,7 @@ export class CompanionReducer {
       record.task ?? '',
       record.progress?.completed ?? '',
       record.progress?.total ?? '',
+      record.reasoningEffort ?? '',
     ].join('|')
   }
 }
