@@ -14,7 +14,6 @@ from runtime.helper import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-CURSORS_DIR = REPO_ROOT / "assets" / "cursors"
 
 
 class GloveCursorControllerTests(unittest.TestCase):
@@ -92,27 +91,22 @@ class NativeCursorFallbackTests(unittest.TestCase):
 
 
 class CursorSourceTests(unittest.TestCase):
-    """The checked-in XPM sources + converter must reproduce the shipped .cur."""
+    """The generator script must reproduce the shipped .cur files byte-for-byte."""
 
-    def test_converter_reproduces_shipped_cursors(self) -> None:
+    def test_generator_reproduces_shipped_cursors(self) -> None:
+        generator = REPO_ROOT / "scripts" / "generate_glove_cursors.py"
+        self.assertTrue(generator.is_file(), "missing scripts/generate_glove_cursors.py")
         with tempfile.TemporaryDirectory() as directory:
             result = subprocess.run(
-                [sys.executable, str(CURSORS_DIR / "xpm2cur.py"), directory],
+                [sys.executable, str(generator), directory],
                 capture_output=True,
                 text=True,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
-            for generated, shipped in (
-                ("openhand.cur", "cursor_grab.cur"),
-                ("closedhand.cur", "cursor_grabbing.cur"),
-            ):
-                gen_md5 = hashlib.md5((Path(directory) / generated).read_bytes()).hexdigest()
-                ship_md5 = hashlib.md5((REPO_ROOT / "assets" / shipped).read_bytes()).hexdigest()
-                self.assertEqual(gen_md5, ship_md5, f"{generated} != assets/{shipped}")
-
-    def test_cursor_sources_exist(self) -> None:
-        for name in ("openhand.32.xpm", "closedhand.32.xpm", "xpm2cur.py", "README.md", "GPL-3.0.txt"):
-            self.assertTrue((CURSORS_DIR / name).is_file(), f"missing assets/cursors/{name}")
+            for name in ("cursor_grab.cur", "cursor_grabbing.cur"):
+                gen_md5 = hashlib.md5((Path(directory) / name).read_bytes()).hexdigest()
+                ship_md5 = hashlib.md5((REPO_ROOT / "assets" / name).read_bytes()).hexdigest()
+                self.assertEqual(gen_md5, ship_md5, f"{name} is not reproducible from the generator")
 
 
 if __name__ == "__main__":
