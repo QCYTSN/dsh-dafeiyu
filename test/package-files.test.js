@@ -7,13 +7,9 @@ import test from 'node:test'
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const assetRoot = join(repositoryRoot, 'assets')
 
-test('package files whitelist ships the glove cursors and their generator', async () => {
+test('package files whitelist ships the glove cursors and their license notice', async () => {
   const pkg = JSON.parse(await readFile(join(repositoryRoot, 'package.json'), 'utf8'))
-  for (const entry of [
-    'assets/cursor_grab.cur',
-    'assets/cursor_grabbing.cur',
-    'scripts/generate_glove_cursors.py',
-  ]) {
+  for (const entry of ['assets/cursor_grab.cur', 'assets/cursor_grabbing.cur', 'assets/cursors/']) {
     assert.ok(pkg.files.includes(entry), `package.json "files" is missing ${entry}`)
   }
 })
@@ -27,7 +23,9 @@ test('glove cursor files are valid 32x32 CUR icons', async () => {
   }
 })
 
-test('glove cursor generator script is present and non-empty', async () => {
-  const info = await stat(join(repositoryRoot, 'scripts', 'generate_glove_cursors.py'))
-  assert.ok(info.size > 0, 'scripts/generate_glove_cursors.py is empty')
+test('cursor license and provenance notice are bundled', async () => {
+  for (const name of ['cursors/LICENSE', 'cursors/README.md']) {
+    const info = await stat(join(assetRoot, name))
+    assert.ok(info.size > 0, `${name} is empty`)
+  }
 })

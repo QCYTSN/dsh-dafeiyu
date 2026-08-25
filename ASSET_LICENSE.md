@@ -20,11 +20,14 @@ They contain no third-party recordings and are covered by the repository's MIT
 license.
 
 The glove status cursors `assets/cursor_grab.cur` (open hand) and
-`assets/cursor_grabbing.cur` (closed fist) are original pixel art, procedurally
-drawn by `scripts/generate_glove_cursors.py` for this repository. They contain
-no third-party assets and are covered by the repository's MIT license, like the
-notification sounds above. The generator reproduces the shipped .cur files
-byte-for-byte (covered by the tests).
+`assets/cursor_grabbing.cur` (closed fist) are **unmodified copies** of the
+cursor images shipped by the Chromium project in
+`ui/resources/cursors/` (`hand_grab.cur`, `hand_grabbing.cur`, 32x32).
+They are licensed under the **BSD 3-Clause license** held by The Chromium
+Authors and are **not covered by the MIT code license**; both licenses are
+permissive and compatible. The upstream license text and a provenance note
+with the upstream URLs and file digests are bundled in `assets/cursors/`
+(`LICENSE`, `README.md`), and the digests are pinned by the test suite.
 
 This is an unofficial fan-made project and is not affiliated with or endorsed
 by DeepSeek. Names, marks, and character-related rights belong to their

@@ -91,22 +91,29 @@ class NativeCursorFallbackTests(unittest.TestCase):
 
 
 class CursorSourceTests(unittest.TestCase):
-    """The generator script must reproduce the shipped .cur files byte-for-byte."""
+    """The shipped .cur files are unmodified upstream Chromium copies.
 
-    def test_generator_reproduces_shipped_cursors(self) -> None:
-        generator = REPO_ROOT / "scripts" / "generate_glove_cursors.py"
-        self.assertTrue(generator.is_file(), "missing scripts/generate_glove_cursors.py")
-        with tempfile.TemporaryDirectory() as directory:
-            result = subprocess.run(
-                [sys.executable, str(generator), directory],
-                capture_output=True,
-                text=True,
-            )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            for name in ("cursor_grab.cur", "cursor_grabbing.cur"):
-                gen_md5 = hashlib.md5((Path(directory) / name).read_bytes()).hexdigest()
-                ship_md5 = hashlib.md5((REPO_ROOT / "assets" / name).read_bytes()).hexdigest()
-                self.assertEqual(gen_md5, ship_md5, f"{name} is not reproducible from the generator")
+    Digests are pinned against the files published in Chromium's
+    ui/resources/cursors (see assets/cursors/README.md). If an upstream file
+    is ever swapped (different art or a different license), this test fails.
+    """
+
+    UPSTREAM_DIGESTS = {
+        "cursor_grab.cur": "3f37213b8c0a7374308b2ae99d4eefa2",
+        "cursor_grabbing.cur": "8605cf2c21985f59d2480da72aebe3aa",
+    }
+
+    def test_shipped_cursors_match_upstream_chromium(self) -> None:
+        for name, expected in self.UPSTREAM_DIGESTS.items():
+            digest = hashlib.md5((REPO_ROOT / "assets" / name).read_bytes()).hexdigest()
+            self.assertEqual(digest, expected, f"{name} differs from the upstream Chromium cursor")
+
+    def test_cursor_license_notice_is_bundled(self) -> None:
+        cursors_dir = REPO_ROOT / "assets" / "cursors"
+        for name in ("LICENSE", "README.md"):
+            self.assertTrue((cursors_dir / name).is_file(), f"missing assets/cursors/{name}")
+        license_text = (cursors_dir / "LICENSE").read_text(encoding="utf-8")
+        self.assertIn("Redistribution and use in source and binary forms", license_text)
 
 
 if __name__ == "__main__":
