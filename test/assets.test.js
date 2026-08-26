@@ -81,9 +81,9 @@ test('dragging keeps a stable held frame without procedural motion', async () =>
 test('drag phase clips cover release, daze, and protest', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   const expected = {
-    dragging_release: { frame: 'dragging/dragging_238_03.png', frameMs: 200, loop: false },
-    dragging_dizzy: { frame: 'dragging/dragging_238_04.png', frameMs: 260, loop: true },
-    dragging_protest: { frame: 'dragging/dragging_238_05.png', frameMs: 260, loop: false },
+    dragging_release: { frame: 'dragging/dragging_238_02.png', frameMs: 200, loop: false },
+    dragging_dizzy: { frame: 'dragging/dragging_238_03.png', frameMs: 260, loop: true },
+    dragging_protest: { frame: 'dragging/dragging_238_04.png', frameMs: 260, loop: false },
   }
 
   for (const [clipName, expectation] of Object.entries(expected)) {
