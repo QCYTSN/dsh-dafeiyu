@@ -19,7 +19,7 @@ stops its native Helper, and provides the Agent events that drive it. The transp
 frameless companion stays above other desktop apps, so you can see whether DSH is thinking,
 editing, testing, waiting, or finished while working in VS Code, a browser, or File Explorer.
 
-> Current version: `0.1.5` · Windows / WSL2 / Linux x64 · experimental macOS support
+> Current version: `0.1.6` · Windows / WSL2 / Linux x64 · experimental macOS support
 
 ## Follow updates
 

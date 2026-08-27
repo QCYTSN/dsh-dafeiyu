@@ -1,6 +1,6 @@
 {
   "name": "dsh-dafeiyu",
-  "version": "0.1.5",
+  "version": "0.1.6",
   "description": "A desktop-native BigFish companion driven by DeepSeek Harness session events.",
   "author": "QCYTSN",
   "type": "module",
