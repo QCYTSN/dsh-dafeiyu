@@ -35,7 +35,6 @@ Date: 2026-08-14
 
 - npm archive: approximately 54.2 MB compressed and 54.6 MB unpacked.
 - Windows helper executable: approximately 50.9 MB.
-- Final package inventory: 72 files; the real-DSH acceptance driver remains repository-only.
 
 ## Runtime baseline
 

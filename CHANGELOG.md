@@ -5,6 +5,7 @@
 ### Changed
 
 - Update the artifact upload and download actions used by the release workflow to their Node.js 24 versions, removing GitHub-hosted runner deprecation warnings and enforcing artifact digest mismatches as errors.
+- Remove completed Phase 0 planning material and the unused legacy UI acceptance harness.
 
 ## 0.1.6
 

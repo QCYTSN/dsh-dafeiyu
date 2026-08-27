@@ -444,8 +444,6 @@ macOS 原生 Helper 的构建说明见 [native/macos/README.md](native/macos/REA
 ## 更多文档
 
 - [产品范围与取舍](docs/PRODUCT_SCOPE.md)
-- [执行计划](docs/EXECUTION_PLAN.md)
-- [兼容性验证](docs/PHASE0.md)
 - [Windows 验收与性能记录](docs/ACCEPTANCE.md)
 - [更新、回退与卸载](docs/UPDATING.md)
 - [维护者发布流程](docs/RELEASING.md)

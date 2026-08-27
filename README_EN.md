@@ -466,8 +466,6 @@ macOS native Helper build instructions: [native/macos/README.md](native/macos/RE
 ## More documentation
 
 - [Product scope and trade-offs](docs/PRODUCT_SCOPE.md)
-- [Execution plan](docs/EXECUTION_PLAN.md)
-- [Compatibility spike](docs/PHASE0.md)
 - [Windows acceptance and performance](docs/ACCEPTANCE.md)
 - [Update, rollback, and uninstall](docs/UPDATING.md)
 - [Maintainer release workflow](docs/RELEASING.md)

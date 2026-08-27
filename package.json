@@ -56,7 +56,6 @@
     "test": "node --test --test-timeout=10000 test/assets.test.js test/config-endpoint.test.js test/client-slot-key.test.js test/helper-command.test.js test/protocol.test.js test/status-copy.test.js test/reducer.test.js test/helper-lifecycle.test.js test/helper-restart.test.js test/plugin-integration.test.js",
     "test:helper": "node --test test/helper-lifecycle.test.js",
     "test:python": "node scripts/run-python.mjs -m unittest discover -s runtime/tests -t .",
-    "test:ui": "node test/fixtures/ui-acceptance.js",
     "helper:headless": "node scripts/run-python.mjs runtime/helper.py --headless",
     "helper:visual": "node scripts/run-python.mjs runtime/helper.py",
     "build:helper": "node scripts/build-helper.mjs",
@@ -93,8 +92,5 @@
   "publishConfig": {
     "access": "public"
   },
-  "license": "SEE LICENSE IN ASSET_LICENSE.md",
-  "devDependencies": {
-    "playwright-core": "^1.62.1"
-  }
+  "license": "SEE LICENSE IN ASSET_LICENSE.md"
 }

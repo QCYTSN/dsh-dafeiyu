@@ -17,10 +17,6 @@ importers:
       '@standard-schema/spec':
         specifier: 1.1.0
         version: 1.1.0
-    devDependencies:
-      playwright-core:
-        specifier: ^1.62.1
-        version: 1.62.1
 
 packages:
 
@@ -33,11 +29,6 @@ packages:
   '@standard-schema/spec@1.1.0':
     resolution: {integrity: sha512-l2aFy5jALhniG5HgqrD6jXLi/rUWrKvqN/qJx6yoJsgKhblVd+iqqU4RCXavm/jPityDo5TCvKMnpjKnOriy0w==}
 
-  playwright-core@1.62.1:
-    resolution: {integrity: sha512-wPYSwEBJY9GHraISXqyqtx0na0LpO3XEX7jNDhntbex7tzUS7kLnZsOlFruFJB4Hi/rhDMjXGqHewDZ68nYZVw==}
-    engines: {node: '>=20'}
-    hasBin: true
-
 snapshots:
 
   '@deepseek-ai/cosmokit@1.8.2': {}
@@ -48,5 +39,3 @@ snapshots:
       '@standard-schema/spec': 1.1.0
 
   '@standard-schema/spec@1.1.0': {}
-
-  playwright-core@1.62.1: {}
