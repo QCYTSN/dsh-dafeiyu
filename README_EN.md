@@ -37,6 +37,7 @@ editing, testing, waiting, or finished while working in VS Code, a browser, or F
 
 - **See DSH status away from the WebUI:** BigFish stays on top of the desktop.
 - **React to real Agent events:** it does not inspect the screen or mistake activity in other apps for DSH work.
+- **Show the effective reasoning effort:** when DSH reports the effort actually applied to a request, the status detail keeps it visible instead of guessing from the model name.
 - **Show useful, compact context:** the card can display the project, current phase, active step, and real todo progress.
 - **Feel alive without becoming noisy:** thinking, searching, editing, commands, testing, waiting, success, and errors have distinct motion and friendly copy.
 - **Avoid a second app experience:** users do not launch the Helper, install Python, or configure another port.
