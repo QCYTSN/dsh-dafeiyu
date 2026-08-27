@@ -252,6 +252,21 @@ function mount(ctx, config = {}, eventCtx = ctx) {
     }
   }, { global: true })
 
+  // Watch DSH global ui-theme setting and forward to helper
+  const offThemeUpdate = eventCtx.on('settings/updated', (ns, next) => {
+    if (ns !== 'ui-theme' || !bridge) return
+    const preference = next?.preference ?? 'system'
+    bridge.send(createMessage(CompanionMessageKind.THEME, { preference }))
+  }, { global: true })
+
+  // Send initial theme if available
+  if (bridge) {
+    const themeSection = (typeof ctx.settings?.get === 'function') ? ctx.settings.get('ui-theme') : undefined
+    if (themeSection) {
+      bridge.send(createMessage(CompanionMessageKind.THEME, { preference: themeSection.preference ?? 'system' }))
+    }
+  }
+
   const unwatch = settings.watch((next) => {
     // Disabling is the only path that tears the helper down.  Every other
     // setting is applied live through a CONFIG message, so sliders never
@@ -288,6 +303,7 @@ function mount(ctx, config = {}, eventCtx = ctx) {
     restartTimer = undefined
     offEvent?.()
     offDisposed?.()
+    offThemeUpdate?.()
     unwatch()
     stopRuntime('dsh-host-stop')
   })

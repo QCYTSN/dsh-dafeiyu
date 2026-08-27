@@ -28,14 +28,6 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
-DRAG_RELEASE_MS = 300
-DRAG_DIZZY_MS = 840
-DRAG_PROTEST_MS = 300
-DRAG_RELEASE_STAGES = (
-    ("dragging_release", DRAG_RELEASE_MS),
-    ("dragging_dizzy", DRAG_DIZZY_MS),
-    ("dragging_protest", DRAG_PROTEST_MS),
-)
 
 
 def bundle_root() -> Path:
@@ -67,6 +59,9 @@ def configure_stdio() -> None:
             reconfigure(encoding="utf-8", errors=errors)
 
 
+THEME_PREFERENCES = {"light", "dark", "system"}
+
+
 def parse_message(line: str) -> dict[str, Any]:
     message = json.loads(line)
     if not isinstance(message, dict):
@@ -76,6 +71,8 @@ def parse_message(line: str) -> dict[str, Any]:
     kind = message.get("kind")
     if kind in {"state", "pulse"} and message.get("state") not in STATES:
         raise ValueError("unsupported companion state")
+    if kind == "theme" and message.get("preference") not in THEME_PREFERENCES:
+        raise ValueError(f"unsupported theme preference: {message.get('preference')}")
     return message
 
 
@@ -134,7 +131,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     configure_qt_platform()
     try:
         from PySide6.QtCore import QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
-        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
+        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPalette, QPen, QPixmap
         from PySide6.QtWidgets import QApplication, QMenu, QWidget
     except ImportError:
         print(
@@ -229,6 +226,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.task = ""
             self.tasks: list[dict[str, Any]] = []
             self.webui_url = os.environ.get("DSH_DAFEIYU_WEBUI_URL", "http://127.0.0.1:3080/")
+            self.theme_preference = "system"
+            self.theme_resolved = "light"
+            self._init_theme_colors()
             self.shake_timer: QTimer | None = None
             self.shake_origin: QPoint | None = None
             self.shake_count = 0
@@ -237,7 +237,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.pet_x = 0
             self.pet_y = 0
             self.dragging = False
-            self.drag_chain_id = 0
             self.last_tick_ms = self._now_ms()
             self.fade_from_pixmap: QPixmap | None = None
             self.fade_started = 0.0
@@ -261,6 +260,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self._apply_window_size()
             QTimer.singleShot(0, self._restore_visible_position)
 
+            # Listen for system theme changes to update colors dynamically
+            app = QApplication.instance()
+            if app is not None:
+                app.paletteChanged.connect(self._on_system_theme_changed)
+                if hasattr(app, 'colorSchemeChanged'):
+                    app.colorSchemeChanged.connect(self._on_system_scheme_changed)
+
         def apply_message(self, message: dict[str, Any]) -> None:
             recorder.record(message)
             kind = message.get("kind")
@@ -283,6 +289,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._sync_bubble_size()
             elif kind == "config":
                 self._apply_config(message)
+            elif kind == "theme":
+                self._apply_theme(message)
             elif kind in {"state", "pulse"}:
                 state = str(message.get("state", "IDLE"))
                 self.display_state = state
@@ -327,15 +335,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if snapshot_path is not None and not self.snapshot_saved:
                 QTimer.singleShot(180, self._save_snapshot)
 
-        def _set_reduced_motion(self, enabled: bool) -> None:
-            self.reduced_motion = enabled
-            self.animation_timer.setInterval(40 if enabled else 20)
-            if enabled:
-                self.micro_timer.stop()
-                self._cancel_drag_release_chain()
-            else:
-                self._schedule_micro()
-
         def _apply_config(self, message: dict[str, Any]) -> None:
             """Apply a live CONFIG message without restarting the window."""
             scale = message.get("scale")
@@ -346,7 +345,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
             reduced_motion = message.get("reducedMotion")
             if isinstance(reduced_motion, bool) and reduced_motion != self.reduced_motion:
-                self._set_reduced_motion(reduced_motion)
+                self.reduced_motion = reduced_motion
+                self.animation_timer.setInterval(40 if self.reduced_motion else 20)
+                if self.reduced_motion:
+                    self.micro_timer.stop()
+                else:
+                    self._schedule_micro()
             sound_enabled = message.get("soundEnabled")
             if isinstance(sound_enabled, bool):
                 self.sound_enabled = sound_enabled
@@ -363,6 +367,73 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.bubble_states = [str(state) for state in bubble_states if isinstance(state, str)]
             self._sync_bubble_size()
             self._save_layout()
+
+        def _init_theme_colors(self) -> None:
+            """Initialize theme color palettes for light and dark modes."""
+            self._theme_colors = {
+                "light": {
+                    "card_fill": QColor(252, 252, 253, 248),
+                    "card_border": QColor(218, 221, 226, 205),
+                    "card_shadow1": QColor(17, 24, 39, 13),
+                    "card_shadow2": QColor(17, 24, 39, 18),
+                    "title_text": QColor("#25282D"),
+                    "detail_text": QColor("#747981"),
+                    "SUCCESS": (QColor("#D9F7E4"), QColor("#12B85A")),
+                    "ERROR": (QColor("#FDE3E3"), QColor("#E5484D")),
+                    "WAITING": (QColor("#FFF0CE"), QColor("#D88A00")),
+                    "THINKING": (QColor("#E2ECFF"), QColor("#4C78E8")),
+                    "WORKING": (QColor("#DDEBFF"), QColor("#3478F6")),
+                    "DISCONNECTED": (QColor("#ECEEF1"), QColor("#7B818A")),
+                },
+                "dark": {
+                    "card_fill": QColor(35, 35, 35, 245),
+                    "card_border": QColor(80, 80, 80, 200),
+                    "card_shadow1": QColor(0, 0, 0, 30),
+                    "card_shadow2": QColor(0, 0, 0, 45),
+                    "title_text": QColor("#F0F0F0"),
+                    "detail_text": QColor("#B0B0B0"),
+                    "SUCCESS": (QColor("#1B4D2C"), QColor("#4ADE80")),
+                    "ERROR": (QColor("#4C1F1F"), QColor("#F87171")),
+                    "WAITING": (QColor("#4A3500"), QColor("#FBBF24")),
+                    "THINKING": (QColor("#1E3A5F"), QColor("#60A5FA")),
+                    "WORKING": (QColor("#1E3A5F"), QColor("#60A5FA")),
+                    "DISCONNECTED": (QColor("#3A3A3A"), QColor("#9CA3AF")),
+                },
+            }
+
+        def _apply_theme(self, message: dict[str, Any]) -> None:
+            """Apply a theme message and update UI colors."""
+            preference = message.get("preference", "system")
+            self.theme_preference = preference
+            self._resolve_theme()
+            self.update()
+
+        def _resolve_theme(self) -> None:
+            """Resolve the current theme based on preference."""
+            if self.theme_preference == "system":
+                app = QApplication.instance()
+                if app is None:
+                    self.theme_resolved = "light"
+                else:
+                    window_color = app.palette().color(QPalette.Window)
+                    brightness = (window_color.red() * 299 + window_color.green() * 587 + window_color.blue() * 114) / 1000
+                    self.theme_resolved = "dark" if brightness < 128 else "light"
+            else:
+                self.theme_resolved = self.theme_preference
+
+        def _on_system_theme_changed(self, palette: Any) -> None:
+            """Callback when system theme changes (older Qt)."""
+            if self.theme_preference != "system":
+                return
+            self._resolve_theme()
+            self.update()
+
+        def _on_system_scheme_changed(self) -> None:
+            """Callback for Qt 6.5+ colorSchemeChanged signal."""
+            if self.theme_preference != "system":
+                return
+            self._resolve_theme()
+            self.update()
 
         def _tick(self) -> None:
             now_ms = self._now_ms()
@@ -428,7 +499,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if self.dragging:
                 return
             self.dragging = True
-            self.drag_chain_id += 1
             self.animation_timer.stop()
             self.micro_timer.stop()
             self._play_model_overlay("dragging", allow_fade=False, repaint=False)
@@ -448,46 +518,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.animation_timer.start(40 if self.reduced_motion else 20)
             if not self.reduced_motion:
                 self._schedule_micro()
-                self._run_drag_release_chain()
-
-        def _run_drag_release_chain(self) -> None:
-            """Play release -> dizzy -> protest, then hand back to the base state.
-
-            Every stage is a single-frame clip, so the chain is driven by timers;
-            any new grab (or a manifest without the stage clips) aborts quietly.
-            """
-            self.drag_chain_id += 1
-            token = self.drag_chain_id
-
-            def play(index: int) -> None:
-                if token != self.drag_chain_id or self.dragging:
-                    return
-                if self.reduced_motion or index >= len(DRAG_RELEASE_STAGES):
-                    self._clear_drag_overlay()
-                    return
-                clip_name, hold_ms = DRAG_RELEASE_STAGES[index]
-                if not self._play_model_overlay(clip_name, allow_fade=False):
-                    self._clear_drag_overlay()
-                    return
-                QTimer.singleShot(hold_ms, lambda: play(index + 1))
-
-            QTimer.singleShot(0, lambda: play(0))
-
-        def _clear_drag_overlay(self) -> None:
-            if self.dragging:
-                return
-            previous_frame = self.model.frame
-            previous_clip = self.model.active_clip_name
-            self.model.clear_overlay()
-            self._sync_frame_transition(previous_frame, previous_clip)
-            self.update()
-
-        def _cancel_drag_release_chain(self) -> None:
-            self.drag_chain_id += 1
-            if not self.dragging and self.model.active_clip_name in {
-                name for name, _ in DRAG_RELEASE_STAGES
-            }:
-                self._clear_drag_overlay()
 
         def _schedule_micro(self) -> None:
             if self.reduced_motion:
@@ -681,16 +711,14 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 return self.status_message, self.status_detail, self.status_state
             return None
 
-        @staticmethod
-        def _status_colors(state: str) -> tuple[QColor, QColor]:
-            return {
-                "SUCCESS": (QColor("#D9F7E4"), QColor("#12B85A")),
-                "ERROR": (QColor("#FDE3E3"), QColor("#E5484D")),
-                "WAITING": (QColor("#FFF0CE"), QColor("#D88A00")),
-                "THINKING": (QColor("#E2ECFF"), QColor("#4C78E8")),
-                "WORKING": (QColor("#DDEBFF"), QColor("#3478F6")),
-                "DISCONNECTED": (QColor("#ECEEF1"), QColor("#7B818A")),
-            }.get(state, (QColor("#ECEEF1"), QColor("#747A84")))
+        def _status_colors(self, state: str) -> tuple[QColor, QColor]:
+            colors = self._theme_colors.get(self.theme_resolved, self._theme_colors["light"])
+            if state in colors:
+                return colors[state]
+            # Default: subtle background with visible foreground
+            if self.theme_resolved == "dark":
+                return (QColor("#2A2A2A"), QColor("#A0A0A0"))
+            return (QColor("#F0F0F0"), QColor("#747A84"))
 
         def _draw_status_icon(self, painter: QPainter, state: str, center_x: int, center_y: int) -> None:
             background, foreground = self._status_colors(state)
@@ -739,19 +767,20 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             corner_radius: int,
             s: float,
         ) -> None:
+            colors = self._theme_colors.get(self.theme_resolved, self._theme_colors["light"])
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.setBrush(QColor(17, 24, 39, 13))
+            painter.setBrush(colors["card_shadow1"])
             painter.drawRoundedRect(
                 card_x + 1, card_y + round(13 * s), card_width - 2, card_height,
                 corner_radius, corner_radius,
             )
-            painter.setBrush(QColor(17, 24, 39, 18))
+            painter.setBrush(colors["card_shadow2"])
             painter.drawRoundedRect(
                 card_x, card_y + round(7 * s), card_width, card_height,
                 corner_radius, corner_radius,
             )
-            painter.setPen(QPen(QColor(218, 221, 226, 205), 1))
-            painter.setBrush(QColor(252, 252, 253, 248))
+            painter.setPen(QPen(colors["card_border"], 1))
+            painter.setBrush(colors["card_fill"])
             painter.drawRoundedRect(
                 card_x, card_y, card_width, card_height,
                 corner_radius, corner_radius,
@@ -771,10 +800,11 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             title_font.setWeight(QFont.Weight.DemiBold)
             detail_font = QFont("Microsoft YaHei UI")
             detail_font.setPointSizeF(max(7.0, 9.0 * s))
+            colors = self._theme_colors.get(self.theme_resolved, self._theme_colors["light"])
             text_x = card_x + round(16 * s)
             text_width = max(40, card_width - round(32 * s))
             painter.setFont(title_font)
-            painter.setPen(QColor("#25282D"))
+            painter.setPen(colors["title_text"])
             title = f"{len(self.tasks)} 个任务进行中"
             painter.drawText(
                 text_x,
@@ -795,7 +825,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(foreground)
                 painter.drawEllipse(text_x, row_y + round(4 * s), round(8 * s), round(8 * s))
-                painter.setPen(QColor("#747981"))
+                painter.setPen(colors["detail_text"])
                 painter.drawText(
                     text_x + round(14 * s),
                     row_y,
@@ -806,7 +836,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 )
             if len(self.tasks) > 3:
                 more = f"还有 {len(self.tasks) - 3} 个任务…"
-                painter.setPen(QColor("#9AA0A6"))
+                painter.setPen(colors["detail_text"])
                 painter.drawText(
                     text_x + round(14 * s),
                     card_y + round((36 + 3 * 24) * s),
@@ -895,8 +925,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 title_font.setWeight(QFont.Weight.DemiBold)
                 detail_font = QFont("Microsoft YaHei UI")
                 detail_font.setPointSizeF(max(7.0, 9.0 * s))
+                colors = self._theme_colors.get(self.theme_resolved, self._theme_colors["light"])
                 painter.setFont(title_font)
-                painter.setPen(QColor("#25282D"))
+                painter.setPen(colors["title_text"])
                 title_text = QFontMetrics(title_font).elidedText(
                     title,
                     Qt.TextElideMode.ElideRight,
@@ -911,7 +942,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     title_text,
                 )
                 painter.setFont(detail_font)
-                painter.setPen(QColor("#747981"))
+                painter.setPen(colors["detail_text"])
                 detail_text = QFontMetrics(detail_font).elidedText(
                     detail,
                     Qt.TextElideMode.ElideRight,
@@ -1080,7 +1111,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("settings", bubbleScale=self.bubble_scale)
             elif selected == reduced_action:
-                self._set_reduced_motion(reduced_action.isChecked())
+                self.reduced_motion = reduced_action.isChecked()
+                self.animation_timer.setInterval(40 if self.reduced_motion else 20)
+                if self.reduced_motion:
+                    self.micro_timer.stop()
+                else:
+                    self._schedule_micro()
                 self._save_layout()
                 emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()
