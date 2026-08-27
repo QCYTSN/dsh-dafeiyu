@@ -17,6 +17,11 @@
   (`native/macos/Tests/AnimationModelTests.swift`, 16 cases, run via
   `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
   the Python and Swift implementations cannot silently drift.
+- Add repeatable Swift unit tests for layout persistence
+  (`native/macos/Tests/LayoutStoreTests.swift`, 11 cases) and fix the drift
+  they exposed: missing `XDG_CONFIG_HOME`/`LOCALAPPDATA` fallbacks, JSON
+  booleans being accepted as coordinates/scales, `bubbleStates` not filtering
+  invalid entries, and `save()` skipping Python-compatible normalisation.
 
 ### Fixed
 

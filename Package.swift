@@ -14,13 +14,12 @@ let package = Package(
             name: "BigFishCore",
             path: "native/macos/Sources",
             exclude: [
-                "LayoutStore.swift",
                 "Permissions.swift",
                 "PetController.swift",
                 "PetView.swift",
                 "main.swift",
             ],
-            sources: ["AnimationModel.swift"]
+            sources: ["AnimationModel.swift", "LayoutStore.swift"]
         ),
         .testTarget(
             name: "BigFishCoreTests",

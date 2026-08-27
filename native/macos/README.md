@@ -66,13 +66,36 @@ arm64 + x86_64，最低 macOS 12.0，ad-hoc 签名，素材打进
 Developer ID / Notary 凭据，因此浏览器下载并带有隔离属性的包仍可能被 Gatekeeper
 拦截。正式签名与公证继续在 #24 跟踪，不能把 ad-hoc 签名描述为正式分发签名。
 
+## 测试（Swift 核心）
+
+状态机（`AnimationModel`）与布局持久化（`PetLayout`）的可重复测试放在
+`Tests/`，分别对照 `runtime/tests/test_animation_model.py` 和
+`runtime/tests/test_layout_store.py` 的用例，防止 Python 与 Swift 两套实现
+静默漂移：
+
+```bash
+native/macos/test.sh        # 等价于在仓库根目录执行 `swift test`
+```
+
+CI（`.github/workflows/publish.yml` 的 macOS job）也会运行 `swift test`。
+如果你的 Command Line Tools 的 SwiftPM 有兼容问题，`test.sh` 会自动优先
+使用 `/Applications/Xcode.app` 的工具链。
+
+### 布局持久化测试发现并修复的漂移
+
+- `defaultPath()` 缺失 `XDG_CONFIG_HOME`（及 `LOCALAPPDATA`）回退，与
+  Python 的平台路径优先级不一致 → 已补齐，并支持注入环境字典以便测试
+- JSON 布尔值会被 Swift 桥接成 `1/0`，导致 `x: true` 被当作坐标、`scale:
+  false` 被当作 `0.55` → 已按 Python 语义排除布尔值
+- `bubbleStates` 含非法项时 Python 只保留字符串项，Swift 会整组丢弃 →
+  已改为同样的过滤行为
+- `save()` 前不做归一化（Python 会 clamp scale/bubbleScale、校验
+  bubbleMode）→ 已统一走 `normalized()`，保存与读取行为一致
+
 ## 用户安装（macOS 端用户）
 
-> 开发者的核心逻辑测试（`AnimationModel` 状态机）见上方「构建」章节之后，
-> 可重复执行：`native/macos/test.sh`（等价于仓库根目录的 `swift test`），
-> CI 的 macOS job 也会运行。用例对照 `runtime/tests/test_animation_model.py`，
-> 防止 Python 与 Swift 两套实现漂移；若 Command Line Tools 的 SwiftPM 不兼容，
-> `test.sh` 会优先使用 `/Applications/Xcode.app` 工具链。
+> 开发者的核心逻辑测试（状态机 + 布局持久化）见上方「测试（Swift 核心）」
+> 章节。
 
 原生 Helper 从 0.1.4 起作为实验性功能随 npm 和 GitHub Release 发布。普通用户
 **不需要**自行构建或运行本目录的源码，直接用 DSH 的插件命令安装即可：
