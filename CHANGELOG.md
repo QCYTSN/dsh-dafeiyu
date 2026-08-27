@@ -6,6 +6,10 @@
 
 - Display the reasoning effort that DSH actually applies to each request in the companion status detail, and keep it visible as the task moves between thinking, tool use, and waiting states.
 
+### Fixed
+
+- WSL visual mode now caches the bundled Windows Helper under the Windows user's local app-data directory before launching it. Re-enabling the pet no longer makes Windows repeatedly read and unpack the large PyInstaller executable through `\\wsl.localhost`; cache failures still fall back to the packaged Helper.
+
 ## 0.1.5
 
 ### Fixed

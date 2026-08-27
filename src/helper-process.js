@@ -1,5 +1,14 @@
 import { execFileSync, spawn } from 'node:child_process'
-import { chmodSync, existsSync, readFileSync } from 'node:fs'
+import {
+  chmodSync,
+  copyFileSync,
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  renameSync,
+  statSync,
+  unlinkSync,
+} from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { dirname, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -24,6 +33,9 @@ const darwinBundledHelperPath = resolve(
   'MacOS',
   'dsh-dafeiyu-helper',
 )
+const packageVersion = JSON.parse(
+  readFileSync(resolve(here, '..', 'package.json'), 'utf8'),
+).version
 const snapshotMessageKinds = new Set([
   CompanionMessageKind.HELLO,
   CompanionMessageKind.STATE,
@@ -92,6 +104,60 @@ function defaultWslPath(...args) {
   return execFileSync('wslpath', args, { encoding: 'utf8' }).trim()
 }
 
+function defaultWindowsLocalAppData({
+  cmdExe = defaultCmdExe,
+  wslpath = defaultWslPath,
+  run = execFileSync,
+} = {}) {
+  const windowsPath = run(
+    cmdExe(),
+    ['/d', '/c', 'echo %LOCALAPPDATA%'],
+    { encoding: 'utf8', windowsHide: true },
+  ).trim()
+  if (!windowsPath || windowsPath.includes('%LOCALAPPDATA%')) {
+    throw new Error('Windows LOCALAPPDATA is unavailable')
+  }
+  return wslpath('-u', windowsPath)
+}
+
+function cacheWslBundledHelper({
+  bundledPath,
+  version = packageVersion,
+  localAppData = defaultWindowsLocalAppData,
+  fileExists = existsSync,
+  makeDirectory = mkdirSync,
+  copyFile = copyFileSync,
+  fileStat = statSync,
+  moveFile = renameSync,
+  removeFile = unlinkSync,
+} = {}) {
+  const sourceSize = fileStat(bundledPath).size
+  const safeVersion = String(version || 'unknown').replaceAll(/[^a-zA-Z0-9._-]/g, '_')
+  const cacheDirectory = resolve(localAppData(), 'dsh-dafeiyu', safeVersion)
+  // Published versions are immutable. Including the source size also keeps
+  // local/repacked builds with the same package version from reusing a stale
+  // executable without hashing the large PyInstaller archive on every start.
+  const cachedPath = resolve(cacheDirectory, `dsh-dafeiyu-helper-${sourceSize}.exe`)
+  if (fileExists(cachedPath) && fileStat(cachedPath).size === sourceSize) return cachedPath
+  makeDirectory(cacheDirectory, { recursive: true })
+  const temporaryPath = `${cachedPath}.${process.pid}.tmp`
+  try {
+    copyFile(bundledPath, temporaryPath)
+    if (fileExists(cachedPath) && fileStat(cachedPath).size === sourceSize) return cachedPath
+    if (fileExists(cachedPath)) removeFile(cachedPath)
+    try {
+      moveFile(temporaryPath, cachedPath)
+    } catch (error) {
+      // Another DSH profile may have populated the same immutable cache while
+      // this process was copying. Its complete file is safe to reuse.
+      if (!fileExists(cachedPath) || fileStat(cachedPath).size !== sourceSize) throw error
+    }
+  } finally {
+    if (fileExists(temporaryPath)) removeFile(temporaryPath)
+  }
+  return cachedPath
+}
+
 function resolveHelperLaunch({
   platform,
   isWslEnv,
@@ -104,6 +170,7 @@ function resolveHelperLaunch({
   fileExists = existsSync,
   windowsPath = toWindowsPath,
   cmdExe = defaultCmdExe,
+  wslHelperCache = cacheWslBundledHelper,
 }) {
   if (platform === 'win32' && fileExists(bundledPath)) {
     return { command: bundledPath, args: [] }
@@ -116,9 +183,20 @@ function resolveHelperLaunch({
     // the EXE directly from WSL can therefore fail with EACCES. cmd.exe opens
     // the Windows path without relying on the Linux executable bit and keeps
     // stdin/stdout attached for the companion protocol.
+    let launchPath = bundledPath
+    try {
+      // Running a PyInstaller one-file EXE directly from \\wsl.localhost makes
+      // Windows read and unpack the archive through the WSL file bridge. That
+      // can saturate the WSL VM whenever the plugin starts or is re-enabled.
+      // Cache one immutable copy on the Windows filesystem and reuse it.
+      launchPath = wslHelperCache({ bundledPath })
+    } catch {
+      // Cache preparation is an optimization. Keep the existing UNC launch as
+      // a compatibility fallback for locked-down or unusual WSL installs.
+    }
     return {
       command: cmdExe(),
-      args: ['/d', '/c', windowsPath(bundledPath)],
+      args: ['/d', '/c', windowsPath(launchPath)],
     }
   }
   if (platform === 'linux' && fileExists(linuxBundledPath)) {
@@ -468,6 +546,8 @@ export {
   defaultCmdExe,
   defaultCommand,
   defaultLaunch,
+  defaultWindowsLocalAppData,
+  cacheWslBundledHelper,
   isBundledHelperCommand,
   isWsl,
   resolveHelperLaunch,
