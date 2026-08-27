@@ -68,6 +68,12 @@ Developer ID / Notary 凭据，因此浏览器下载并带有隔离属性的包�
 
 ## 用户安装（macOS 端用户）
 
+> 开发者的核心逻辑测试（`AnimationModel` 状态机）见上方「构建」章节之后，
+> 可重复执行：`native/macos/test.sh`（等价于仓库根目录的 `swift test`），
+> CI 的 macOS job 也会运行。用例对照 `runtime/tests/test_animation_model.py`，
+> 防止 Python 与 Swift 两套实现漂移；若 Command Line Tools 的 SwiftPM 不兼容，
+> `test.sh` 会优先使用 `/Applications/Xcode.app` 工具链。
+
 原生 Helper 从 0.1.4 起作为实验性功能随 npm 和 GitHub Release 发布。普通用户
 **不需要**自行构建或运行本目录的源码，直接用 DSH 的插件命令安装即可：
 

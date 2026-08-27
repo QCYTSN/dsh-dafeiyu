@@ -135,6 +135,9 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
+      - name: Run Swift core tests
+        run: swift test
+
       - name: Build and smoke-test macOS Helper
         run: |
           npm run build:helper:darwin

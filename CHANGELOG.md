@@ -13,6 +13,10 @@
 - Display the reasoning effort that DSH actually applies to each request in the companion status detail, and keep it visible as the task moves between thinking, tool use, and waiting states.
 - Add four community-contributed dragging poses and a short release, dizzy, and protest reaction sequence, with reduced-motion fallback and interruption when the pet is grabbed again.
 - Bring the native macOS Helper to feature parity for that drag-release reaction sequence, including safe cancellation when reduced motion is enabled or the pet is grabbed again.
+- Add repeatable Swift unit tests for the native animation state machine
+  (`native/macos/Tests/AnimationModelTests.swift`, 16 cases, run via
+  `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
+  the Python and Swift implementations cannot silently drift.
 
 ### Fixed
 
