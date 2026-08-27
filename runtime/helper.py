@@ -327,6 +327,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if snapshot_path is not None and not self.snapshot_saved:
                 QTimer.singleShot(180, self._save_snapshot)
 
+        def _set_reduced_motion(self, enabled: bool) -> None:
+            self.reduced_motion = enabled
+            self.animation_timer.setInterval(40 if enabled else 20)
+            if enabled:
+                self.micro_timer.stop()
+                self._cancel_drag_release_chain()
+            else:
+                self._schedule_micro()
+
         def _apply_config(self, message: dict[str, Any]) -> None:
             """Apply a live CONFIG message without restarting the window."""
             scale = message.get("scale")
@@ -337,13 +346,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
             reduced_motion = message.get("reducedMotion")
             if isinstance(reduced_motion, bool) and reduced_motion != self.reduced_motion:
-                self.reduced_motion = reduced_motion
-                self.animation_timer.setInterval(40 if self.reduced_motion else 20)
-                if self.reduced_motion:
-                    self.micro_timer.stop()
-                    self._cancel_drag_release_chain()
-                else:
-                    self._schedule_micro()
+                self._set_reduced_motion(reduced_motion)
             sound_enabled = message.get("soundEnabled")
             if isinstance(sound_enabled, bool):
                 self.sound_enabled = sound_enabled
@@ -1077,13 +1080,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("settings", bubbleScale=self.bubble_scale)
             elif selected == reduced_action:
-                self.reduced_motion = reduced_action.isChecked()
-                self.animation_timer.setInterval(40 if self.reduced_motion else 20)
-                if self.reduced_motion:
-                    self.micro_timer.stop()
-                    self._cancel_drag_release_chain()
-                else:
-                    self._schedule_micro()
+                self._set_reduced_motion(reduced_action.isChecked())
                 self._save_layout()
                 emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()

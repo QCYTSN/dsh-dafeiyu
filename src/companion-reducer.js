@@ -19,6 +19,11 @@ const statePriority = Object.freeze({
   [CompanionState.DISCONNECTED]: -1,
 })
 
+function compareRecords(left, right) {
+  const priority = (statePriority[right.state] ?? 0) - (statePriority[left.state] ?? 0)
+  return priority || right.updatedAt - left.updatedAt || left.id.localeCompare(right.id)
+}
+
 function toolActivity(name) {
   const value = String(name || '').toLowerCase()
   if (/search|grep|find|glob|web|read|fetch|open/.test(value)) return 'searching'
@@ -161,7 +166,6 @@ export class CompanionReducer {
     this.sessions = new Map()
     this.maxSessions = maxSessions
     this.clock = 0
-    this.selectedSessionId = undefined
     this.outputSignature = undefined
     this.tasksSignature = undefined
   }
@@ -303,7 +307,6 @@ export class CompanionReducer {
     return this.#resumeAfterTool(record, event)
   }
 
-
   #approvalDecided(record, event) {
     const id = String(event.data?.id ?? '')
     if (!record.waitingApprovalId || id !== record.waitingApprovalId) return []
@@ -316,17 +319,14 @@ export class CompanionReducer {
       return this.#render()
     }
     const next = record.openTools.size > 0 ? CompanionState.WORKING : CompanionState.THINKING
+    const activity = next === CompanionState.WORKING
+      ? toolActivity(record.openTools.values().next().value)
+      : undefined
     const nextPayload = {
       phase: 'tool-result',
-      activity: next === CompanionState.WORKING
-        ? toolActivity(record.openTools.values().next().value)
-        : undefined,
-      stage: next === CompanionState.WORKING
-        ? activityStage(toolActivity(record.openTools.values().next().value))
-        : '整理阶段',
-      message: next === CompanionState.WORKING
-        ? activityCopy(toolActivity(record.openTools.values().next().value), event.seq)
-        : statusCopy('result', event.seq),
+      activity,
+      stage: activity ? activityStage(activity) : '整理阶段',
+      message: activity ? activityCopy(activity, event.seq) : statusCopy('result', event.seq),
     }
     this.#update(record, next, nextPayload)
     if (!event.data?.error) return this.#render()
@@ -495,10 +495,7 @@ export class CompanionReducer {
         },
       }
     }
-    records.sort((left, right) => {
-      const priority = (statePriority[right.state] ?? 0) - (statePriority[left.state] ?? 0)
-      return priority || right.updatedAt - left.updatedAt || left.id.localeCompare(right.id)
-    })
+    records.sort(compareRecords)
     return { record: records[0] }
   }
 
@@ -547,10 +544,7 @@ export class CompanionReducer {
   #activeTaskList() {
     return [...this.sessions.values()]
       .filter((record) => record.state !== CompanionState.IDLE && record.state !== CompanionState.DISCONNECTED)
-      .sort((left, right) => {
-        const priority = (statePriority[right.state] ?? 0) - (statePriority[left.state] ?? 0)
-        return priority || right.updatedAt - left.updatedAt || left.id.localeCompare(right.id)
-      })
+      .sort(compareRecords)
       .map((record) => ({
         sessionId: record.id,
         state: record.state,
@@ -567,7 +561,6 @@ export class CompanionReducer {
   }
 
   #remember(selection) {
-    this.selectedSessionId = selection.record.id
     this.outputSignature = this.#signature(selection.record)
   }
 

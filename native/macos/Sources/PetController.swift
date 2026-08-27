@@ -534,15 +534,19 @@ final class PetController: NSObject {
         reportSettings(["bubbleScale": bubbleScale])
     }
 
-    @objc private func toggleReducedMotion(_ sender: NSMenuItem) {
-        reducedMotion = sender.state == .off
+    private func setReducedMotion(_ enabled: Bool) {
+        reducedMotion = enabled
         restartAnimTimer()
-        if reducedMotion {
+        if enabled {
             microTimer?.invalidate()
             cancelDragReleaseChain()
         } else {
             scheduleMicro()
         }
+    }
+
+    @objc private func toggleReducedMotion(_ sender: NSMenuItem) {
+        setReducedMotion(sender.state == .off)
         saveLayout()
         reportSettings(["reducedMotion": reducedMotion])
         contentView?.needsDisplay = true
@@ -659,14 +663,7 @@ final class PetController: NSObject {
             changed = true
         }
         if let value = message["reducedMotion"] as? Bool, value != reducedMotion {
-            reducedMotion = value
-            restartAnimTimer()
-            if reducedMotion {
-                microTimer?.invalidate()
-                cancelDragReleaseChain()
-            } else {
-                scheduleMicro()
-            }
+            setReducedMotion(value)
             changed = true
         }
         if let value = message["soundEnabled"] as? Bool {
