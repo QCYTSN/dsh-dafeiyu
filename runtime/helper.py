@@ -90,19 +90,47 @@ def emit_reply(kind: str, **payload: Any) -> None:
 
 
 # ---- Glove cursor (native Win32 .cur) ----
-def load_native_cursor(path: Path) -> Any:
-    """Load a .cur cursor with LoadCursorFromFileW.
+def _cursor_api() -> tuple[Any, Any, Any]:
+    """Return configured (LoadCursorFromFileW, SetCursor, LoadCursorW) callables.
 
-    Windows scales the .cur by DPI itself, so the result has the same size and
-    sharpness as the system cursors. Returns None outside Windows or on
-    failure; callers then fall back to the Qt default cursor.
+    Function signatures are declared explicitly so HCURSOR values are handled
+    as pointer-sized handles: without argtypes/restype, ctypes treats the
+    return value as a C int and truncates 64-bit HCURSORs. wintypes has no
+    HCURSOR type, so ``wintypes.HANDLE`` (pointer-sized) is used.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+
+    load_from_file = user32.LoadCursorFromFileW
+    load_from_file.argtypes = [wintypes.LPCWSTR]
+    load_from_file.restype = wintypes.HANDLE
+
+    set_cursor = user32.SetCursor
+    set_cursor.argtypes = [wintypes.HANDLE]
+    set_cursor.restype = wintypes.HANDLE
+
+    load_cursor = user32.LoadCursorW
+    load_cursor.argtypes = [wintypes.HANDLE, wintypes.LPCWSTR]
+    load_cursor.restype = wintypes.HANDLE
+
+    return load_from_file, set_cursor, load_cursor
+
+
+def load_native_cursor(path: Path) -> Any:
+    """Load a .cur cursor with LoadCursorFromFileW (pointer-sized handles).
+
+    Returns None outside Windows or on failure; callers then fall back to the
+    Qt default cursor. The resource is loaded at its natural size: per the MSDN
+    remarks, LoadCursorFromFileW does not participate in DPI virtualization, so
+    the 32x32 .cur is NOT scaled up automatically; the OS renders the cursor
+    bitmap on the same pipeline as system cursors.
     """
     if sys.platform != "win32":
         return None
     try:
-        import ctypes
-
-        handle = ctypes.windll.user32.LoadCursorFromFileW(str(path))
+        handle = _cursor_api()[0](str(path))
         return handle or None
     except Exception:
         return None
@@ -111,19 +139,19 @@ def load_native_cursor(path: Path) -> Any:
 def set_native_cursor(handle: Any) -> None:
     """Set the current cursor immediately (bypasses Qt's cursor pipeline)."""
     try:
-        import ctypes
-
-        ctypes.windll.user32.SetCursor(handle)
+        _cursor_api()[1](handle)
     except Exception:
         pass
 
 
 def reset_native_cursor() -> None:
-    """Restore the default arrow cursor."""
+    """Restore the default arrow cursor (IDC_ARROW)."""
     try:
         import ctypes
 
-        ctypes.windll.user32.SetCursor(ctypes.windll.user32.LoadCursorW(None, 32512))  # IDC_ARROW
+        # MAKEINTRESOURCE(32512): the identifier is passed as a pointer value.
+        arrow = ctypes.cast(ctypes.c_void_p(32512), ctypes.c_wchar_p)
+        _cursor_api()[2](None, arrow)
     except Exception:
         pass
 
@@ -243,10 +271,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         The pet shows a glove hand cursor: an open hand on hover and a closed
         fist while the left button is held. Native .cur cursors are loaded with
-        LoadCursorFromFileW so Windows does the DPI scaling (same size and
-        sharpness as system cursors), and the message is consumed immediately
-        instead of going through Qt's QCursor bitmaps, which are re-scaled a
-        second time by Qt and only take effect on the next cursor update cycle.
+        LoadCursorFromFileW and handed to the OS cursor pipeline directly (the
+        same rendering path as system cursors; note the API loads the resource
+        at its natural 32x32 size and does not participate in DPI
+        virtualization). The message is consumed immediately instead of going
+        through Qt's QCursor bitmaps, which are re-scaled by Qt and only take
+        effect on the next cursor update cycle.
         """
 
         def __init__(self, widget: Any, open_h: Any, closed_h: Any) -> None:
@@ -275,7 +305,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 mouse_msg = (msg.lParam >> 16) & 0xFFFF
                 handle = self.widget.glove.on_wm_setcursor(mouse_msg)
                 if handle:
-                    ctypes.windll.user32.SetCursor(handle)
+                    set_native_cursor(handle)
                     return True, 0
             except Exception:
                 pass
@@ -346,7 +376,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.status_message = "我在这儿等新任务哦"
             self.status_detail = "DSH · 等待下一次任务"
             self.status_deadline_ms: int | None = self._now_ms() + 4200
-            # Glove cursor: native .cur handles (Windows scales them by DPI).
+            # Glove cursor: native .cur handles (loaded at natural size).
             self.glove_open_h = load_native_cursor(asset_root.parent / "cursor_grab.cur")
             self.glove_closed_h = load_native_cursor(asset_root.parent / "cursor_grabbing.cur")
             self.glove = GloveCursorController(self.glove_open_h, self.glove_closed_h)

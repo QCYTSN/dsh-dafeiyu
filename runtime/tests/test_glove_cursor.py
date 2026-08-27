@@ -116,5 +116,45 @@ class CursorSourceTests(unittest.TestCase):
         self.assertIn("Redistribution and use in source and binary forms", license_text)
 
 
+@unittest.skipUnless(sys.platform == "win32", "Windows-only native cursor tests")
+class WindowsNativeCursorTests(unittest.TestCase):
+    """Real Win32 calls: pointer-sized signatures and valid handles.
+
+    ctypes defaults to C int return values for undeclared functions, which
+    truncates 64-bit HCURSORs; these tests pin the explicit signatures and
+    exercise the actual loading path.
+    """
+
+    def test_cursor_api_uses_pointer_sized_signatures(self) -> None:
+        import ctypes
+        from ctypes import wintypes
+
+        from runtime.helper import _cursor_api
+
+        load_from_file, set_cursor, load_cursor = _cursor_api()
+        # wintypes.HANDLE is c_void_p = pointer-sized; no truncation to C int.
+        self.assertEqual(ctypes.sizeof(wintypes.HANDLE), ctypes.sizeof(ctypes.c_void_p))
+        self.assertIs(load_from_file.restype, wintypes.HANDLE)
+        self.assertIs(set_cursor.restype, wintypes.HANDLE)
+        self.assertIs(load_cursor.restype, wintypes.HANDLE)
+        self.assertEqual(list(load_from_file.argtypes), [wintypes.LPCWSTR])
+        self.assertEqual(list(set_cursor.argtypes), [wintypes.HANDLE])
+        self.assertEqual(list(load_cursor.argtypes), [wintypes.HANDLE, wintypes.LPCWSTR])
+
+    def test_bundled_cursor_loads_to_valid_handle(self) -> None:
+        from runtime.helper import load_native_cursor
+
+        handle = load_native_cursor(REPO_ROOT / "assets" / "cursor_grab.cur")
+        self.assertTrue(handle, "bundled cursor_grab.cur must load to a valid handle")
+
+    def test_set_and_reset_with_real_handles(self) -> None:
+        from runtime.helper import load_native_cursor, reset_native_cursor, set_native_cursor
+
+        handle = load_native_cursor(REPO_ROOT / "assets" / "cursor_grab.cur")
+        self.assertTrue(handle)
+        set_native_cursor(handle)  # must not raise or truncate
+        reset_native_cursor()
+
+
 if __name__ == "__main__":
     unittest.main()
