@@ -23,6 +23,7 @@ final class AnimationModelTests: XCTestCase {
         ("testPulseResumeStateUpdatesBaseState", testPulseResumeStateUpdatesBaseState),
         ("testIdleMicroPlaysWhenIdle", testIdleMicroPlaysWhenIdle),
         ("testIdleMicroReturnsToIdleWhenFinished", testIdleMicroReturnsToIdleWhenFinished),
+        ("testSameInputSequenceYieldsSameEndState", testSameInputSequenceYieldsSameEndState),
     ]
 
     private static let manifest: [String: Any] = {
@@ -253,5 +254,34 @@ final class AnimationModelTests: XCTestCase {
             model.advance(elapsedMs: 100, nowMs: tick * 100)
         }
         XCTAssertEqual(model.activeClipName, "idle")
+    }
+
+    func testSameInputSequenceYieldsSameEndState() {
+        func run() -> (clip: String, base: String) {
+            let model = makeModel()
+            model.applyState("WORKING", activity: "searching")
+            model.applyPulse(
+                state: "SUCCESS",
+                ttlMs: 500,
+                nowMs: 0,
+                resumeState: "WAITING",
+                resumeActivity: nil
+            )
+            for tick in 0..<10 {
+                model.advance(elapsedMs: 100, nowMs: tick * 100)
+            }
+            model.applyState("THINKING")
+            model.clearOverlay()
+            return (model.activeClipName, model.baseState)
+        }
+        // Same input sequence must always produce the same end state.
+        let first = run()
+        let second = run()
+        let third = run()
+        XCTAssertEqual(first.clip, second.clip)
+        XCTAssertEqual(second.clip, third.clip)
+        XCTAssertEqual(first.base, second.base)
+        XCTAssertEqual(first.clip, "thinking")
+        XCTAssertEqual(first.base, "THINKING")
     }
 }

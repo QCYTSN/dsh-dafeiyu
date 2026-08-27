@@ -18,6 +18,9 @@ final class LayoutStoreTests: XCTestCase {
         ("testSaveClampsScaleAndBubbleScaleLikePython", testSaveClampsScaleAndBubbleScaleLikePython),
         ("testSaveNormalizesBubbleMode", testSaveNormalizesBubbleMode),
         ("testBubbleStatesMixedListKeepsStringsOnly", testBubbleStatesMixedListKeepsStringsOnly),
+        ("testSaveLoadRoundTripIsByteStable", testSaveLoadRoundTripIsByteStable),
+        ("testNormalizedIsIdempotent", testNormalizedIsIdempotent),
+        ("testRepeatedLoadsAreDeterministic", testRepeatedLoadsAreDeterministic),
     ]
 
     private var tempDirectory: URL!
@@ -190,5 +193,69 @@ final class LayoutStoreTests: XCTestCase {
             PetLayout.load(from: layoutURL()).bubbleStates,
             ["SUCCESS", "ERROR"]
         )
+    }
+
+    // MARK: - Repeatability / idempotency
+
+    func testSaveLoadRoundTripIsByteStable() {
+        var layout = PetLayout()
+        layout.x = 120
+        layout.y = -20
+        layout.petX = 400
+        layout.petY = 300
+        layout.scale = 1.1
+        layout.bubbleScale = 0.9
+        layout.reducedMotion = true
+        layout.bubbleMode = "hidden"
+        layout.bubbleStates = ["SUCCESS"]
+        layout.save(to: layoutURL())
+        let firstWrite = try! Data(contentsOf: layoutURL())
+
+        // load -> save again must produce a byte-identical file: repeated
+        // cycles must not accumulate drift (e.g. re-normalising a value).
+        let loaded = PetLayout.load(from: layoutURL())
+        loaded.save(to: layoutURL())
+        let secondWrite = try! Data(contentsOf: layoutURL())
+        XCTAssertEqual(firstWrite, secondWrite)
+
+        // Values survive the round trip unchanged.
+        let reloaded = PetLayout.load(from: layoutURL())
+        XCTAssertEqual(reloaded.x, 120)
+        XCTAssertEqual(reloaded.y, -20)
+        XCTAssertEqual(reloaded.petX, 400)
+        XCTAssertEqual(reloaded.petY, 300)
+        XCTAssertEqual(reloaded.scale, 1.1)
+        XCTAssertEqual(reloaded.bubbleScale, 0.9)
+        XCTAssertEqual(reloaded.reducedMotion, true)
+        XCTAssertEqual(reloaded.bubbleMode, "hidden")
+        XCTAssertEqual(reloaded.bubbleStates, ["SUCCESS"])
+    }
+
+    func testNormalizedIsIdempotent() {
+        var layout = PetLayout()
+        layout.scale = 9
+        layout.bubbleScale = 0.1
+        layout.bubbleMode = "bogus"
+        let once = layout.normalized()
+        let twice = once.normalized()
+        XCTAssertEqual(once.scale, twice.scale)
+        XCTAssertEqual(once.bubbleScale, twice.bubbleScale)
+        XCTAssertEqual(once.bubbleMode, twice.bubbleMode)
+    }
+
+    func testRepeatedLoadsAreDeterministic() {
+        var layout = PetLayout()
+        layout.petX = 777
+        layout.petY = 42
+        layout.scale = 0.9
+        layout.save(to: layoutURL())
+        let first = PetLayout.load(from: layoutURL())
+        let second = PetLayout.load(from: layoutURL())
+        let third = PetLayout.load(from: layoutURL())
+        XCTAssertEqual(first.petX, second.petX)
+        XCTAssertEqual(second.petX, third.petX)
+        XCTAssertEqual(first.petY, second.petY)
+        XCTAssertEqual(first.scale, second.scale)
+        XCTAssertEqual(first.coordinateSpace, second.coordinateSpace)
     }
 }

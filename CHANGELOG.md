@@ -22,6 +22,9 @@
   they exposed: missing `XDG_CONFIG_HOME`/`LOCALAPPDATA` fallbacks, JSON
   booleans being accepted as coordinates/scales, `bubbleStates` not filtering
   invalid entries, and `save()` skipping Python-compatible normalisation.
+- Add repeatability cases: layout save/load round trips are byte-stable,
+  `normalized()` is idempotent, repeated loads and identical state-machine
+  input sequences are deterministic (suite verified over 10 consecutive runs).
 
 ### Fixed
 
