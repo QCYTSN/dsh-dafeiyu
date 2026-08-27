@@ -19,6 +19,7 @@ export const CompanionMessageKind = Object.freeze({
   TASKS: 'tasks',
   CONFIG: 'config',
   SETTINGS: 'settings',
+  THEME: 'theme',
   PING: 'ping',
   PONG: 'pong',
   CLOSED: 'closed',
@@ -38,6 +39,8 @@ export function createMessage(kind, payload = {}) {
   }
 }
 
+const themePreferences = new Set(['light', 'dark', 'system'])
+
 export function assertCompanionMessage(value) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
     throw new TypeError('Companion message must be an object')
@@ -49,6 +52,11 @@ export function assertCompanionMessage(value) {
   if ((value.kind === CompanionMessageKind.STATE || value.kind === CompanionMessageKind.PULSE)
     && !states.has(value.state)) {
     throw new TypeError(`Unknown companion state: ${String(value.state)}`)
+  }
+  if (value.kind === CompanionMessageKind.THEME) {
+    if (!themePreferences.has(value.preference)) {
+      throw new TypeError(`Unknown theme preference: ${String(value.preference)}`)
+    }
   }
   return value
 }

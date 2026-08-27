@@ -39,12 +39,6 @@ final class PetController: NSObject {
         "lively": (3.5, 8),
     ]
 
-    private static let dragReleaseStages: [(clipName: String, holdMs: Int)] = [
-        ("dragging_release", 300),
-        ("dragging_dizzy", 840),
-        ("dragging_protest", 300),
-    ]
-
     let model: AnimationModel
     let manifest: [String: Any]
     let assetRoot: URL
@@ -81,6 +75,10 @@ final class PetController: NSObject {
     var task = ""
     var tasks: [[String: Any]] = []
 
+    // Theme
+    var themePreference: String = "system"
+    var themeResolved: String = "light"
+
     // Geometry (pet anchor in AppKit bottom-left coordinates)
     private var petX: CGFloat = 0
     private var petY: CGFloat = 0
@@ -96,7 +94,6 @@ final class PetController: NSObject {
     private var lastTickMs: Int
     private var dragPetOffsetX: CGFloat = 0
     private var dragPetOffsetY: CGFloat = 8
-    private var dragChainID = 0
     private var fadeFromFrame: String?
     private var fadeStarted: CFTimeInterval = 0
     private var fadeDuration: Double = 0.15
@@ -150,6 +147,7 @@ final class PetController: NSObject {
         if let mfw = manifest["maxFrameWidth"] as? Int { maxFrameWidth = CGFloat(mfw) }
         if let mfh = manifest["maxFrameHeight"] as? Int { maxFrameHeight = CGFloat(mfh) }
         loadFrames()
+        resolveTheme()
         if !isHeadless() {
             buildWindow()
             restorePosition()
@@ -158,6 +156,12 @@ final class PetController: NSObject {
                 self,
                 selector: #selector(screenParametersChanged),
                 name: NSApplication.didChangeScreenParametersNotification,
+                object: nil
+            )
+            DistributedNotificationCenter.default.addObserver(
+                self,
+                selector: #selector(systemThemeChanged),
+                name: NSNotification.Name("AppleInterfaceThemeChangedNotification"),
                 object: nil
             )
         }
@@ -324,6 +328,12 @@ final class PetController: NSObject {
         moveToPet(petX, petY)
     }
 
+    @objc private func systemThemeChanged() {
+        if themePreference != "system" { return }
+        resolveTheme()
+        contentView?.needsDisplay = true
+    }
+
     // MARK: - Timers
 
     private func startAnimTimer() {
@@ -403,7 +413,6 @@ final class PetController: NSObject {
     func beginDrag() {
         guard !dragging else { return }
         dragging = true
-        dragChainID &+= 1
         // Remember where the pet sits inside the window when the drag starts.
         // During the drag the window moves directly; without re-anchoring the
         // pet it would slide inside the window at the same rate and stay
@@ -437,7 +446,6 @@ final class PetController: NSObject {
         startAnimTimer()
         if !reducedMotion {
             scheduleMicro()
-            runDragReleaseChain()
         }
         saveLayout()
         contentView?.needsDisplay = true
@@ -534,19 +542,14 @@ final class PetController: NSObject {
         reportSettings(["bubbleScale": bubbleScale])
     }
 
-    private func setReducedMotion(_ enabled: Bool) {
-        reducedMotion = enabled
+    @objc private func toggleReducedMotion(_ sender: NSMenuItem) {
+        reducedMotion = sender.state == .off
         restartAnimTimer()
-        if enabled {
+        if reducedMotion {
             microTimer?.invalidate()
-            cancelDragReleaseChain()
         } else {
             scheduleMicro()
         }
-    }
-
-    @objc private func toggleReducedMotion(_ sender: NSMenuItem) {
-        setReducedMotion(sender.state == .off)
         saveLayout()
         reportSettings(["reducedMotion": reducedMotion])
         contentView?.needsDisplay = true
@@ -590,6 +593,8 @@ final class PetController: NSObject {
             contentView?.needsDisplay = true
         case "config":
             applyConfig(message)
+        case "theme":
+            handleTheme(message)
         default:
             break
         }
@@ -663,7 +668,13 @@ final class PetController: NSObject {
             changed = true
         }
         if let value = message["reducedMotion"] as? Bool, value != reducedMotion {
-            setReducedMotion(value)
+            reducedMotion = value
+            restartAnimTimer()
+            if reducedMotion {
+                microTimer?.invalidate()
+            } else {
+                scheduleMicro()
+            }
             changed = true
         }
         if let value = message["soundEnabled"] as? Bool {
@@ -686,6 +697,25 @@ final class PetController: NSObject {
         if changed {
             resizeAndReposition()
             saveLayout()
+        }
+    }
+
+    // MARK: - Theme
+
+    private func handleTheme(_ message: [String: Any]) {
+        let preference = (message["preference"] as? String) ?? "system"
+        themePreference = preference
+        resolveTheme()
+        contentView?.needsDisplay = true
+    }
+
+    private func resolveTheme() {
+        if themePreference == "system" {
+            let appearance = NSApp.effectiveAppearance
+            let isDark = appearance.bestMatch(from: [NSAppearance.Name.darkAqua, NSAppearance.Name.aqua]) == .darkAqua
+            themeResolved = isDark ? "dark" : "light"
+        } else {
+            themeResolved = themePreference
         }
     }
 
@@ -730,50 +760,6 @@ final class PetController: NSObject {
         overlayDetail = ""
         overlayState = nil
         overlayDeadlineMs = nil
-    }
-
-    private func runDragReleaseChain() {
-        dragChainID &+= 1
-        playDragReleaseStage(0, token: dragChainID)
-    }
-
-    private func playDragReleaseStage(_ index: Int, token: Int) {
-        guard token == dragChainID, !dragging else { return }
-        guard !reducedMotion, index < Self.dragReleaseStages.count else {
-            clearDragReleaseOverlay()
-            return
-        }
-
-        let stage = Self.dragReleaseStages[index]
-        let previousFrame = model.frame
-        let previousClip = model.activeClipName
-        guard model.playOverlay(stage.clipName) else {
-            clearDragReleaseOverlay()
-            return
-        }
-        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
-        contentView?.needsDisplay = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double(stage.holdMs) / 1000.0) { [weak self] in
-            self?.playDragReleaseStage(index + 1, token: token)
-        }
-    }
-
-    private func clearDragReleaseOverlay() {
-        guard !dragging else { return }
-        let previousFrame = model.frame
-        let previousClip = model.activeClipName
-        model.clearOverlay()
-        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
-        contentView?.needsDisplay = true
-    }
-
-    private func cancelDragReleaseChain() {
-        dragChainID &+= 1
-        let releaseClips = Set(Self.dragReleaseStages.map { $0.clipName })
-        if !dragging, releaseClips.contains(model.activeClipName) {
-            clearDragReleaseOverlay()
-        }
     }
 
     func currentCard() -> (title: String, detail: String, state: String)? {
@@ -975,6 +961,7 @@ final class PetController: NSObject {
     private func drawStatusCard(rect: NSRect, card: (title: String, detail: String, state: String)) {
         let s = bubbleScale
         let corner: CGFloat = 16 * s
+        let isDark = themeResolved == "dark"
         let shadow1 = NSRect(x: rect.minX + 1, y: rect.minY + 6, width: rect.width - 2, height: rect.height)
         let shadow2 = NSRect(x: rect.minX, y: rect.minY + 3, width: rect.width, height: rect.height)
         NSColor(calibratedWhite: 0.05, alpha: 0.05).setFill()
@@ -983,9 +970,15 @@ final class PetController: NSObject {
         NSBezierPath(roundedRect: shadow2, xRadius: corner, yRadius: corner).fill()
 
         let cardPath = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-        NSColor(calibratedRed: 0.988, green: 0.988, blue: 0.992, alpha: 0.97).setFill()
+        let cardBg = isDark
+            ? NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 0.97)
+            : NSColor(calibratedRed: 0.988, green: 0.988, blue: 0.992, alpha: 0.97)
+        cardBg.setFill()
         cardPath.fill()
-        NSColor(calibratedWhite: 0.85, alpha: 0.8).setStroke()
+        let borderColor = isDark
+            ? NSColor(calibratedWhite: 0.25, alpha: 0.8)
+            : NSColor(calibratedWhite: 0.85, alpha: 0.8)
+        borderColor.setStroke()
         cardPath.lineWidth = 1
         cardPath.stroke()
 
@@ -996,17 +989,19 @@ final class PetController: NSObject {
         let textWidth = max(40, rect.width - 102 * s)
         let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * s), weight: .semibold)
         let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * s))
+        let textColor = isDark ? Self.hex("#E8E8E8") : Self.hex("#25282D")
+        let detailColor = isDark ? Self.hex("#9A9A9A") : Self.hex("#747981")
         drawText(
             card.title,
             in: NSRect(x: textX, y: rect.minY + 15 * s, width: textWidth, height: max(12, 27 * s)),
             font: titleFont,
-            color: Self.hex("#25282D")
+            color: textColor
         )
         drawText(
             card.detail,
             in: NSRect(x: textX, y: rect.minY + 43 * s, width: textWidth, height: max(12, 24 * s)),
             font: detailFont,
-            color: Self.hex("#747981")
+            color: detailColor
         )
     }
 
@@ -1056,13 +1051,20 @@ final class PetController: NSObject {
     private func drawTaskCard(rect: NSRect) {
         let s = bubbleScale
         let corner: CGFloat = 16 * s
+        let isDark = themeResolved == "dark"
         NSColor(calibratedWhite: 0.05, alpha: 0.05).setFill()
         NSBezierPath(roundedRect: NSRect(x: rect.minX + 1, y: rect.minY + 6, width: rect.width - 2, height: rect.height),
                      xRadius: corner, yRadius: corner).fill()
         let cardPath = NSBezierPath(roundedRect: rect, xRadius: corner, yRadius: corner)
-        NSColor(calibratedRed: 0.988, green: 0.988, blue: 0.992, alpha: 0.97).setFill()
+        let cardBg = isDark
+            ? NSColor(calibratedRed: 0.12, green: 0.12, blue: 0.14, alpha: 0.97)
+            : NSColor(calibratedRed: 0.988, green: 0.988, blue: 0.992, alpha: 0.97)
+        cardBg.setFill()
         cardPath.fill()
-        NSColor(calibratedWhite: 0.85, alpha: 0.8).setStroke()
+        let borderColor = isDark
+            ? NSColor(calibratedWhite: 0.25, alpha: 0.8)
+            : NSColor(calibratedWhite: 0.85, alpha: 0.8)
+        borderColor.setStroke()
         cardPath.lineWidth = 1
         cardPath.stroke()
 
@@ -1070,11 +1072,13 @@ final class PetController: NSObject {
         let textWidth = max(40, rect.width - 32 * s)
         let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * s), weight: .semibold)
         let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * s))
+        let textColor = isDark ? Self.hex("#E8E8E8") : Self.hex("#25282D")
+        let detailColor = isDark ? Self.hex("#9A9A9A") : Self.hex("#747981")
         drawText(
             "\(tasks.count) 个任务进行中",
             in: NSRect(x: textX, y: rect.minY + 10 * s, width: textWidth, height: max(12, 22 * s)),
             font: titleFont,
-            color: Self.hex("#25282D")
+            color: textColor
         )
 
         for (index, task) in tasks.prefix(3).enumerated() {
@@ -1093,7 +1097,7 @@ final class PetController: NSObject {
                 line,
                 in: NSRect(x: textX + 14 * s, y: rowY, width: textWidth - 14 * s, height: max(12, 20 * s)),
                 font: detailFont,
-                color: Self.hex("#747981")
+                color: detailColor
             )
         }
         if tasks.count > 3 {
@@ -1102,7 +1106,7 @@ final class PetController: NSObject {
                 in: NSRect(x: textX + 14 * s, y: rect.minY + (36 + 3 * 24) * s,
                            width: textWidth, height: max(12, 20 * s)),
                 font: detailFont,
-                color: Self.hex("#9AA0A6")
+                color: detailColor
             )
         }
     }
