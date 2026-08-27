@@ -17,7 +17,14 @@ final class AnimationModel {
         "IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED",
     ]
 
-    private static let nonCrossfadeClips: Set<String> = ["blink", "glance", "dragging"]
+    private static let nonCrossfadeClips: Set<String> = [
+        "blink",
+        "glance",
+        "dragging",
+        "dragging_release",
+        "dragging_dizzy",
+        "dragging_protest",
+    ]
 
     /// Same rules as the Python `crossfade_duration`: expression frames stay
     /// crisp, dragging switches atomically.

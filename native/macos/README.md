@@ -33,7 +33,7 @@ PyObjC 在 macOS 26 上崩溃 → EPIPE 未捕获 → 整个 dsh 服务器退出
 - 动画内核：`runtime/animation_model.py` 的忠实移植（clips、pulse、
   overlay、idle 微动作、crossfade、程序化 motion：breathe/think/work/
   wait/bounce/shake/dizzy/float + 行走摆动）
-- 交互：左键拖拽（带 dragging 动画并持久化位置）、单击摸头/戳/尾巴、
+- 交互：左键拖拽（带抓取、松手、眩晕和抗议动画并持久化位置）、单击摸头/戳/尾巴、
   双击、右键菜单（大小/气泡大小/减少动态/打开 WebUI/辅助功能权限/
   本次隐藏/本次关闭）
 - 全屏置顶：`NSWindow.CollectionBehavior` 的 `canJoinAllSpaces` +

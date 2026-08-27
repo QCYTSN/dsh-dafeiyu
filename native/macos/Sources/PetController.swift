@@ -39,6 +39,12 @@ final class PetController: NSObject {
         "lively": (3.5, 8),
     ]
 
+    private static let dragReleaseStages: [(clipName: String, holdMs: Int)] = [
+        ("dragging_release", 300),
+        ("dragging_dizzy", 840),
+        ("dragging_protest", 300),
+    ]
+
     let model: AnimationModel
     let manifest: [String: Any]
     let assetRoot: URL
@@ -90,6 +96,7 @@ final class PetController: NSObject {
     private var lastTickMs: Int
     private var dragPetOffsetX: CGFloat = 0
     private var dragPetOffsetY: CGFloat = 8
+    private var dragChainID = 0
     private var fadeFromFrame: String?
     private var fadeStarted: CFTimeInterval = 0
     private var fadeDuration: Double = 0.15
@@ -396,6 +403,7 @@ final class PetController: NSObject {
     func beginDrag() {
         guard !dragging else { return }
         dragging = true
+        dragChainID &+= 1
         // Remember where the pet sits inside the window when the drag starts.
         // During the drag the window moves directly; without re-anchoring the
         // pet it would slide inside the window at the same rate and stay
@@ -429,6 +437,7 @@ final class PetController: NSObject {
         startAnimTimer()
         if !reducedMotion {
             scheduleMicro()
+            runDragReleaseChain()
         }
         saveLayout()
         contentView?.needsDisplay = true
@@ -530,6 +539,7 @@ final class PetController: NSObject {
         restartAnimTimer()
         if reducedMotion {
             microTimer?.invalidate()
+            cancelDragReleaseChain()
         } else {
             scheduleMicro()
         }
@@ -653,6 +663,7 @@ final class PetController: NSObject {
             restartAnimTimer()
             if reducedMotion {
                 microTimer?.invalidate()
+                cancelDragReleaseChain()
             } else {
                 scheduleMicro()
             }
@@ -722,6 +733,50 @@ final class PetController: NSObject {
         overlayDetail = ""
         overlayState = nil
         overlayDeadlineMs = nil
+    }
+
+    private func runDragReleaseChain() {
+        dragChainID &+= 1
+        playDragReleaseStage(0, token: dragChainID)
+    }
+
+    private func playDragReleaseStage(_ index: Int, token: Int) {
+        guard token == dragChainID, !dragging else { return }
+        guard !reducedMotion, index < Self.dragReleaseStages.count else {
+            clearDragReleaseOverlay()
+            return
+        }
+
+        let stage = Self.dragReleaseStages[index]
+        let previousFrame = model.frame
+        let previousClip = model.activeClipName
+        guard model.playOverlay(stage.clipName) else {
+            clearDragReleaseOverlay()
+            return
+        }
+        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
+        contentView?.needsDisplay = true
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + Double(stage.holdMs) / 1000.0) { [weak self] in
+            self?.playDragReleaseStage(index + 1, token: token)
+        }
+    }
+
+    private func clearDragReleaseOverlay() {
+        guard !dragging else { return }
+        let previousFrame = model.frame
+        let previousClip = model.activeClipName
+        model.clearOverlay()
+        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
+        contentView?.needsDisplay = true
+    }
+
+    private func cancelDragReleaseChain() {
+        dragChainID &+= 1
+        let releaseClips = Set(Self.dragReleaseStages.map { $0.clipName })
+        if !dragging, releaseClips.contains(model.activeClipName) {
+            clearDragReleaseOverlay()
+        }
     }
 
     func currentCard() -> (title: String, detail: String, state: String)? {
