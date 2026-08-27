@@ -63,7 +63,7 @@ jobs:
           npm run build:helper:windows
 
       - name: Upload Windows Helper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: windows-helper
           path: runtime/bin/win32-x64/dsh-dafeiyu-helper.exe
@@ -112,7 +112,7 @@ jobs:
         run: xvfb-run --auto-servernum npm run build:helper:linux
 
       - name: Upload Linux Helper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: linux-helper
           path: runtime/bin/linux-x64/dsh-dafeiyu-helper
@@ -148,7 +148,7 @@ jobs:
           codesign --verify --deep --strict --verbose=2 "$app"
 
       - name: Upload macOS Helper
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: macos-helper
           path: runtime/bin/darwin
@@ -188,19 +188,19 @@ jobs:
             libxcb-xinerama0 libxcb-xkb1 libxkbcommon-x11-0
 
       - name: Download Windows Helper
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: windows-helper
           path: runtime/bin/win32-x64
 
       - name: Download Linux Helper
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: linux-helper
           path: runtime/bin/linux-x64
 
       - name: Download macOS Helper
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: macos-helper
           path: runtime/bin/darwin
@@ -222,7 +222,7 @@ jobs:
             --executable .build/package-check/package/runtime/bin/linux-x64/dsh-dafeiyu-helper
 
       - name: Upload verified archive
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: npm-package
           path: dsh-dafeiyu-*.tgz
@@ -247,7 +247,7 @@ jobs:
           package-manager-cache: false
 
       - name: Download verified cross-platform package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: npm-package
           path: dist
@@ -285,7 +285,7 @@ jobs:
           package-manager-cache: false
 
       - name: Download verified cross-platform package
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: npm-package
           path: dist
