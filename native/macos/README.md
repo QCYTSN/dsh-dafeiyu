@@ -77,7 +77,8 @@ Developer ID / Notary 凭据，因此浏览器下载并带有隔离属性的包�
 swift test                  # 仓库根目录（Swift Package Manager）
 ```
 
-CI（`.github/workflows/publish.yml` 的 macOS job）也会运行 `swift test`。
+PR 与发布 CI（`.github/workflows/ci.yml` 和
+`.github/workflows/publish.yml` 的 macOS job）都会运行 `swift test`。
 
 ### 布局持久化测试发现并修复的漂移
 
