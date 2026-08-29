@@ -92,6 +92,26 @@ CI（`.github/workflows/publish.yml` 的 macOS job）也会运行 `swift test`�
 - `save()` 前不做归一化（Python 会 clamp scale/bubbleScale、校验
   bubbleMode）→ 已统一走 `normalized()`，保存与读取行为一致
 
+### 事件日志测试按协议语义匹配
+
+JS heartbeat 用例原先按 `"kind": "ping"`（带空格）的字符串匹配事件日志，
+与具体 JSON 序列化格式耦合。现改为逐行 `JSON.parse` 后判断 `kind`，
+验证的是协议语义而非空白格式，Swift 与 Python helper 均可通过。
+
+## 本机验证记录
+
+**测试机型：MacBook Pro（Apple M3，16 GB，arm64，macOS 26.5.2 / 25F84）**
+
+| 项目 | 结果 |
+| --- | --- |
+| Swift 核心测试（状态机 + 布局 + 可重复性，`swift test`） | 32/32 通过 |
+| Python 测试（animation_model + layout_store + helper_platform） | 20/20 通过 |
+| JS 测试套件（`npm test`，含 helper 生命周期/心跳/集成） | 71/71 通过 |
+| 打包产物烟测（`test-packaged-helper.mjs`，最终 .app 可视 + EOF） | 通过 |
+| 通用二进制校验（`lipo -verify_arch arm64 x86_64`） | 通过 |
+| 签名校验（`codesign --verify --deep --strict`） | 通过 |
+| 端到端（打开页面→宠物出现→关闭页面→宠物退出，0.1.6 原生 helper） | 通过 |
+
 ## 用户安装（macOS 端用户）
 
 > 开发者的核心逻辑测试（状态机 + 布局持久化）见上方「测试（Swift 核心）」

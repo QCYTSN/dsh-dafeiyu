@@ -6,6 +6,27 @@
 
 - Update the artifact upload and download actions used by the release workflow to their Node.js 24 versions, removing GitHub-hosted runner deprecation warnings and enforcing artifact digest mismatches as errors.
 
+### Added
+
+- Add repeatable Swift unit tests for the native animation state machine
+  (`native/macos/Tests/AnimationModelTests.swift`, 18 cases, run via
+  `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
+  the Python and Swift implementations cannot silently drift.
+- Add repeatable Swift unit tests for layout persistence
+  (`native/macos/Tests/LayoutStoreTests.swift`, 14 cases) and fix the drift
+  they exposed: missing `XDG_CONFIG_HOME`/`LOCALAPPDATA` fallbacks, JSON
+  booleans being accepted as coordinates/scales, `bubbleStates` not filtering
+  invalid entries, and `save()` skipping Python-compatible normalisation.
+- Add repeatability cases: layout save/load round trips are byte-stable,
+  `normalized()` is idempotent, repeated loads and identical state-machine
+  input sequences are deterministic.
+- Make the JS heartbeat test assert protocol semantics instead of JSON
+  whitespace: it now parses event-log lines and checks `kind`, so both the
+  Swift and Python helpers pass regardless of serializer formatting.
+- Verified the full test matrix on a MacBook Pro (Apple M3, arm64, macOS
+  26.5.2): Swift 32/32, Python 20/20, JS 71/71, packaged smoke test, universal
+  architecture and signature checks, and an end-to-end page-open/close cycle.
+
 ## 0.1.6
 
 ### Added
@@ -13,18 +34,6 @@
 - Display the reasoning effort that DSH actually applies to each request in the companion status detail, and keep it visible as the task moves between thinking, tool use, and waiting states.
 - Add four community-contributed dragging poses and a short release, dizzy, and protest reaction sequence, with reduced-motion fallback and interruption when the pet is grabbed again.
 - Bring the native macOS Helper to feature parity for that drag-release reaction sequence, including safe cancellation when reduced motion is enabled or the pet is grabbed again.
-- Add repeatable Swift unit tests for the native animation state machine
-  (`native/macos/Tests/AnimationModelTests.swift`, 16 cases, run via
-  `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
-  the Python and Swift implementations cannot silently drift.
-- Add repeatable Swift unit tests for layout persistence
-  (`native/macos/Tests/LayoutStoreTests.swift`, 11 cases) and fix the drift
-  they exposed: missing `XDG_CONFIG_HOME`/`LOCALAPPDATA` fallbacks, JSON
-  booleans being accepted as coordinates/scales, `bubbleStates` not filtering
-  invalid entries, and `save()` skipping Python-compatible normalisation.
-- Add repeatability cases: layout save/load round trips are byte-stable,
-  `normalized()` is idempotent, repeated loads and identical state-machine
-  input sequences are deterministic (suite verified over 10 consecutive runs).
 
 ### Fixed
 
