@@ -5,27 +5,6 @@ import XCTest
 /// so the two ports cannot silently drift. Every case runs against the real
 /// `assets/pet-manifest.json`, exactly like the Python suite.
 final class AnimationModelTests: XCTestCase {
-    static let allTests = [
-        ("testWorkingActivitySelectsPersistentLoop", testWorkingActivitySelectsPersistentLoop),
-        ("testInteractionReturnsToLatestAgentState", testInteractionReturnsToLatestAgentState),
-        ("testPulseExpiresToCurrentBaseState", testPulseExpiresToCurrentBaseState),
-        ("testIdleMicroDoesNotInterruptAgentWork", testIdleMicroDoesNotInterruptAgentWork),
-        ("testDragOverlayReturnsToLatestAgentState", testDragOverlayReturnsToLatestAgentState),
-        ("testDragTransitionsNeverCrossfade", testDragTransitionsNeverCrossfade),
-        ("testDragStageClipsAreSingleFrameAndRegistered", testDragStageClipsAreSingleFrameAndRegistered),
-        ("testDragReleaseChainMatchesRegisteredStageClips", testDragReleaseChainMatchesRegisteredStageClips),
-        ("testSingleFrameDragStageSurvivesAdvanceUntilCleared", testSingleFrameDragStageSurvivesAdvanceUntilCleared),
-        ("testUnknownStateIsIgnored", testUnknownStateIsIgnored),
-        ("testPulseWithNonPositiveTtlIsIgnored", testPulseWithNonPositiveTtlIsIgnored),
-        ("testUnknownOverlayReturnsFalse", testUnknownOverlayReturnsFalse),
-        ("testStateMapCoversEveryState", testStateMapCoversEveryState),
-        ("testWorkingActivityMap", testWorkingActivityMap),
-        ("testPulseResumeStateUpdatesBaseState", testPulseResumeStateUpdatesBaseState),
-        ("testIdleMicroPlaysWhenIdle", testIdleMicroPlaysWhenIdle),
-        ("testIdleMicroReturnsToIdleWhenFinished", testIdleMicroReturnsToIdleWhenFinished),
-        ("testSameInputSequenceYieldsSameEndState", testSameInputSequenceYieldsSameEndState),
-    ]
-
     private static let manifest: [String: Any] = {
         var url = URL(fileURLWithPath: #filePath)
         url.deleteLastPathComponent() // Tests/

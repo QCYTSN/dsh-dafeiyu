@@ -74,12 +74,10 @@ Developer ID / Notary 凭据，因此浏览器下载并带有隔离属性的包�
 静默漂移：
 
 ```bash
-native/macos/test.sh        # 等价于在仓库根目录执行 `swift test`
+swift test                  # 仓库根目录（Swift Package Manager）
 ```
 
 CI（`.github/workflows/publish.yml` 的 macOS job）也会运行 `swift test`。
-如果你的 Command Line Tools 的 SwiftPM 有兼容问题，`test.sh` 会自动优先
-使用 `/Applications/Xcode.app` 的工具链。
 
 ### 布局持久化测试发现并修复的漂移
 

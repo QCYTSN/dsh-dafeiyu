@@ -6,23 +6,6 @@ import XCTest
 /// adds regression cases for the drift found between the two ports (missing
 /// XDG_CONFIG_HOME fallback, bubbleStates filtering, save-time normalisation).
 final class LayoutStoreTests: XCTestCase {
-    static let allTests = [
-        ("testCorruptLayoutFallsBackSafely", testCorruptLayoutFallsBackSafely),
-        ("testMissingFileFallsBackSafely", testMissingFileFallsBackSafely),
-        ("testLayoutIsClampedAndSavedAtomically", testLayoutIsClampedAndSavedAtomically),
-        ("testBooleanIsNotAcceptedAsCoordinateOrScale", testBooleanIsNotAcceptedAsCoordinateOrScale),
-        ("testBubbleModeAndStatesAreNormalised", testBubbleModeAndStatesAreNormalised),
-        ("testBubbleScaleIsClamped", testBubbleScaleIsClamped),
-        ("testCharacterScaleSupportsMiniRange", testCharacterScaleSupportsMiniRange),
-        ("testDefaultPathRespectsEnvironmentPrecedence", testDefaultPathRespectsEnvironmentPrecedence),
-        ("testSaveClampsScaleAndBubbleScaleLikePython", testSaveClampsScaleAndBubbleScaleLikePython),
-        ("testSaveNormalizesBubbleMode", testSaveNormalizesBubbleMode),
-        ("testBubbleStatesMixedListKeepsStringsOnly", testBubbleStatesMixedListKeepsStringsOnly),
-        ("testSaveLoadRoundTripIsByteStable", testSaveLoadRoundTripIsByteStable),
-        ("testNormalizedIsIdempotent", testNormalizedIsIdempotent),
-        ("testRepeatedLoadsAreDeterministic", testRepeatedLoadsAreDeterministic),
-    ]
-
     private var tempDirectory: URL!
 
     override func setUpWithError() throws {
