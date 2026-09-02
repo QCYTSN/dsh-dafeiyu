@@ -39,12 +39,6 @@ final class PetController: NSObject {
         "lively": (3.5, 8),
     ]
 
-    private static let dragReleaseStages: [(clipName: String, holdMs: Int)] = [
-        ("dragging_release", 300),
-        ("dragging_dizzy", 840),
-        ("dragging_protest", 300),
-    ]
-
     let model: AnimationModel
     let manifest: [String: Any]
     let assetRoot: URL
@@ -739,12 +733,12 @@ final class PetController: NSObject {
 
     private func playDragReleaseStage(_ index: Int, token: Int) {
         guard token == dragChainID, !dragging else { return }
-        guard !reducedMotion, index < Self.dragReleaseStages.count else {
+        guard !reducedMotion, index < AnimationModel.dragReleaseStages.count else {
             clearDragReleaseOverlay()
             return
         }
 
-        let stage = Self.dragReleaseStages[index]
+        let stage = AnimationModel.dragReleaseStages[index]
         let previousFrame = model.frame
         let previousClip = model.activeClipName
         guard model.playOverlay(stage.clipName) else {
@@ -770,7 +764,7 @@ final class PetController: NSObject {
 
     private func cancelDragReleaseChain() {
         dragChainID &+= 1
-        let releaseClips = Set(Self.dragReleaseStages.map { $0.clipName })
+        let releaseClips = Set(AnimationModel.dragReleaseStages.map { $0.clipName })
         if !dragging, releaseClips.contains(model.activeClipName) {
             clearDragReleaseOverlay()
         }

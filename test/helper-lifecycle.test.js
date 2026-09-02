@@ -16,6 +16,24 @@ async function waitFor(predicate, timeoutMs = 3000) {
   throw new Error('timed out waiting for helper condition')
 }
 
+// Checks protocol semantics (message kind) rather than whitespace/formatting:
+// the native helper and the Python helper may serialize the same message with
+// different JSON separators.
+async function eventLogHasKind(eventLog, kind) {
+  try {
+    const lines = (await readFile(eventLog, 'utf8')).trim().split(/\r?\n/).filter(Boolean)
+    return lines.some((line) => {
+      try {
+        return JSON.parse(line).kind === kind
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    return false
+  }
+}
+
 test('helper process exposes WSL detection helpers without throwing', () => {
   assert.equal(typeof isWsl(), 'boolean')
   assert.equal(typeof shouldUseBundledHelper(), 'boolean')
@@ -62,21 +80,13 @@ test('helper heartbeat stays healthy and responds without a restart', async () =
     message: 'heartbeat test',
   }))
   await waitFor(async () => {
-    try {
-      return (await readFile(eventLog, 'utf8')).includes('"kind": "ping"')
-    } catch {
-      return false
-    }
+    return eventLogHasKind(eventLog, CompanionMessageKind.PING)
   })
   await new Promise((resolve) => setTimeout(resolve, 220))
   assert.equal(bridge.child, initialChild)
   bridge.stop('heartbeat-test-complete')
   await waitFor(async () => {
-    try {
-      return (await readFile(eventLog, 'utf8')).includes('"kind": "shutdown"')
-    } catch {
-      return false
-    }
+    return eventLogHasKind(eventLog, CompanionMessageKind.SHUTDOWN)
   })
   await rm(directory, { recursive: true, force: true })
 })

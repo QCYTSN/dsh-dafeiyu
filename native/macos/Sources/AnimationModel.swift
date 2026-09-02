@@ -17,6 +17,16 @@ final class AnimationModel {
         "IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED",
     ]
 
+    /// Drag-release reaction chain: clip name + hold time in ms. Shared with
+    /// the UI layer so the sequence is testable and stays aligned with the
+    /// manifest-registered stage clips (mirrors `DRAG_RELEASE_STAGES` in
+    /// `runtime/helper.py`).
+    static let dragReleaseStages: [(clipName: String, holdMs: Int)] = [
+        ("dragging_release", 300),
+        ("dragging_dizzy", 840),
+        ("dragging_protest", 300),
+    ]
+
     private static let nonCrossfadeClips: Set<String> = [
         "blink",
         "glance",

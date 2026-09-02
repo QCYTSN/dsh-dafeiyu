@@ -110,6 +110,9 @@ jobs:
           node-version: "24"
           package-manager-cache: false
 
+      - name: Run Swift core tests
+        run: swift test
+
       - name: Install JavaScript dependencies
         run: npm install --ignore-scripts --no-package-lock
 

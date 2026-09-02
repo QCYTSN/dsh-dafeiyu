@@ -33,6 +33,23 @@ async function waitFor(predicate, timeoutMs = 5000) {
   throw new Error('timed out waiting for plugin integration condition')
 }
 
+// Checks protocol semantics (message kind) rather than JSON whitespace, so
+// both the Swift and Python helpers pass regardless of serializer formatting.
+async function eventLogHasKind(eventLog, kind) {
+  try {
+    const lines = (await readFile(eventLog, 'utf8')).trim().split(/\r?\n/).filter(Boolean)
+    return lines.some((line) => {
+      try {
+        return JSON.parse(line).kind === kind
+      } catch {
+        return false
+      }
+    })
+  } catch {
+    return false
+  }
+}
+
 test('plugin forwards DSH-shaped session events and owns helper shutdown', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-dafeiyu-plugin-'))
   const eventLog = join(directory, 'events.jsonl')
@@ -64,11 +81,7 @@ test('plugin forwards DSH-shaped session events and owns helper shutdown', async
   dispose()
 
   await waitFor(async () => {
-    try {
-      return (await readFile(eventLog, 'utf8')).includes('"kind": "shutdown"')
-    } catch {
-      return false
-    }
+    return eventLogHasKind(eventLog, 'shutdown')
   })
 
   const messages = (await readFile(eventLog, 'utf8')).trim().split(/\r?\n/).map(JSON.parse)
@@ -141,11 +154,7 @@ test('live settings keep the active project state without restarting the helper'
   dispose()
 
   await waitFor(async () => {
-    try {
-      return (await readFile(eventLog, 'utf8')).includes('"kind": "shutdown"')
-    } catch {
-      return false
-    }
+    return eventLogHasKind(eventLog, 'shutdown')
   })
 
   const messages = (await readFile(eventLog, 'utf8')).trim().split(/\r?\n/).map(JSON.parse)

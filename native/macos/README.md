@@ -66,7 +66,55 @@ arm64 + x86_64，最低 macOS 12.0，ad-hoc 签名，素材打进
 Developer ID / Notary 凭据，因此浏览器下载并带有隔离属性的包仍可能被 Gatekeeper
 拦截。正式签名与公证继续在 #24 跟踪，不能把 ad-hoc 签名描述为正式分发签名。
 
+## 测试（Swift 核心）
+
+状态机（`AnimationModel`）与布局持久化（`PetLayout`）的可重复测试放在
+`Tests/`，分别对照 `runtime/tests/test_animation_model.py` 和
+`runtime/tests/test_layout_store.py` 的用例，防止 Python 与 Swift 两套实现
+静默漂移：
+
+```bash
+swift test                  # 仓库根目录（Swift Package Manager）
+```
+
+PR 与发布 CI（`.github/workflows/ci.yml` 和
+`.github/workflows/publish.yml` 的 macOS job）都会运行 `swift test`。
+
+### 布局持久化测试发现并修复的漂移
+
+- `defaultPath()` 缺失 `XDG_CONFIG_HOME`（及 `LOCALAPPDATA`）回退，与
+  Python 的平台路径优先级不一致 → 已补齐，并支持注入环境字典以便测试
+- JSON 布尔值会被 Swift 桥接成 `1/0`，导致 `x: true` 被当作坐标、`scale:
+  false` 被当作 `0.55` → 已按 Python 语义排除布尔值
+- `bubbleStates` 含非法项时 Python 只保留字符串项，Swift 会整组丢弃 →
+  已改为同样的过滤行为
+- `save()` 前不做归一化（Python 会 clamp scale/bubbleScale、校验
+  bubbleMode）→ 已统一走 `normalized()`，保存与读取行为一致
+
+### 事件日志测试按协议语义匹配
+
+JS heartbeat 用例原先按 `"kind": "ping"`（带空格）的字符串匹配事件日志，
+与具体 JSON 序列化格式耦合。现改为逐行 `JSON.parse` 后判断 `kind`，
+验证的是协议语义而非空白格式，Swift 与 Python helper 均可通过。
+
+## 本机验证记录
+
+**测试机型：MacBook Pro（Apple M3，16 GB，arm64，macOS 26.5.2 / 25F84）**
+
+| 项目 | 结果 |
+| --- | --- |
+| Swift 核心测试（状态机 + 布局 + 可重复性，`swift test`） | 32/32 通过 |
+| Python 测试（animation_model + layout_store + helper_platform） | 20/20 通过 |
+| JS 测试套件（`npm test`，含 helper 生命周期/心跳/集成） | 71/71 通过 |
+| 打包产物烟测（`test-packaged-helper.mjs`，最终 .app 可视 + EOF） | 通过 |
+| 通用二进制校验（`lipo -verify_arch arm64 x86_64`） | 通过 |
+| 签名校验（`codesign --verify --deep --strict`） | 通过 |
+| 端到端（打开页面→宠物出现→关闭页面→宠物退出，0.1.6 原生 helper） | 通过 |
+
 ## 用户安装（macOS 端用户）
+
+> 开发者的核心逻辑测试（状态机 + 布局持久化）见上方「测试（Swift 核心）」
+> 章节。
 
 原生 Helper 从 0.1.4 起作为实验性功能随 npm 和 GitHub Release 发布。普通用户
 **不需要**自行构建或运行本目录的源码，直接用 DSH 的插件命令安装即可：

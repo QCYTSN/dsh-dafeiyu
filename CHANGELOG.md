@@ -8,6 +8,27 @@
 - Remove completed Phase 0 planning material and the unused legacy UI acceptance harness.
 - Consolidate repeated task ordering and reduced-motion transitions without changing runtime behavior.
 
+### Added
+
+- Add repeatable Swift unit tests for the native animation state machine
+  (`native/macos/Tests/AnimationModelTests.swift`, 18 cases, run via
+  `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
+  the Python and Swift implementations cannot silently drift.
+- Add repeatable Swift unit tests for layout persistence
+  (`native/macos/Tests/LayoutStoreTests.swift`, 14 cases) and fix the drift
+  they exposed: missing `XDG_CONFIG_HOME`/`LOCALAPPDATA` fallbacks, JSON
+  booleans being accepted as coordinates/scales, `bubbleStates` not filtering
+  invalid entries, and `save()` skipping Python-compatible normalisation.
+- Add repeatability cases: layout save/load round trips are byte-stable,
+  `normalized()` is idempotent, repeated loads and identical state-machine
+  input sequences are deterministic.
+- Make the JS heartbeat test assert protocol semantics instead of JSON
+  whitespace: it now parses event-log lines and checks `kind`, so both the
+  Swift and Python helpers pass regardless of serializer formatting.
+- Verified the full test matrix on a MacBook Pro (Apple M3, arm64, macOS
+  26.5.2): Swift 32/32, Python 20/20, JS 71/71, packaged smoke test, universal
+  architecture and signature checks, and an end-to-end page-open/close cycle.
+
 ## 0.1.6
 
 ### Added
