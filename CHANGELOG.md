@@ -10,6 +10,12 @@
 
 ### Added
 
+- Document verified macOS Gatekeeper behavior in both READMEs (issue #24):
+  npm installs, terminal downloads, and browser-downloaded `.tgz` archives
+  installed directly never trigger Gatekeeper; only Finder-extracted `.app`
+  bundles carry quarantine attributes. Includes the recommended install flow,
+  terminal download commands, and the `xattr` cleanup for users who already
+  extracted with Finder.
 - Degrade gracefully when a packaged runtime dependency cannot be resolved
   (for example an incomplete `link:` install): the loader entry now imports
   the plugin behind a guard, logs one actionable notice naming the missing

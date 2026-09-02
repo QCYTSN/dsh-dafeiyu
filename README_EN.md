@@ -185,7 +185,8 @@ the Helper yourself.
 > CI verifies its universal architecture, AppKit rendering, and process lifecycle;
 > Apple Silicon experience will continue to be validated through user feedback.
 > The app currently has an ad-hoc signature, not a Developer ID signature or
-> notarization, so Gatekeeper may block browser-downloaded archives.
+> notarization. Gatekeeper only triggers in specific scenarios; see
+> "About macOS Gatekeeper" below.
 
 Installation on macOS is the same as Windows, just in the Terminal with macOS
 paths. The release bundle ships a native Helper — **no Python, PySide6 or Xcode
@@ -220,6 +221,33 @@ pnpm dsh plugin --profile web add ~/Downloads/dsh-dafeiyu-<version>.tgz
 
 Then launch DSH WebUI normally; BigFish is started automatically. Do not start
 the Helper yourself.
+
+#### About macOS Gatekeeper
+
+Verified conclusions (see issue
+[#24](https://github.com/QCYTSN/dsh-dafeiyu/issues/24)): installing from npm,
+downloading via the terminal, and installing a browser-downloaded `.tgz`
+**directly** all bypass Gatekeeper. Only an `.app` extracted with Finder
+carries the quarantine attribute and gets blocked on double-click.
+
+- Recommended: after downloading the `.tgz` in a browser, **do not extract it
+  with Finder** — run the install command above directly (npm/tar extraction
+  does not propagate quarantine attributes).
+- Downloading in a terminal never creates quarantine attributes in the first
+  place:
+
+  ```bash
+  gh release download --repo QCYTSN/dsh-dafeiyu
+  # or
+  curl -LO https://github.com/QCYTSN/dsh-dafeiyu/releases/download/v<version>/dsh-dafeiyu-<version>.tgz
+  ```
+
+- If you already extracted with Finder and got blocked: right-click the Helper
+  → "Open" once to allow it, or clear the quarantine attribute and run it:
+
+  ```bash
+  xattr -dr com.apple.quarantine <path to the extracted dsh-dafeiyu-helper.app>
+  ```
 
 ### 3. GitHub Release fallback
 
