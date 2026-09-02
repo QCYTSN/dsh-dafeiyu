@@ -53,7 +53,7 @@
     "@standard-schema/spec"
   ],
   "scripts": {
-    "test": "node --test --test-timeout=10000 test/assets.test.js test/config-endpoint.test.js test/client-slot-key.test.js test/helper-command.test.js test/protocol.test.js test/status-copy.test.js test/reducer.test.js test/helper-lifecycle.test.js test/helper-restart.test.js test/plugin-integration.test.js",
+    "test": "node --test --test-timeout=10000 test/assets.test.js test/config-endpoint.test.js test/client-slot-key.test.js test/entry-guard.test.js test/helper-command.test.js test/protocol.test.js test/status-copy.test.js test/reducer.test.js test/helper-lifecycle.test.js test/helper-restart.test.js test/plugin-integration.test.js",
     "test:helper": "node --test test/helper-lifecycle.test.js",
     "test:python": "node scripts/run-python.mjs -m unittest discover -s runtime/tests -t .",
     "helper:headless": "node scripts/run-python.mjs runtime/helper.py --headless",

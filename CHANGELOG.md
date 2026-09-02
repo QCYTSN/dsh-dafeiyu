@@ -10,6 +10,12 @@
 
 ### Added
 
+- Degrade gracefully when a packaged runtime dependency cannot be resolved
+  (for example an incomplete `link:` install): the loader entry now imports
+  the plugin behind a guard, logs one actionable notice naming the missing
+  package and the reinstall command, and exports an inert plugin so the DSH
+  plugin tree and all other plugins keep booting instead of failing with
+  `ERR_MODULE_NOT_FOUND` (#39).
 - Add repeatable Swift unit tests for the native animation state machine
   (`native/macos/Tests/AnimationModelTests.swift`, 18 cases, run via
   `swift test` in CI), ported from `runtime/tests/test_animation_model.py` so
