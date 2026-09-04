@@ -24,6 +24,16 @@ test('package metadata exposes the DSH web client bundle', () => {
   ])
 })
 
+test('activation failure degrades to a disabled pet instead of failing the host', () => {
+  const errors = []
+  const ctx = {
+    logger: { debug() {}, info() {}, warn() {}, error(message) { errors.push(message) } },
+    settings: { register: () => { throw new Error('host settings API changed') } },
+  }
+  assert.doesNotThrow(() => apply(ctx, {}))
+  assert.ok(errors.some((message) => message.includes('failed to activate')))
+})
+
 async function waitFor(predicate, timeoutMs = 5000) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {

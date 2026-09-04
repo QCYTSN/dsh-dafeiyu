@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Keep the DSH host boot alive when plugin activation fails (for example a
+  host-side settings or web-server API change after a DSH update): activation
+  errors are now logged and the pet stays disabled for that session instead of
+  rejecting the whole plugin tree, matching the import-time guard shipped in
+  0.1.7.
+
 ## 0.1.7
 
 ### Changed
