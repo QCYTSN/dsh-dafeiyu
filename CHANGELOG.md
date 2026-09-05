@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.8
+
 ### Added
 
 - Keep the DSH host boot alive when plugin activation fails (for example a
