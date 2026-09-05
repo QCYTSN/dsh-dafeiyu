@@ -134,6 +134,17 @@ export function createConfigHandler(settings) {
 
 function mount(ctx, config = {}, eventCtx = ctx) {
   const logger = ctx.logger ?? console
+  try {
+    mountCompanion(ctx, config, eventCtx, logger)
+  } catch (error) {
+    // DSH treats a failing plugin activation as fatal for the whole boot
+    // (dsh-app-boot rethrows init rejections). A host-side API change must
+    // cost the pet its session, never the host its startup.
+    logger.error?.(`dsh-dafeiyu failed to activate and stays disabled for this session: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
   const base = publicConfig(config)
   const settings = ctx.settings?.register?.('dsh-dafeiyu', Config, {
     base,
@@ -257,23 +268,29 @@ function mount(ctx, config = {}, eventCtx = ctx) {
     // setting is applied live through a CONFIG message, so sliders never
     // restart the pet.  Starting a previously-disabled runtime is debounced
     // to avoid spawning repeatedly while settings settle.
-    if (next.enabled === false) {
+    try {
+      if (next.enabled === false) {
+        if (restartTimer) {
+          clearTimeout(restartTimer)
+          restartTimer = undefined
+        }
+        stopRuntime('settings-change')
+        return
+      }
+      if (!bridge) {
+        scheduleRestart(next)
+        return
+      }
       if (restartTimer) {
         clearTimeout(restartTimer)
         restartTimer = undefined
       }
-      stopRuntime('settings-change')
-      return
+      applyLiveSettings(next)
+    } catch (error) {
+      // This callback runs inside the host's settings dispatch; a throw here
+      // would take the host's settings service down with the pet.
+      logger.error?.(`dsh-dafeiyu failed to apply settings: ${error instanceof Error ? error.message : String(error)}`)
     }
-    if (!bridge) {
-      scheduleRestart(next)
-      return
-    }
-    if (restartTimer) {
-      clearTimeout(restartTimer)
-      restartTimer = undefined
-    }
-    applyLiveSettings(next)
   })
   if (typeof ctx.inject === 'function') {
     ctx.inject(['webServer'], (httpCtx) => {
