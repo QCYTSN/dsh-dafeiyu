@@ -2,6 +2,19 @@
 
 ## Unreleased
 
+## 0.1.9
+
+### Added
+
+- Add the native glove hand cursor for the companion window on Windows
+  (community PR #33): hovering and grabbing the pet shows custom `.cur`
+  cursors (`cursor_grab` / `cursor_grabbing`) loaded through Win32
+  `WM_SETCURSOR`, with all three cursor API functions declaring explicit
+  pointer-sized `argtypes`/`restype` so 64-bit handles are never truncated,
+  and graceful fallback to the system cursor when loading fails or on
+  non-Windows platforms. Cursor assets are BSD-3-Clause licensed (Chromium),
+  documented under `assets/cursors/` and `ASSET_LICENSE.md`.
+
 ## 0.1.8
 
 ### Added
