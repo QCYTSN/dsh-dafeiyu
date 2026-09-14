@@ -65,7 +65,7 @@ test('state clips play full-motion loops at the imported 12fps cadence', async (
   for (const clipName of ['idle', 'waiting', 'thinking', 'working', 'working_search', 'working_command', 'success', 'error', 'dragging']) {
     const clip = manifest.clips[clipName]
     assert.ok(clip.frames.length >= 30, `${clipName} should import a full-motion sequence`)
-    assert.equal(clip.frameMs, 83, `${clipName} should stay on the 12fps cadence`)
+    assert.equal(clip.frameMs, 125, `${clipName} should stay on the 8fps cadence`)
     assert.equal(clip.loop, true, `${clipName} state clips must loop`)
     assert.equal(clip.motion, undefined, `${clipName} uses real frames, not procedural motion`)
   }

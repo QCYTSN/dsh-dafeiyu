@@ -12,10 +12,14 @@
   thinking, working, searching, commanding, success, error), the drag phase,
   and touch reactions now play full-motion 12 fps transparent WebP frame
   sequences (412x344 crop of the source 640x360 canvas, 21 MB total) instead
-  of single-pose sprites with procedural wobbles. Reduced motion still freezes
+  of single-pose sprites with procedural wobbles. The set ships at 8 fps
+  (classic-anime cadence, 13 MB total) and the archived BigFish frames moved
+  out of `assets/` so the per-platform Helper binaries no longer embed them
+  three times over; the 0.1.10 npm publish was rejected as Payload Too Large
+  (206 MB) before this budget landed. Reduced motion still freezes
   looped clips on the standing pose, and the dizzy reaction keeps its
   procedural motion. The previous BigFish frames are archived under
-  `assets/legacy/dafeiyu/`, excluded from the npm bundle, and keep their
+  `legacy/dafeiyu/`, excluded from the npm bundle, and keep their
   original restricted terms; the upstream MIT notice ships as
   `assets/dsh-pet-LICENSE.txt` and `ASSET_LICENSE.md` documents both provenance
   chains. `scripts/import_dshpet_webm.py` reproduces the conversion from the

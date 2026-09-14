@@ -37,9 +37,9 @@ from pathlib import Path
 
 CANVAS_WIDTH = 640
 CANVAS_HEIGHT = 360
-FPS = 12
-FRAME_MS = 83  # round(1000 / 12)
-QUALITY = 75
+FPS = 8
+FRAME_MS = 125  # round(1000 / 8) — classic-anime cadence, halves the embedded payload
+QUALITY = 68
 PAD = 12
 ALPHA_THRESHOLD = 8
 
