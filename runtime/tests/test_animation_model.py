@@ -24,7 +24,9 @@ class AnimationModelTests(unittest.TestCase):
         model.apply_state("THINKING")
         model.play_overlay("head_pat")
         model.apply_state("WAITING")
-        for tick in range(8):
+        # head_pat is a 48-frame overlay (~4s at 83ms); the walk-through must
+        # outlast it to observe the hand-back to the base state.
+        for tick in range(30):
             model.advance(200, tick * 200)
         self.assertEqual(model.active_clip_name, "waiting")
         self.assertEqual(model.base_state, "WAITING")
@@ -62,18 +64,21 @@ class AnimationModelTests(unittest.TestCase):
         self.assertEqual(crossfade_duration("thinking", "working"), 0.10)
         self.assertEqual(crossfade_duration("working_search", "working_search"), 0.045)
 
-    def test_drag_stage_clips_are_single_frame_and_registered(self) -> None:
+    def test_drag_stage_clips_are_registered(self) -> None:
+        # Release and protest are real animations now; the daze stage stays a
+        # single pose so the procedural dizzy wobble carries it.
         stages = {
-            "dragging_release": False,
-            "dragging_dizzy": True,
-            "dragging_protest": False,
+            "dragging_release": (False, 24),
+            "dragging_dizzy": (True, 1),
+            "dragging_protest": (False, 48),
         }
         model = AnimationModel(MANIFEST)
-        for name, loop in stages.items():
+        for name, (loop, frames) in stages.items():
             clip = MANIFEST["clips"][name]
-            self.assertEqual(len(clip["frames"]), 1, name)
+            self.assertEqual(len(clip["frames"]), frames, name)
             self.assertIs(clip["loop"], loop, name)
             self.assertTrue(model.play_overlay(name), name)
+        self.assertEqual(MANIFEST["clips"]["dragging_dizzy"].get("motion"), "dizzy")
 
     def test_drag_release_chain_matches_registered_stage_clips(self) -> None:
         self.assertEqual(
