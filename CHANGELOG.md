@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.12
+
 ### Added
 
 - Expose a loopback-only server-sent events channel at
