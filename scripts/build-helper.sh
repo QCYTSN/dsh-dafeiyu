@@ -3,7 +3,6 @@ set -euo pipefail
 
 project_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 entry="$project_root/runtime/helper.py"
-assets="$project_root/assets"
 output="$project_root/runtime/bin/linux-x64"
 work="$project_root/.build/helper-linux"
 project_python="$project_root/.build/python-env/bin/python"
@@ -38,7 +37,6 @@ fi
   --distpath "$output" \
   --workpath "$work" \
   --specpath "$work" \
-  --add-data "$assets:assets" \
   --paths "$project_root/runtime" \
   "$entry"
 

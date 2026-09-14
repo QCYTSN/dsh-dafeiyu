@@ -5,7 +5,6 @@ param(
 $ErrorActionPreference = 'Stop'
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $entry = Join-Path $projectRoot 'runtime\helper.py'
-$assets = Join-Path $projectRoot 'assets'
 $output = Join-Path $projectRoot 'runtime\bin\win32-x64'
 $work = Join-Path $projectRoot '.build\helper'
 $projectPython = Join-Path $projectRoot '.build\python-env\Scripts\python.exe'
@@ -30,7 +29,6 @@ if ($LASTEXITCODE -ne 0) {
   --distpath $output `
   --workpath $work `
   --specpath $work `
-  --add-data "$assets;assets" `
   --paths (Join-Path $projectRoot 'runtime') `
   $entry
 
