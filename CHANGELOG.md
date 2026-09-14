@@ -2,6 +2,14 @@
 
 ## Unreleased
 
+### Added
+
+- Expose a loopback-only server-sent events channel at
+  `/plugins/dsh-dafeiyu/events` that mirrors every companion message
+  (snapshot kinds replay on connect, transient pulses do not). This is the
+  data plumbing for the planned in-page web overlay; the native Helper path
+  is untouched.
+
 ### Changed
 
 - The npm package now ships the animation assets once: the Windows/Linux
