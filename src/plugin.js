@@ -18,6 +18,7 @@ export const name = 'dsh-dafeiyu'
 // is never consumed directly.
 export const inject = ['sessions', 'settings']
 export const CONFIG_ENDPOINT = '/plugins/dsh-dafeiyu/config'
+export const EVENTS_ENDPOINT = '/plugins/dsh-dafeiyu/events'
 export const Config = Schema.object({
   enabled: Schema.boolean().default(true).description('启用桌面大肥鱼'),
   scale: Schema.number().min(0.55).max(1.4).step(0.05).default(1).role('slider').description('角色大小'),
@@ -132,6 +133,66 @@ export function createConfigHandler(settings) {
   }
 }
 
+// Server-sent events channel mirroring the companion protocol for in-page
+// consumers (the future web overlay). Snapshot kinds are remembered so a client
+// that connects late still renders the current state immediately.
+export function createEventStream() {
+  const clients = new Set()
+  const snapshot = new Map()
+  return {
+    get clientCount() {
+      return clients.size
+    },
+    broadcast(message) {
+      if (message?.kind === 'hello' || message?.kind === 'state' || message?.kind === 'task'
+        || message?.kind === 'tasks' || message?.kind === 'config') {
+        snapshot.set(message.kind, message)
+      }
+      const payload = `data: ${JSON.stringify(message)}\n\n`
+      for (const res of clients) {
+        try {
+          res.write(payload)
+        } catch {
+          clients.delete(res)
+        }
+      }
+    },
+    add(res) {
+      clients.add(res)
+      for (const message of snapshot.values()) {
+        res.write(`data: ${JSON.stringify(message)}\n\n`)
+      }
+      return () => clients.delete(res)
+    },
+  }
+}
+
+export function createEventsHandler(stream) {
+  return (req, res) => {
+    if (!isLoopback(req.socket?.remoteAddress)) {
+      jsonResponse(res, 403, { error: 'local access only' })
+      return
+    }
+    const origin = req.headers?.origin
+    if (origin) {
+      let originHost
+      try { originHost = new URL(origin).host } catch {}
+      if (!originHost || originHost !== req.headers.host) {
+        jsonResponse(res, 403, { error: 'origin mismatch' })
+        return
+      }
+    }
+    res.writeHead(200, {
+      'content-type': 'text/event-stream; charset=utf-8',
+      'cache-control': 'no-store',
+      connection: 'keep-alive',
+    })
+    res.write('retry: 2000\n\n')
+    const remove = stream.add(res)
+    req.on('close', remove)
+  }
+}
+
 function mount(ctx, config = {}, eventCtx = ctx) {
   const logger = ctx.logger ?? console
   try {
@@ -146,6 +207,7 @@ function mount(ctx, config = {}, eventCtx = ctx) {
 
 function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
   const base = publicConfig(config)
+  const eventStream = createEventStream()
   const settings = ctx.settings?.register?.('dsh-dafeiyu', Config, {
     base,
     applies: 'live',
@@ -219,6 +281,13 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         })
       },
     }, logger)
+    // Mirror every companion message to in-page subscribers without changing
+    // what the helper receives; the wrap is per-runtime and dies with it.
+    const deliver = bridge.send.bind(bridge)
+    bridge.send = (message) => {
+      deliver(message)
+      eventStream.broadcast(message)
+    }
     reducer = new CompanionReducer({ includeSubagents: resolved.includeSubagents === true })
     bridge.start()
     bridge.send(createMessage(CompanionMessageKind.HELLO, {
@@ -297,6 +366,10 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       httpCtx.effect(
         () => httpCtx.webServer.register({ kind: 'exact', path: CONFIG_ENDPOINT, handler: createConfigHandler(settings) }),
         'dsh-dafeiyu: local settings endpoint',
+      )
+      httpCtx.effect(
+        () => httpCtx.webServer.register({ kind: 'exact', path: EVENTS_ENDPOINT, handler: createEventsHandler(eventStream) }),
+        'dsh-dafeiyu: local event stream',
       )
     })
   }
