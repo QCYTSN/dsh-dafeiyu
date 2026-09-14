@@ -35,7 +35,7 @@ class BundleRootTests(unittest.TestCase):
             meipass.mkdir()
             with mock.patch.object(sys, "executable", str(exe_dir / "dsh-dafeiyu-helper.exe")), \
                  mock.patch.object(sys, "_MEIPASS", str(meipass), create=True):
-                self.assertEqual(bundle_root(), exe_dir)
+                self.assertEqual(bundle_root().resolve(), exe_dir.resolve())
 
     def test_package_layout_when_run_from_the_installed_tree(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -45,7 +45,7 @@ class BundleRootTests(unittest.TestCase):
             meipass.mkdir()
             with mock.patch.object(sys, "executable", str(exe_dir / "dsh-dafeiyu-helper.exe")), \
                  mock.patch.object(sys, "_MEIPASS", str(meipass), create=True):
-                self.assertEqual(bundle_root(), root)
+                self.assertEqual(bundle_root().resolve(), root.resolve())
 
     def test_legacy_embedded_assets_remain_the_fallback(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
