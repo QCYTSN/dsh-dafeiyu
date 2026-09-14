@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.10
+
 ### Changed
 
 - 大肥鱼视觉优化（素材更新）：the bundled companion animation set is now
