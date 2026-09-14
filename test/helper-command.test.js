@@ -34,6 +34,24 @@ test('native Windows launches the bundled x64 helper directly', () => {
   assert.deepEqual(resolve({ platform: 'win32' }), { command: bundledPath, args: [] })
 })
 
+test('native Windows prefers the versioned local cache so the plugin directory stays unlocked', () => {
+  const cachedPath = 'C:\\Users\\me\\AppData\\Local\\dsh-dafeiyu\\0.1.9\\dsh-dafeiyu-helper-1.exe'
+  assert.deepEqual(
+    resolve({ platform: 'win32', wslHelperCache: () => cachedPath }),
+    { command: cachedPath, args: [] },
+  )
+})
+
+test('native Windows falls back to the bundled path when caching fails', () => {
+  assert.deepEqual(
+    resolve({
+      platform: 'win32',
+      wslHelperCache: () => { throw new Error('cache unavailable') },
+    }),
+    { command: bundledPath, args: [] },
+  )
+})
+
 test('native macOS launches the bundled universal helper directly', () => {
   assert.deepEqual(resolve({ platform: 'darwin' }), {
     command: darwinBundledPath,

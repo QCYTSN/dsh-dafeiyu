@@ -120,10 +120,18 @@ function defaultWindowsLocalAppData({
   return wslpath('-u', windowsPath)
 }
 
+// On native Windows LOCALAPPDATA is already an environment variable; the
+// cmd.exe probe only exists for WSL, where the value must be read from the
+// Windows side and mapped back to a /mnt path.
+function defaultLocalAppData() {
+  if (process.platform === 'win32' && process.env.LOCALAPPDATA) return process.env.LOCALAPPDATA
+  return defaultWindowsLocalAppData()
+}
+
 function cacheWslBundledHelper({
   bundledPath,
   version = packageVersion,
-  localAppData = defaultWindowsLocalAppData,
+  localAppData = defaultLocalAppData,
   fileExists = existsSync,
   makeDirectory = mkdirSync,
   copyFile = copyFileSync,
@@ -173,7 +181,15 @@ function resolveHelperLaunch({
   wslHelperCache = cacheWslBundledHelper,
 }) {
   if (platform === 'win32' && fileExists(bundledPath)) {
-    return { command: bundledPath, args: [] }
+    // Run the versioned Windows-local copy when the cache is available. The
+    // plugin directory then never holds a running executable, so a plugin
+    // update can replace node_modules/dsh-dafeiyu while DSH is still open
+    // (issue #66: pnpm rename failed with EPERM on the locked directory).
+    try {
+      return { command: wslHelperCache({ bundledPath }), args: [] }
+    } catch {
+      return { command: bundledPath, args: [] }
+    }
   }
   if (platform === 'darwin' && fileExists(darwinBundledPath)) {
     return { command: darwinBundledPath, args: [] }
@@ -547,6 +563,7 @@ export {
   defaultCommand,
   defaultLaunch,
   defaultWindowsLocalAppData,
+  defaultLocalAppData,
   cacheWslBundledHelper,
   isBundledHelperCommand,
   isWsl,

@@ -21,6 +21,16 @@
 - Both renderers keep reading sizes from `pet-manifest.json`, so the new
   envelope requires no runtime code changes.
 
+### Fixed
+
+- On native Windows the Helper now runs from the versioned cache under
+  `%LOCALAPPDATA%\dsh-dafeiyu\<version>\` (the mechanism introduced for WSL
+  in 0.1.6, now applied to win32 as well), so the plugin directory never
+  holds a running executable and `dsh plugin ... update` no longer fails with
+  `ERR_PNPM_EPERM` rename errors while DSH is open (#66). Cache preparation
+  stays an optimization: any failure falls back to launching the bundled
+  path directly.
+
 ## 0.1.9
 
 ### Added
