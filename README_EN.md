@@ -513,6 +513,6 @@ clips under its MIT terms, and the upstream license ships in the package as
 `assets/dsh-pet-LICENSE.txt`. Many thanks to the dsh-pet authors for the
 high-quality assets and the published AI-generation recipes.
 
-The earlier BigFish frames are archived under `assets/legacy/dafeiyu/` (no
+The earlier BigFish frames are archived under `legacy/dafeiyu/` (no
 longer bundled) and keep their original restricted terms. Full provenance and
 usage boundaries are documented in [ASSET_LICENSE.md](ASSET_LICENSE.md).

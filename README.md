@@ -486,5 +486,5 @@ PC2005-cloud，MIT 许可）：我们按其 MIT 条款精选导入了 16 个动�
 上游许可证原文随包发布（`assets/dsh-pet-LICENSE.txt`）。感谢 dsh-pet 作者
 贡献的高质量素材与公开的 AI 生成配方。
 
-早期大肥鱼形象帧已归档至 `assets/legacy/dafeiyu/`（不再随包发布），其原始
+早期大肥鱼形象帧已归档至 `legacy/dafeiyu/`（不再随包发布），其原始
 受限条款继续适用。完整来源与使用边界见 [ASSET_LICENSE.md](ASSET_LICENSE.md)。

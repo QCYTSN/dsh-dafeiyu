@@ -102,9 +102,9 @@ final class AnimationModelTests: XCTestCase {
         // Release and protest are real animations now; the daze stage stays a
         // single pose so the procedural dizzy wobble carries it.
         let stages: [(name: String, loop: Bool, frames: Int)] = [
-            ("dragging_release", false, 24),
+            ("dragging_release", false, 16),
             ("dragging_dizzy", true, 1),
-            ("dragging_protest", false, 48),
+            ("dragging_protest", false, 32),
         ]
         let model = makeModel()
         guard let clips = Self.manifest["clips"] as? [String: Any] else {
