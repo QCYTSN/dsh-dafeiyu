@@ -8,22 +8,33 @@ const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const assetRoot = join(repositoryRoot, 'assets', 'pet')
 const manifestPath = join(repositoryRoot, 'assets', 'pet-manifest.json')
 
-async function pngFiles(directory) {
+async function webpFiles(directory) {
   const entries = await readdir(directory, { withFileTypes: true })
   const files = []
   for (const entry of entries) {
     const path = join(directory, entry.name)
-    if (entry.isDirectory()) files.push(...await pngFiles(path))
-    else if (entry.isFile() && entry.name.endsWith('.png')) files.push(path)
+    if (entry.isDirectory()) files.push(...await webpFiles(path))
+    else if (entry.isFile() && entry.name.endsWith('.webp')) files.push(path)
   }
   return files
+}
+
+// libwebp with alpha emits the extended VP8X chunk: canvas size is stored as
+// 24-bit little-endian (value - 1) at RIFF payload offsets 24 and 27.
+function webpSize(bytes) {
+  assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF', 'not a RIFF container')
+  assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WEBP', 'not a WebP file')
+  assert.equal(bytes.subarray(12, 16).toString('ascii'), 'VP8X', 'expected the extended VP8X chunk')
+  return {
+    width: bytes.readUIntLE(24, 3) + 1,
+    height: bytes.readUIntLE(27, 3) + 1,
+  }
 }
 
 test('pet manifest allowlists every bundled runtime frame', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
   assert.equal(manifest.formatVersion, 1)
-  assert.equal(manifest.baseSize, 238)
-  assert.ok(Object.keys(manifest.clips).length >= 18)
+  assert.ok(Object.keys(manifest.clips).length >= 15)
 
   const declared = new Set()
   for (const [clipName, clip] of Object.entries(manifest.clips)) {
@@ -36,63 +47,44 @@ test('pet manifest allowlists every bundled runtime frame', async () => {
       assert.equal(declared.has(frame), false, `duplicate frame declaration: ${frame}`)
       declared.add(frame)
       const bytes = await readFile(path)
-      assert.deepEqual([...bytes.subarray(0, 8)], [137, 80, 78, 71, 13, 10, 26, 10])
-      const width = bytes.readUInt32BE(16)
-      const height = bytes.readUInt32BE(20)
+      const { width, height } = webpSize(bytes)
       assert.ok(width > 0 && width <= manifest.maxFrameWidth, `${frame} width exceeds the runtime envelope`)
       assert.ok(height > 0 && height <= manifest.maxFrameHeight, `${frame} height exceeds the runtime envelope`)
     }
   }
 
-  const bundled = new Set((await pngFiles(assetRoot)).map((path) => relative(assetRoot, path).split(sep).join('/')))
+  const bundled = new Set((await webpFiles(assetRoot)).map((path) => relative(assetRoot, path).split(sep).join('/')))
   assert.deepEqual([...bundled].sort(), [...declared].sort())
   for (const clip of Object.values(manifest.stateMap)) assert.ok(manifest.clips[clip])
   for (const clip of Object.values(manifest.workingActivityMap)) assert.ok(manifest.clips[clip])
   for (const clip of manifest.idleMicroClips) assert.ok(manifest.clips[clip])
 })
 
-test('multi-frame clips keep the mildly accelerated motion timing', async () => {
+test('state clips play full-motion loops at the imported 12fps cadence', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  const expectedFrameMs = {
-    blink: 100,
-    glance: 160,
-    working_search: 135,
-    working_command: 135,
-    walk_start_left: 118,
-    walk_stop_left: 135,
-    walk_start_right: 118,
-    walk_stop_right: 135,
-    head_pat: 180,
-    poke: 170,
-    tail: 220,
-  }
-
-  for (const [clipName, frameMs] of Object.entries(expectedFrameMs)) {
-    assert.equal(manifest.clips[clipName].frameMs, frameMs, `${clipName} motion timing drifted`)
-  }
-})
-
-test('dragging keeps a stable held frame without procedural motion', async () => {
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  assert.deepEqual(manifest.clips.dragging.frames, ['dragging/dragging_238_01.png'])
-  assert.equal(manifest.clips.dragging.motion, undefined)
-})
-
-test('drag phase clips cover release, daze, and protest', async () => {
-  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  const expected = {
-    dragging_release: { frame: 'dragging/dragging_238_02.png', frameMs: 200, loop: false },
-    dragging_dizzy: { frame: 'dragging/dragging_238_03.png', frameMs: 260, loop: true },
-    dragging_protest: { frame: 'dragging/dragging_238_04.png', frameMs: 260, loop: false },
-  }
-
-  for (const [clipName, expectation] of Object.entries(expected)) {
+  for (const clipName of ['idle', 'waiting', 'thinking', 'working', 'working_search', 'working_command', 'success', 'error', 'dragging']) {
     const clip = manifest.clips[clipName]
-    assert.ok(clip, `${clipName} must stay registered in the manifest`)
-    assert.deepEqual(clip.frames, [expectation.frame], `${clipName} frame drifted`)
-    assert.equal(clip.frameMs, expectation.frameMs, `${clipName} timing drifted`)
-    assert.equal(clip.loop, expectation.loop, `${clipName} looping drifted`)
+    assert.ok(clip.frames.length >= 30, `${clipName} should import a full-motion sequence`)
+    assert.equal(clip.frameMs, 83, `${clipName} should stay on the 12fps cadence`)
+    assert.equal(clip.loop, true, `${clipName} state clips must loop`)
+    assert.equal(clip.motion, undefined, `${clipName} uses real frames, not procedural motion`)
   }
+})
+
+test('touch overlays play once and hand control back to the base state', async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  for (const clipName of ['dragging_release', 'dragging_protest', 'head_pat', 'poke', 'tail', 'eat_token']) {
+    const clip = manifest.clips[clipName]
+    assert.ok(clip, `${clipName} must stay registered for the helper overlays`)
+    assert.equal(clip.loop, false, `${clipName} overlays must not loop`)
+  }
+})
+
+test('drag daze stays procedural so reduced-motion devices keep a stable pose', async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  assert.equal(manifest.clips.dragging_dizzy.frames.length, 1)
+  assert.equal(manifest.clips.dragging_dizzy.motion, 'dizzy')
+  assert.equal(manifest.clips.dragging.motion, undefined)
 })
 
 test('original notification sounds are valid short mono WAV files', async () => {

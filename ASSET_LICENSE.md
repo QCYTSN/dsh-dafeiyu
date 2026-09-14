@@ -1,14 +1,43 @@
 # Visual asset notice
 
-The source code in this repository is MIT-licensed. The bundled BigFish visual
-character assets under `assets/pet/` are **not covered by the MIT code license**.
+The source code in this repository is MIT-licensed. The visual character
+assets currently bundled under `assets/pet/` are MIT-licensed as well and
+originate from the [dsh-pet](https://github.com/PC2005-cloud/dsh-pet) project;
+see the "Whale-tail maid character assets" section below. The previous BigFish
+frames remain archived under `assets/legacy/dafeiyu/` under their original
+restricted terms; see the "Legacy BigFish frames" section.
 
-These 238px runtime PNG frames were copied from the formal runtime output of
+## Whale-tail maid character assets (current, MIT)
+
+The runtime frames under `assets/pet/` are converted from the animation set of
+[PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
+(`assets/webm/`, Copyright (c) 2026 PC2005-cloud), which that project
+distributes under the MIT license together with its AI-generation prompt
+recipes. The source clips are AI-generated green-screen animations matted to
+transparent VP9 WebM; this repository re-encodes the selected clips as 12 fps
+transparent WebP frame sequences on one shared crop window (see
+`scripts/import_dshpet_webm.py`).
+
+They remain subject to the upstream MIT license, bundled verbatim as
+`assets/dsh-pet-LICENSE.txt` and shipped in the npm package. No warranty is
+given; the "dsh-pet" name and its project identity belong to their respective
+owners.
+
+## Legacy BigFish frames (archived, restricted)
+
+The frames previously bundled under `assets/pet/` now live under
+`assets/legacy/dafeiyu/`. The source code in this repository is MIT-licensed;
+those BigFish visual character assets are **not covered by the MIT code
+license**.
+
+These 238px runtime PNG frames (now archived under `assets/legacy/dafeiyu/`,
+excluded from the npm bundle) were copied from the formal runtime output of
 `QCYTSN/ds-local-pet` at local release `v0.2.0`. They are derived from a mixture
 of fan-made DeepSeek-related character views and AI-assisted animation sheets.
 Image processing, resizing, or repackaging does not change rights in the
 underlying artwork. No additional license or warranty is granted for these
-visual files.
+visual files. The four community-contributed dragging poses live under
+`assets/legacy/dafeiyu/dragging/`.
 
 The plugin does not include source references, paid pose references, candidate
 sheets, or original working material. Only the explicitly allowlisted runtime
@@ -38,9 +67,9 @@ Source provenance and the fuller notice are documented in:
 - https://github.com/QCYTSN/ds-local-pet/blob/main/ASSET_LICENSE.md
 - https://github.com/1190fasheqi/dafeiyu-pet
 
-## Community-contributed dragging frames
+## Community-contributed dragging frames (archived with the legacy set)
 
-The four frames under `assets/pet/dragging/` (`dragging_238_01.png`,
+The four frames under `assets/legacy/dafeiyu/dragging/` (`dragging_238_01.png`,
 `dragging_238_02.png`, `dragging_238_03.png`, and `dragging_238_04.png`: held,
 released, dizzy, and protest poses) were contributed to this repository by
 `@Serendipity-wu02`. They are original AI-assisted artwork created for the
