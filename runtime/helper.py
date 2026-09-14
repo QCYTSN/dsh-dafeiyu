@@ -21,9 +21,11 @@ from typing import Any, TextIO
 try:
     from .animation_model import AnimationModel, crossfade_duration
     from .layout_store import default_layout_path, load_layout, save_layout
+    from .asset_paths import bundle_root
 except ImportError:
     from animation_model import AnimationModel, crossfade_duration
     from layout_store import default_layout_path, load_layout, save_layout
+    from asset_paths import bundle_root
 
 
 PROTOCOL_VERSION = 1
@@ -36,14 +38,6 @@ DRAG_RELEASE_STAGES = (
     ("dragging_dizzy", DRAG_DIZZY_MS),
     ("dragging_protest", DRAG_PROTEST_MS),
 )
-
-
-def bundle_root() -> Path:
-    """Locate packaged assets both from source and a PyInstaller one-file build."""
-    frozen_root = getattr(sys, "_MEIPASS", None)
-    if frozen_root is not None:
-        return Path(frozen_root)
-    return Path(__file__).resolve().parent.parent
 
 
 def configure_qt_platform() -> None:

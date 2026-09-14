@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+### Changed
+
+- The npm package now ships the animation assets once: the Windows/Linux
+  Helper binaries no longer embed a copy of `assets/`, and the versioned
+  Windows-local cache (WSL since 0.1.6, native Windows since 0.1.11) carries
+  an `assets/` directory next to the cached executable. A frozen helper
+  resolves assets from its own neighbourhood first and keeps the `_MEIPASS`
+  fallback so older cached builds upgrade cleanly. This removes ~40 MB of
+  duplicated payload and restores headroom for the planned web-first
+  rendering work.
+
 ## 0.1.11
 
 ## 0.1.10

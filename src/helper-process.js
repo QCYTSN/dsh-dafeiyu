@@ -2,6 +2,7 @@ import { execFileSync, spawn } from 'node:child_process'
 import {
   chmodSync,
   copyFileSync,
+  cpSync,
   existsSync,
   mkdirSync,
   readFileSync,
@@ -132,9 +133,11 @@ function cacheWslBundledHelper({
   bundledPath,
   version = packageVersion,
   localAppData = defaultLocalAppData,
+  assetsSource = resolve(here, '..', 'assets'),
   fileExists = existsSync,
   makeDirectory = mkdirSync,
   copyFile = copyFileSync,
+  copyTree = cpSync,
   fileStat = statSync,
   moveFile = renameSync,
   removeFile = unlinkSync,
@@ -146,23 +149,34 @@ function cacheWslBundledHelper({
   // local/repacked builds with the same package version from reusing a stale
   // executable without hashing the large PyInstaller archive on every start.
   const cachedPath = resolve(cacheDirectory, `dsh-dafeiyu-helper-${sourceSize}.exe`)
-  if (fileExists(cachedPath) && fileStat(cachedPath).size === sourceSize) return cachedPath
+  // The frozen helper resolves assets from the directory next to the
+  // executable (see runtime/helper.py bundle_root), so the cache carries them
+  // and the npm package ships a single copy instead of embedding three.
+  const cachedManifest = resolve(cacheDirectory, 'assets', 'pet-manifest.json')
+  const exeCurrent = fileExists(cachedPath) && fileStat(cachedPath).size === sourceSize
+  if (exeCurrent && fileExists(cachedManifest)) return cachedPath
   makeDirectory(cacheDirectory, { recursive: true })
-  const temporaryPath = `${cachedPath}.${process.pid}.tmp`
-  try {
-    copyFile(bundledPath, temporaryPath)
-    if (fileExists(cachedPath) && fileStat(cachedPath).size === sourceSize) return cachedPath
-    if (fileExists(cachedPath)) removeFile(cachedPath)
+  if (!exeCurrent) {
+    const temporaryPath = `${cachedPath}.${process.pid}.tmp`
     try {
-      moveFile(temporaryPath, cachedPath)
-    } catch (error) {
-      // Another DSH profile may have populated the same immutable cache while
-      // this process was copying. Its complete file is safe to reuse.
-      if (!fileExists(cachedPath) || fileStat(cachedPath).size !== sourceSize) throw error
+      copyFile(bundledPath, temporaryPath)
+      if (!fileExists(cachedPath)) {
+        try {
+          moveFile(temporaryPath, cachedPath)
+        } catch (error) {
+          // Another DSH profile may have populated the same immutable cache while
+          // this process was copying. Its complete file is safe to reuse.
+          if (!fileExists(cachedPath) || fileStat(cachedPath).size !== sourceSize) throw error
+        }
+      } else if (fileStat(cachedPath).size !== sourceSize) {
+        removeFile(cachedPath)
+        moveFile(temporaryPath, cachedPath)
+      }
+    } finally {
+      if (fileExists(temporaryPath)) removeFile(temporaryPath)
     }
-  } finally {
-    if (fileExists(temporaryPath)) removeFile(temporaryPath)
   }
+  if (!fileExists(cachedManifest)) copyTree(assetsSource, resolve(cacheDirectory, 'assets'), { recursive: true })
   return cachedPath
 }
 

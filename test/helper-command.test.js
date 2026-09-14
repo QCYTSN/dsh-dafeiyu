@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import test from 'node:test'
@@ -153,32 +153,72 @@ test('defaultWindowsLocalAppData resolves LOCALAPPDATA back to a WSL mount path'
 test('cacheWslBundledHelper copies once into a versioned Windows-local cache', () => {
   const root = mkdtempSync(join(tmpdir(), 'dsh-dafeiyu-wsl-cache-'))
   const source = join(root, 'package', 'dsh-dafeiyu-helper.exe')
+  const assetsSource = join(root, 'package', 'assets')
   const localAppData = join(root, 'windows-local')
   mkdirSync(join(root, 'package'), { recursive: true })
+  mkdirSync(join(assetsSource, 'pet'), { recursive: true })
   writeFileSync(source, 'helper-binary')
+  writeFileSync(join(assetsSource, 'pet-manifest.json'), '{}')
 
   let copies = 0
+  let treeCopies = 0
   const copyFile = (from, to) => {
     copies += 1
     writeFileSync(to, readFileSync(from))
   }
-  const first = cacheWslBundledHelper({
+  const copyTree = (from, to) => {
+    treeCopies += 1
+    cpSync(from, to, { recursive: true })
+  }
+  const options = {
     bundledPath: source,
+    assetsSource,
     version: '0.1.5',
     localAppData: () => localAppData,
     copyFile,
-  })
-  const second = cacheWslBundledHelper({
-    bundledPath: source,
-    version: '0.1.5',
-    localAppData: () => localAppData,
-    copyFile,
-  })
+    copyTree,
+  }
+  const first = cacheWslBundledHelper(options)
+  const second = cacheWslBundledHelper(options)
 
   assert.equal(first, second)
   assert.match(first.replaceAll('\\', '/'), /windows-local\/dsh-dafeiyu\/0\.1\.5\/dsh-dafeiyu-helper-13\.exe$/)
   assert.equal(readFileSync(first, 'utf8'), 'helper-binary')
   assert.equal(copies, 1)
+  assert.equal(treeCopies, 1)
+  // The frozen helper resolves assets next to the executable, so the cache must
+  // carry the manifest the moment it exists.
+  assert.equal(readFileSync(join(localAppData, 'dsh-dafeiyu', '0.1.5', 'assets', 'pet-manifest.json'), 'utf8'), '{}')
+})
+
+test('cacheWslBundledHelper heals an exe-only cache from an older release', () => {
+  const root = mkdtempSync(join(tmpdir(), 'dsh-dafeiyu-wsl-heal-'))
+  const source = join(root, 'package', 'dsh-dafeiyu-helper.exe')
+  const assetsSource = join(root, 'package', 'assets')
+  const cacheDirectory = join(root, 'windows-local', 'dsh-dafeiyu', '0.1.11')
+  mkdirSync(join(root, 'package'), { recursive: true })
+  mkdirSync(join(assetsSource, 'pet'), { recursive: true })
+  mkdirSync(cacheDirectory, { recursive: true })
+  writeFileSync(source, 'helper-binary')
+  writeFileSync(join(assetsSource, 'pet-manifest.json'), '{}')
+  // An 0.1.11 cache holds only the exe; the new code must add the assets dir.
+  writeFileSync(join(cacheDirectory, 'dsh-dafeiyu-helper-13.exe'), 'helper-binary')
+
+  let copies = 0
+  let treeCopies = 0
+  const cached = cacheWslBundledHelper({
+    bundledPath: source,
+    assetsSource,
+    version: '0.1.11',
+    localAppData: () => join(root, 'windows-local'),
+    copyFile: (from, to) => { copies += 1; writeFileSync(to, readFileSync(from)) },
+    copyTree: (from, to) => { treeCopies += 1; cpSync(from, to, { recursive: true }) },
+  })
+
+  assert.match(cached.replaceAll('\\', '/'), /dsh-dafeiyu-helper-13\.exe$/)
+  assert.equal(copies, 0, 'the cached exe is reused without re-copying')
+  assert.equal(treeCopies, 1)
+  assert.ok(existsSync(join(cacheDirectory, 'assets', 'pet-manifest.json')))
 })
 
 test('WSL headless mode uses the Linux helper so event-log paths stay on Linux', () => {
