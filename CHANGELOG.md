@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+### Added
+
+- Opt-in in-page companion (web-first refactor Phase 3): a new `webOverlay`
+  setting (default off) renders a small decorative pet in the bottom-right of
+  the DSH page. The client module reads the setting once at mount, subscribes
+  to the loopback SSE channel, and animates manifest-declared WebP frames;
+  every failure path ends in "no pet", never an exception reaching the WebUI.
+  New loopback-only routes serve the manifest and allowlisted frames
+  (`/plugins/dsh-dafeiyu/manifest`, `/plugins/dsh-dafeiyu/frame`).
+
 ## 0.1.12
 
 ### Added
