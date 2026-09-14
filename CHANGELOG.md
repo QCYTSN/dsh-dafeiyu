@@ -4,9 +4,9 @@
 
 ### Changed
 
-- Replace the bundled companion visual set with the whale-tail maid animation
-  set from the MIT-licensed [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
-  project (community project by PC2005-cloud): every state (idle, waiting,
+- 大肥鱼视觉优化（素材更新）：the bundled companion animation set is now
+  imported from the MIT-licensed [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
+  community project (Credit: PC2005-cloud). Every state (idle, waiting,
   thinking, working, searching, commanding, success, error), the drag phase,
   and touch reactions now play full-motion 12 fps transparent WebP frame
   sequences (412x344 crop of the source 640x360 canvas, 21 MB total) instead
