@@ -37,7 +37,9 @@ final class AnimationModelTests: XCTestCase {
         model.applyState("THINKING")
         XCTAssertTrue(model.playOverlay("head_pat"))
         model.applyState("WAITING")
-        for tick in 0..<8 {
+        // head_pat is a 48-frame overlay (~4s at 83ms); the walk-through must
+        // outlast it to observe the hand-back to the base state.
+        for tick in 0..<30 {
             model.advance(elapsedMs: 200, nowMs: tick * 200)
         }
         XCTAssertEqual(model.activeClipName, "waiting")
@@ -96,25 +98,32 @@ final class AnimationModelTests: XCTestCase {
         )
     }
 
-    func testDragStageClipsAreSingleFrameAndRegistered() {
-        let stages: [(name: String, loop: Bool)] = [
-            ("dragging_release", false),
-            ("dragging_dizzy", true),
-            ("dragging_protest", false),
+    func testDragStageClipsAreRegistered() {
+        // Release and protest are real animations now; the daze stage stays a
+        // single pose so the procedural dizzy wobble carries it.
+        let stages: [(name: String, loop: Bool, frames: Int)] = [
+            ("dragging_release", false, 24),
+            ("dragging_dizzy", true, 1),
+            ("dragging_protest", false, 48),
         ]
         let model = makeModel()
         guard let clips = Self.manifest["clips"] as? [String: Any] else {
             return XCTFail("manifest has no clips")
         }
-        for (name, loop) in stages {
+        for (name, loop, frames) in stages {
             guard let clip = clips[name] as? [String: Any] else {
                 XCTFail("missing clip \(name)")
                 continue
             }
-            XCTAssertEqual((clip["frames"] as? [String])?.count, 1, name)
+            XCTAssertEqual((clip["frames"] as? [String])?.count, frames, name)
             XCTAssertEqual(clip["loop"] as? Bool, loop, name)
             XCTAssertTrue(model.playOverlay(name), name)
         }
+        XCTAssertEqual(
+            ((clips["dragging_dizzy"] as? [String: Any])?["motion"] as? String),
+            "dizzy",
+            "the daze stage must keep its procedural motion"
+        )
     }
 
     func testSingleFrameDragStageSurvivesAdvanceUntilCleared() {
@@ -221,15 +230,15 @@ final class AnimationModelTests: XCTestCase {
         let model = makeModel()
         model.applyState("IDLE")
         XCTAssertTrue(model.playIdleMicro(index: 0))
-        XCTAssertEqual(model.overlayClipName, "blink")
-        XCTAssertEqual(model.activeClipName, "blink")
+        XCTAssertEqual(model.overlayClipName, "eat_token")
+        XCTAssertEqual(model.activeClipName, "eat_token")
     }
 
     func testIdleMicroReturnsToIdleWhenFinished() {
         let model = makeModel()
         model.applyState("IDLE")
-        XCTAssertTrue(model.playIdleMicro(index: 0)) // blink: 5 frames x 100ms
-        for tick in 0..<6 {
+        XCTAssertTrue(model.playIdleMicro(index: 0)) // eat_token: 60 frames x 83ms (~5s)
+        for tick in 0..<70 {
             model.advance(elapsedMs: 100, nowMs: tick * 100)
         }
         XCTAssertEqual(model.activeClipName, "idle")

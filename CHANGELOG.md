@@ -2,6 +2,25 @@
 
 ## Unreleased
 
+### Changed
+
+- 大肥鱼视觉优化（素材更新）：the bundled companion animation set is now
+  imported from the MIT-licensed [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
+  community project (Credit: PC2005-cloud). Every state (idle, waiting,
+  thinking, working, searching, commanding, success, error), the drag phase,
+  and touch reactions now play full-motion 12 fps transparent WebP frame
+  sequences (412x344 crop of the source 640x360 canvas, 21 MB total) instead
+  of single-pose sprites with procedural wobbles. Reduced motion still freezes
+  looped clips on the standing pose, and the dizzy reaction keeps its
+  procedural motion. The previous BigFish frames are archived under
+  `assets/legacy/dafeiyu/`, excluded from the npm bundle, and keep their
+  original restricted terms; the upstream MIT notice ships as
+  `assets/dsh-pet-LICENSE.txt` and `ASSET_LICENSE.md` documents both provenance
+  chains. `scripts/import_dshpet_webm.py` reproduces the conversion from the
+  upstream release.
+- Both renderers keep reading sizes from `pet-manifest.json`, so the new
+  envelope requires no runtime code changes.
+
 ## 0.1.9
 
 ### Added

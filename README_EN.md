@@ -504,5 +504,15 @@ standalone desktop-pet version. This repository is the DSH-only companion plugin
 
 ## License
 
-Code is released under the [MIT License](LICENSE). Character artwork is not covered by the MIT
-code license; see [ASSET_LICENSE.md](ASSET_LICENSE.md) for provenance and usage boundaries.
+Code is released under the [MIT License](LICENSE).
+
+The current character animation set (`assets/pet/`) is imported from the
+community project [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
+(Copyright © 2026 PC2005-cloud, MIT license): we selected and re-encoded 16
+clips under its MIT terms, and the upstream license ships in the package as
+`assets/dsh-pet-LICENSE.txt`. Many thanks to the dsh-pet authors for the
+high-quality assets and the published AI-generation recipes.
+
+The earlier BigFish frames are archived under `assets/legacy/dafeiyu/` (no
+longer bundled) and keep their original restricted terms. Full provenance and
+usage boundaries are documented in [ASSET_LICENSE.md](ASSET_LICENSE.md).
