@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.13
+
 ### Added
 
 - Opt-in in-page companion (web-first refactor Phase 3): a new `webOverlay`
