@@ -14,3 +14,4 @@
           - ERROR
           - WAITING
         includeSubagents: false
+        webOverlay: false

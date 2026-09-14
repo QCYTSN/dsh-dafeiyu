@@ -1,4 +1,7 @@
 import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
+import { dirname, join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import Schema from '@deepseek-ai/schemastery'
 import { CompanionReducer } from './companion-reducer.js'
 import { HelperProcess } from './helper-process.js'
@@ -19,6 +22,11 @@ export const name = 'dsh-dafeiyu'
 export const inject = ['sessions', 'settings']
 export const CONFIG_ENDPOINT = '/plugins/dsh-dafeiyu/config'
 export const EVENTS_ENDPOINT = '/plugins/dsh-dafeiyu/events'
+export const MANIFEST_ENDPOINT = '/plugins/dsh-dafeiyu/manifest'
+export const FRAME_ENDPOINT = '/plugins/dsh-dafeiyu/frame'
+
+const here = dirname(fileURLToPath(import.meta.url))
+const assetsRoot = resolve(here, '..', 'assets')
 export const Config = Schema.object({
   enabled: Schema.boolean().default(true).description('启用桌面大肥鱼'),
   scale: Schema.number().min(0.55).max(1.4).step(0.05).default(1).role('slider').description('角色大小'),
@@ -37,6 +45,7 @@ export const Config = Schema.object({
   ]).default('always').description('气泡显示模式'),
   bubbleStates: Schema.array(Schema.string()).default(['SUCCESS', 'ERROR', 'WAITING']).description('自定义模式下显示气泡的状态'),
   includeSubagents: Schema.boolean().default(false).description('允许子 Agent 抢占宠物状态'),
+  webOverlay: Schema.boolean().default(false).description('在 DSH 页面右下角显示轻量桌宠（可与桌面窗口同时开启）'),
 }).description('由 DeepSeek Harness 状态驱动的桌面大肥鱼伴侣')
 
 const defaults = Object.freeze({
@@ -49,6 +58,7 @@ const defaults = Object.freeze({
   bubbleMode: 'always',
   bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
   includeSubagents: false,
+  webOverlay: false,
 })
 
 function publicConfig(config = {}) {
@@ -62,6 +72,7 @@ function publicConfig(config = {}) {
     bubbleMode: config.bubbleMode ?? defaults.bubbleMode,
     bubbleStates: Array.isArray(config.bubbleStates) ? config.bubbleStates : defaults.bubbleStates,
     includeSubagents: config.includeSubagents ?? defaults.includeSubagents,
+    webOverlay: config.webOverlay === true,
   }
 }
 
@@ -190,6 +201,68 @@ export function createEventsHandler(stream) {
     res.write('retry: 2000\n\n')
     const remove = stream.add(res)
     req.on('close', remove)
+  }
+}
+
+// Frame bytes are served only for paths the manifest declares, so the query
+// parameter can never steer the reader outside assets/pet. Returns null when
+// the manifest cannot be read; the overlay routes then stay unregistered.
+export function createAssetRoutes() {
+  let manifest
+  try {
+    manifest = JSON.parse(readFileSync(join(assetsRoot, 'pet-manifest.json'), 'utf8'))
+  } catch {
+    return null
+  }
+  const frames = new Set()
+  for (const clip of Object.values(manifest.clips ?? {})) {
+    for (const frame of clip.frames ?? []) frames.add(frame)
+  }
+  const allowed = (req) => {
+    if (!isLoopback(req.socket?.remoteAddress)) return false
+    const origin = req.headers?.origin
+    if (!origin) return true
+    let originHost
+    try { originHost = new URL(origin).host } catch { return false }
+    return originHost === req.headers.host
+  }
+  return {
+    manifestHandler(req, res) {
+      if (!allowed(req)) {
+        jsonResponse(res, 403, { error: 'local access only' })
+        return
+      }
+      jsonResponse(res, 200, manifest)
+    },
+    frameHandler(req, res) {
+      if (!allowed(req)) {
+        jsonResponse(res, 403, { error: 'local access only' })
+        return
+      }
+      let frame
+      try {
+        frame = new URL(req.url ?? '', 'http://dsh.local').searchParams.get('frame')
+      } catch {
+        frame = null
+      }
+      if (!frame || !frames.has(frame)) {
+        jsonResponse(res, 404, { error: 'unknown frame' })
+        return
+      }
+      let bytes
+      try {
+        bytes = readFileSync(join(assetsRoot, 'pet', frame))
+      } catch {
+        jsonResponse(res, 404, { error: 'frame unavailable' })
+        return
+      }
+      res.writeHead(200, {
+        'content-type': 'image/webp',
+        'cache-control': 'public, max-age=86400',
+        'content-length': bytes.length,
+      })
+      res.end(bytes)
+    },
   }
 }
 
@@ -371,6 +444,17 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         () => httpCtx.webServer.register({ kind: 'exact', path: EVENTS_ENDPOINT, handler: createEventsHandler(eventStream) }),
         'dsh-dafeiyu: local event stream',
       )
+      const assetRoutes = createAssetRoutes()
+      if (assetRoutes) {
+        httpCtx.effect(
+          () => httpCtx.webServer.register({ kind: 'exact', path: MANIFEST_ENDPOINT, handler: assetRoutes.manifestHandler }),
+          'dsh-dafeiyu: local manifest endpoint',
+        )
+        httpCtx.effect(
+          () => httpCtx.webServer.register({ kind: 'exact', path: FRAME_ENDPOINT, handler: assetRoutes.frameHandler }),
+          'dsh-dafeiyu: local frame endpoint',
+        )
+      }
     })
   }
   ctx.effect(() => () => {
