@@ -68,9 +68,9 @@ class AnimationModelTests(unittest.TestCase):
         # Release and protest are real animations now; the daze stage stays a
         # single pose so the procedural dizzy wobble carries it.
         stages = {
-            "dragging_release": (False, 16),
+            "dragging_release": (False, 49),
             "dragging_dizzy": (True, 1),
-            "dragging_protest": (False, 32),
+            "dragging_protest": (False, 96),
         }
         model = AnimationModel(MANIFEST)
         for name, (loop, frames) in stages.items():
