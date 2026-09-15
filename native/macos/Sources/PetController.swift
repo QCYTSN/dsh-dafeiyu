@@ -178,7 +178,7 @@ final class PetController: NSObject {
 
     private var decodedFrameBytes: Int { Int(maxFrameWidth * maxFrameHeight * 4) }
 
-    private func image(for frame: String) -> NSImage? {
+    private func frameImage(for frame: String) -> NSImage? {
         let key = frame as NSString
         if let cached = imageCache.object(forKey: key) { return cached }
         guard let data = frameData[frame], let image = NSImage(data: data) else { return nil }
@@ -874,7 +874,7 @@ final class PetController: NSObject {
     // MARK: - Drawing
 
     func drawPet(in view: NSView) {
-        guard let image = image(for: model.frame) else { return }
+        guard let image = frameImage(for: model.frame) else { return }
         let phase = CACurrentMediaTime()
         var motion = model.activeClip.motion
         if reducedMotion {
@@ -920,7 +920,7 @@ final class PetController: NSObject {
 
         var fadeAlpha: CGFloat = 1
         var fadeImage: NSImage?
-        if let fromFrame = fadeFromFrame, let fromImage = image(for: fromFrame) {
+        if let fromFrame = fadeFromFrame, let fromImage = frameImage(for: fromFrame) {
             let elapsed = CACurrentMediaTime() - fadeStarted
             if elapsed < fadeDuration {
                 fadeAlpha = min(1, pow(CGFloat(elapsed / fadeDuration), 0.7))
