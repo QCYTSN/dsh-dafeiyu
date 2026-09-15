@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.1.14
+
 ### Changed
 
 - Companion animation now plays at the source clips' native 24 fps. The
