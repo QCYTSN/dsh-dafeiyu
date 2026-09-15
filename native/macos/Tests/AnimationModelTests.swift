@@ -102,9 +102,9 @@ final class AnimationModelTests: XCTestCase {
         // Release and protest are real animations now; the daze stage stays a
         // single pose so the procedural dizzy wobble carries it.
         let stages: [(name: String, loop: Bool, frames: Int)] = [
-            ("dragging_release", false, 16),
+            ("dragging_release", false, 49),
             ("dragging_dizzy", true, 1),
-            ("dragging_protest", false, 32),
+            ("dragging_protest", false, 96),
         ]
         let model = makeModel()
         guard let clips = Self.manifest["clips"] as? [String: Any] else {
@@ -237,7 +237,7 @@ final class AnimationModelTests: XCTestCase {
     func testIdleMicroReturnsToIdleWhenFinished() {
         let model = makeModel()
         model.applyState("IDLE")
-        XCTAssertTrue(model.playIdleMicro(index: 0)) // eat_token: 60 frames x 83ms (~5s)
+        XCTAssertTrue(model.playIdleMicro(index: 0)) // eat_token: 120 frames x 42ms (~5s)
         for tick in 0..<70 {
             model.advance(elapsedMs: 100, nowMs: tick * 100)
         }

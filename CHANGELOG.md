@@ -2,6 +2,33 @@
 
 ## Unreleased
 
+### Changed
+
+- Companion animation now plays at the source clips' native 24 fps. The
+  bundled set had been decimated to 8 fps by the npm size emergency in 0.1.10;
+  the asset budget that Phase 1 freed makes the full-motion frames fit again.
+  Measured: 864 frames / 13.7 MB becomes 2,600 frames / 41.1 MB, so the
+  published archive grows by about 27 MB.
+- The Qt and macOS helpers keep only the compressed frame bytes resident and
+  decode through a bounded cache instead of holding every decoded frame in
+  memory. Measured working set during live animation: 517 MB becomes 100 MB.
+- The animation timer now polls at a third of the active clip's frame period
+  (clamped to 8-20 ms) on both desktop renderers. Driving 42 ms frames from the
+  previous fixed 20 ms tick left frame changes pinned to the polling grid
+  (measured 29.4% interval jitter and 80 ms holes); the sub-frame grid absorbs
+  a late delivery instead. Measured: 23.8 fps with 17.2% jitter and no gaps.
+  A 125 ms manifest keeps the previous behaviour exactly.
+- The in-page overlay drives its loop from `requestAnimationFrame` with a
+  time accumulator and prefetches the next frame, replacing the drift-prone
+  `setTimeout` chain that reloaded each frame cold.
+- Desktop animation costs about 31% of one core while animating, against 17%
+  at 8 fps: three times the decoded frames is the price of the higher cadence.
+
+### Fixed
+
+- Correct the importer's stale documentation, which still described the
+  0.1.10-era 12 fps import that 0.1.10 itself replaced with 8 fps.
+
 ## 0.1.13
 
 ### Added

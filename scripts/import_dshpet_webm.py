@@ -13,8 +13,8 @@ alpha becomes a plain gray plane through ``alphaextract``. The bounding box is
 therefore measured by piping alphaextract rawvideo through Python and scanning
 rows for non-transparent pixels -- the only dependency is ffmpeg with libvpx.
 
-Frames are re-encoded as transparent WebP (q75, 12 fps), which PySide6 decodes
-natively and keeps the bundled package small.
+Frames are re-encoded as transparent WebP (q68) at the clips' native 24 fps,
+which PySide6 decodes natively and keeps the bundled package small.
 
 Usage:
     python scripts/import_dshpet_webm.py \
@@ -37,8 +37,8 @@ from pathlib import Path
 
 CANVAS_WIDTH = 640
 CANVAS_HEIGHT = 360
-FPS = 8
-FRAME_MS = 125  # round(1000 / 8) — classic-anime cadence, halves the embedded payload
+FPS = 24
+FRAME_MS = 42  # round(1000 / 24); the source clips are natively 24 fps, so no decimation
 QUALITY = 68
 PAD = 12
 ALPHA_THRESHOLD = 8
@@ -151,7 +151,7 @@ def global_crop_box(boxes: list[tuple[int, int, int, int]]) -> tuple[int, int, i
 
 
 def encode_webp(ffmpeg: Path, source: Path, crop: tuple[int, int, int, int], target: Path) -> list[Path]:
-    """Encode the full 12fps source as cropped transparent WebP frames."""
+    """Encode the full source at FPS as cropped transparent WebP frames."""
     target.mkdir(parents=True, exist_ok=True)
     run([
         str(ffmpeg), "-v", "error", "-c:v", "libvpx-vp9", "-i", str(source),

@@ -47,7 +47,11 @@ final class PetController: NSObject {
     let eventLogURL: URL?
     let snapshotURL: URL?
 
-    private(set) var frames: [String: NSImage] = [:]
+    private var frameData: [String: Data] = [:]
+    private let imageCache = NSCache<NSString, NSImage>()
+    /// Decoded frames are held only in this bounded cache: a 24 fps set is
+    /// thousands of frames and each decoded one costs about 0.55 MB.
+    private static let decodedFrameCache = 24
     private var maxFrameWidth: CGFloat = 238
     private var maxFrameHeight: CGFloat = 260
 
@@ -165,12 +169,21 @@ final class PetController: NSObject {
 
     private func loadFrames() {
         for clip in model.clips.values {
-            for frame in clip.frames where frames[frame] == nil {
-                if let image = NSImage(contentsOf: assetRoot.appendingPathComponent(frame)) {
-                    frames[frame] = image
-                }
+            for frame in clip.frames where frameData[frame] == nil {
+                frameData[frame] = try? Data(contentsOf: assetRoot.appendingPathComponent(frame))
             }
         }
+        imageCache.totalCostLimit = Self.decodedFrameCache * decodedFrameBytes
+    }
+
+    private var decodedFrameBytes: Int { Int(maxFrameWidth * maxFrameHeight * 4) }
+
+    private func image(for frame: String) -> NSImage? {
+        let key = frame as NSString
+        if let cached = imageCache.object(forKey: key) { return cached }
+        guard let data = frameData[frame], let image = NSImage(data: data) else { return nil }
+        imageCache.setObject(image, forKey: key, cost: decodedFrameBytes)
+        return image
     }
 
     private var petWidth: CGFloat { maxFrameWidth * scale }
@@ -320,10 +333,15 @@ final class PetController: NSObject {
 
     // MARK: - Timers
 
+    private var animationInterval: TimeInterval {
+        if reducedMotion { return 0.04 }
+        // Sub-frame poll: a once-per-frame timer turns one early delivery into a whole-frame hitch.
+        return min(0.02, max(0.008, Double(model.activeClip.frameMs) / 3000))
+    }
+
     private func startAnimTimer() {
         animTimer?.invalidate()
-        let interval = reducedMotion ? 0.04 : 0.02
-        animTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        animTimer = Timer.scheduledTimer(withTimeInterval: animationInterval, repeats: true) { [weak self] _ in
             self?.tick()
         }
     }
@@ -376,6 +394,9 @@ final class PetController: NSObject {
         }
         if let deadline = overlayDeadlineMs, now >= deadline {
             clearOverlay()
+        }
+        if animTimer?.timeInterval != animationInterval {
+            startAnimTimer()
         }
         contentView?.needsDisplay = true
     }
@@ -853,7 +874,7 @@ final class PetController: NSObject {
     // MARK: - Drawing
 
     func drawPet(in view: NSView) {
-        guard let image = frames[model.frame] else { return }
+        guard let image = image(for: model.frame) else { return }
         let phase = CACurrentMediaTime()
         var motion = model.activeClip.motion
         if reducedMotion {
@@ -899,7 +920,7 @@ final class PetController: NSObject {
 
         var fadeAlpha: CGFloat = 1
         var fadeImage: NSImage?
-        if let fromFrame = fadeFromFrame, let fromImage = frames[fromFrame] {
+        if let fromFrame = fadeFromFrame, let fromImage = image(for: fromFrame) {
             let elapsed = CACurrentMediaTime() - fadeStarted
             if elapsed < fadeDuration {
                 fadeAlpha = min(1, pow(CGFloat(elapsed / fadeDuration), 0.7))

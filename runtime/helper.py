@@ -15,6 +15,7 @@ import random
 import sys
 import threading
 import time
+from collections import OrderedDict
 from pathlib import Path
 from typing import Any, TextIO
 
@@ -38,6 +39,10 @@ DRAG_RELEASE_STAGES = (
     ("dragging_dizzy", DRAG_DIZZY_MS),
     ("dragging_protest", DRAG_PROTEST_MS),
 )
+# A decoded 412x344 ARGB32 frame costs ~0.55 MB, so keeping every frame of a
+# 24 fps set resident would need well over a gigabyte. Frames are read from disk
+# once as compressed bytes and decoded through a bounded cache instead.
+DECODED_FRAME_CACHE = 24
 
 
 def configure_qt_platform() -> None:
@@ -355,15 +360,22 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             else:
                 self.bubble_states = list(self.layout.get("bubbleStates", ["SUCCESS", "ERROR", "WAITING"]))
             self.model = AnimationModel(manifest)
-            self.pixmaps: dict[str, QPixmap] = {}
+            self.frame_sources: dict[str, bytes] = {}
             for clip in self.model.clips.values():
                 for frame in clip.frames:
-                    if frame in self.pixmaps:
+                    if frame in self.frame_sources:
                         continue
-                    pixmap = QPixmap(str(asset_root / frame))
-                    if pixmap.isNull():
-                        raise RuntimeError(f"Unable to load BigFish frame: {frame}")
-                    self.pixmaps[frame] = pixmap
+                    try:
+                        self.frame_sources[frame] = (asset_root / frame).read_bytes()
+                    except OSError as error:
+                        raise RuntimeError(f"Unable to load BigFish frame: {frame}") from error
+            self.decoded_frames: OrderedDict[str, QPixmap] = OrderedDict()
+            # Fail here, not on the first paint, when the assets are unreadable or
+            # the bundled Qt has no WebP image plugin.
+            for clip in self.model.clips.values():
+                if clip.frames:
+                    self._pixmap(clip.frames[0])
+            self.decoded_frames.clear()
 
             self.display_state = "IDLE"
             self.status_state = "IDLE"
@@ -395,8 +407,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.fade_started = 0.0
             self.fade_duration = 0.15
             self.animation_timer = QTimer(self)
+            self.animation_timer.setTimerType(Qt.TimerType.PreciseTimer)
             self.animation_timer.timeout.connect(self._tick)
-            self.animation_timer.start(40 if self.reduced_motion else 20)
+            self.animation_timer.start(self._animation_interval_ms())
             self.micro_timer = QTimer(self)
             self.micro_timer.setSingleShot(True)
             self.micro_timer.timeout.connect(self._play_idle_micro)
@@ -481,7 +494,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def _set_reduced_motion(self, enabled: bool) -> None:
             self.reduced_motion = enabled
-            self.animation_timer.setInterval(40 if enabled else 20)
+            self.animation_timer.setInterval(self._animation_interval_ms())
             if enabled:
                 self.micro_timer.stop()
                 self._cancel_drag_release_chain()
@@ -536,6 +549,30 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             reset_native_cursor()
             super().leaveEvent(event)
 
+        def _animation_interval_ms(self) -> int:
+            if self.reduced_motion:
+                return 40
+            # Sub-frame poll: a once-per-frame timer turns one early delivery into a whole-frame hitch.
+            return max(8, min(20, round(self.model.active_clip.frame_ms / 3)))
+
+        def _rearm_animation_interval(self) -> None:
+            wanted = self._animation_interval_ms()
+            if self.animation_timer.interval() != wanted:
+                self.animation_timer.setInterval(wanted)
+
+        def _pixmap(self, frame: str) -> QPixmap:
+            cached = self.decoded_frames.get(frame)
+            if cached is not None:
+                self.decoded_frames.move_to_end(frame)
+                return cached
+            pixmap = QPixmap()
+            if not pixmap.loadFromData(self.frame_sources[frame], "WEBP"):
+                raise RuntimeError(f"Unable to load BigFish frame: {frame}")
+            self.decoded_frames[frame] = pixmap
+            while len(self.decoded_frames) > DECODED_FRAME_CACHE:
+                self.decoded_frames.popitem(last=False)
+            return pixmap
+
         def _tick(self) -> None:
             now_ms = self._now_ms()
             elapsed_ms = max(0, now_ms - self.last_tick_ms)
@@ -550,6 +587,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.display_state = self.model.base_state
             if self.overlay_deadline_ms is not None and now_ms >= self.overlay_deadline_ms:
                 self._clear_overlay()
+            self._rearm_animation_interval()
             self.update()
 
         def _play_idle_micro(self) -> None:
@@ -576,7 +614,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if duration is None:
                 self.fade_from_pixmap = None
                 return
-            self.fade_from_pixmap = self.pixmaps.get(previous_frame)
+            self.fade_from_pixmap = (
+                self._pixmap(previous_frame) if previous_frame in self.frame_sources else None
+            )
             self.fade_started = time.monotonic()
             self.fade_duration = duration
 
@@ -617,7 +657,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self._sync_frame_transition(previous_frame, previous_clip, allow_fade=False)
             self.dragging = False
             self.last_tick_ms = now_ms
-            self.animation_timer.start(40 if self.reduced_motion else 20)
+            self.animation_timer.start(self._animation_interval_ms())
             if not self.reduced_motion:
                 self._schedule_micro()
                 self._run_drag_release_chain()
@@ -1098,7 +1138,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     detail_text,
                 )
 
-            pixmap = self.pixmaps[self.model.frame]
+            pixmap = self._pixmap(self.model.frame)
             phase = time.monotonic()
             motion = self.model.active_clip.motion
             if self.reduced_motion:
