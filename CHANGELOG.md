@@ -2,6 +2,12 @@
 
 ## Unreleased
 
+### Fixed
+
+- `ASSET_LICENSE.md` claimed the imported frames are re-encoded at 12 fps,
+  which no shipped release ever was: 0.1.10 shipped 8 fps and 0.1.14 restored
+  the source clips' native 24 fps. Both READMEs now state the real cadence.
+
 ## 0.1.14
 
 ### Changed

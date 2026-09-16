@@ -14,8 +14,8 @@ The runtime frames under `assets/pet/` are converted from the animation set of
 (`assets/webm/`, Copyright (c) 2026 PC2005-cloud), which that project
 distributes under the MIT license together with its AI-generation prompt
 recipes. The source clips are AI-generated green-screen animations matted to
-transparent VP9 WebM; this repository re-encodes the selected clips as 12 fps
-transparent WebP frame sequences on one shared crop window (see
+transparent VP9 WebM; this repository re-encodes the selected clips, at their
+native 24 fps, as transparent WebP frame sequences on one shared crop window (see
 `scripts/import_dshpet_webm.py`).
 
 They remain subject to the upstream MIT license, bundled verbatim as

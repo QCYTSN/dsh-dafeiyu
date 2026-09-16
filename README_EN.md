@@ -508,8 +508,9 @@ Code is released under the [MIT License](LICENSE).
 
 The current character animation set (`assets/pet/`) is imported from the
 community project [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)
-(Copyright © 2026 PC2005-cloud, MIT license): we selected and re-encoded 16
-clips under its MIT terms, and the upstream license ships in the package as
+(Copyright © 2026 PC2005-cloud, MIT license): we selected 16 clips and
+re-encoded them, at their native 24 fps, under its MIT terms; the upstream
+license ships in the package as
 `assets/dsh-pet-LICENSE.txt`. Many thanks to the dsh-pet authors for the
 high-quality assets and the published AI-generation recipes.
 

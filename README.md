@@ -482,8 +482,9 @@ macOS 原生 Helper 的构建说明见 [native/macos/README.md](native/macos/REA
 
 当前角色动画素材（`assets/pet/`）来自社区项目
 [dsh-pet](https://github.com/PC2005-cloud/dsh-pet)（Copyright © 2026
-PC2005-cloud，MIT 许可）：我们按其 MIT 条款精选导入了 16 个动画并重新编码，
-上游许可证原文随包发布（`assets/dsh-pet-LICENSE.txt`）。感谢 dsh-pet 作者
+PC2005-cloud，MIT 许可）：我们按其 MIT 条款精选导入了 16 个动画，并按其源生
+24fps 重新编码为逐帧 WebP；上游许可证原文随包发布
+（`assets/dsh-pet-LICENSE.txt`）。感谢 dsh-pet 作者
 贡献的高质量素材与公开的 AI 生成配方。
 
 早期大肥鱼形象帧已归档至 `legacy/dafeiyu/`（不再随包发布），其原始
