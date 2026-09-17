@@ -21,11 +21,23 @@ final class AnimationModel {
     /// the UI layer so the sequence is testable and stays aligned with the
     /// manifest-registered stage clips (mirrors `DRAG_RELEASE_STAGES` in
     /// `runtime/helper.py`).
+    ///
+    /// Each hold covers the motion its clip actually contains at the shipped
+    /// 42 ms/frame: `dragging_release` is a 49-frame bounce that settles around
+    /// frame 30, and `dragging_protest` is a 96-frame turn that completes around
+    /// frame 42. Shorter holds truncate the bounce and stop the turn in its
+    /// first quadrant. `dragging_dizzy` is a single static pose, so its hold is
+    /// a readability choice; it stays short enough to keep the whole reaction
+    /// under four seconds.
     static let dragReleaseStages: [(clipName: String, holdMs: Int)] = [
-        ("dragging_release", 300),
-        ("dragging_dizzy", 840),
-        ("dragging_protest", 300),
+        ("dragging_release", 1320),
+        ("dragging_dizzy", 620),
+        ("dragging_protest", 1850),
     ]
+
+    /// The drag clip is a 241 frame dangling loop; frame 0 looks identical to
+    /// the idle pose, so a drag starts partway in and keeps advancing.
+    static let dragAnimationStartFrame = 36
 
     private static let nonCrossfadeClips: Set<String> = [
         "blink",
@@ -131,6 +143,15 @@ final class AnimationModel {
     func clearOverlay() {
         overlayClipName = nil
         activate(underlayClipName)
+    }
+
+    /// Jump inside the clip that is playing right now, for loops whose first
+    /// frame is not the pose the interaction should start on.
+    func seekActiveClip(toFrame frame: Int) {
+        let clip = activeClip
+        guard !clip.frames.isEmpty else { return }
+        frameIndex = min(max(0, frame), clip.frames.count - 1)
+        frameElapsedMs = 0
     }
 
     @discardableResult

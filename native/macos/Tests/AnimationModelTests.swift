@@ -1,4 +1,4 @@
-import XCTest
+﻿import XCTest
 @testable import BigFishCore
 
 /// Ports `runtime/tests/test_animation_model.py` to the Swift implementation
@@ -150,6 +150,78 @@ final class AnimationModelTests: XCTestCase {
         for stage in stages {
             XCTAssertTrue(model.playOverlay(stage.clipName), stage.clipName)
         }
+    }
+
+    func testDragReleaseHoldsCoverTheShippedClips() {
+        // Frames each straight-through stage needs to finish its motion, measured
+        // from the shipped art. The daze stage is excluded: it is a single static
+        // pose held for readability, so its hold is not a motion budget.
+        // Mirrors runtime/tests/test_animation_model.py.
+        let motionFrames = ["dragging_release": 30, "dragging_protest": 42]
+        let expectedFrames = ["dragging_release": 49, "dragging_dizzy": 1, "dragging_protest": 96]
+
+        guard let clips = Self.manifest["clips"] as? [String: Any] else {
+            return XCTFail("manifest has no clips")
+        }
+        var holds: [String: Int] = [:]
+        for stage in AnimationModel.dragReleaseStages {
+            holds[stage.clipName] = stage.holdMs
+        }
+
+        for (name, frames) in expectedFrames {
+            guard let clip = clips[name] as? [String: Any] else {
+                XCTFail("missing clip \(name)")
+                continue
+            }
+            XCTAssertEqual((clip["frames"] as? [String])?.count, frames, name)
+            XCTAssertEqual((clip["frameMs"] as? NSNumber)?.intValue, 42, name)
+        }
+
+        for (name, motion) in motionFrames {
+            guard let clip = clips[name] as? [String: Any],
+                  let frameMs = (clip["frameMs"] as? NSNumber)?.intValue,
+                  let frameCount = (clip["frames"] as? [String])?.count,
+                  let hold = holds[name] else {
+                XCTFail("incomplete data for \(name)")
+                continue
+            }
+            XCTAssertGreaterThanOrEqual(
+                hold,
+                motion * frameMs,
+                "\(name) is held \(hold) ms but its motion needs \(motion * frameMs) ms"
+            )
+            XCTAssertLessThanOrEqual(
+                hold,
+                frameMs * frameCount,
+                "\(name) is held \(hold) ms, longer than the clip itself"
+            )
+        }
+
+        // The daze stage stays a single looping pose for the procedural wobble,
+        // and the whole reaction has to stay under four seconds.
+        XCTAssertEqual((clips["dragging_dizzy"] as? [String: Any])?["loop"] as? Bool, true)
+        XCTAssertLessThanOrEqual(holds.values.reduce(0, +), 4000)
+    }
+
+    func testDragStartsInsideTheDanglingLoop() {
+        let model = makeModel()
+        model.applyState("IDLE")
+        XCTAssertTrue(model.playOverlay("dragging"))
+        model.seekActiveClip(toFrame: AnimationModel.dragAnimationStartFrame)
+        XCTAssertEqual(model.frameIndex, AnimationModel.dragAnimationStartFrame)
+        XCTAssertEqual(model.frame, model.activeClip.frames[AnimationModel.dragAnimationStartFrame])
+
+        // The loop keeps advancing from the seeked frame, so the pet swings
+        // instead of sitting on one pose.
+        let start = model.frame
+        model.advance(elapsedMs: 42 * 3, nowMs: 126)
+        XCTAssertNotEqual(model.frame, start)
+
+        // Seeking past the clip clamps instead of trapping.
+        model.seekActiveClip(toFrame: 10_000)
+        XCTAssertEqual(model.frameIndex, model.activeClip.frames.count - 1)
+        model.seekActiveClip(toFrame: -5)
+        XCTAssertEqual(model.frameIndex, 0)
     }
 
     // MARK: - Additional Swift-side edge cases

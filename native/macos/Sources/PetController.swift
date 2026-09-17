@@ -426,9 +426,21 @@ final class PetController: NSObject {
         let rect = petRect()
         dragPetOffsetX = rect.minX
         dragPetOffsetY = rect.minY
-        animTimer?.invalidate()
         microTimer?.invalidate()
-        _ = model.playOverlay("dragging")
+        // `dragging` is a dangling loop: keep it advancing while the pointer
+        // moves the window, otherwise the pet sits on its first frame and looks
+        // frozen. Reduced motion keeps the previous frozen behaviour.
+        guard model.playOverlay("dragging") else {
+            animTimer?.invalidate()
+            contentView?.needsDisplay = true
+            return
+        }
+        model.seekActiveClip(toFrame: AnimationModel.dragAnimationStartFrame)
+        if reducedMotion || !model.activeClip.loop {
+            animTimer?.invalidate()
+        } else {
+            restartAnimTimer()
+        }
         contentView?.needsDisplay = true
     }
 
