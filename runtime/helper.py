@@ -31,9 +31,9 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
-DRAG_RELEASE_MS = 300
-DRAG_DIZZY_MS = 840
-DRAG_PROTEST_MS = 300
+DRAG_RELEASE_MS = 1320
+DRAG_DIZZY_MS = 620
+DRAG_PROTEST_MS = 1850
 DRAG_RELEASE_STAGES = (
     ("dragging_release", DRAG_RELEASE_MS),
     ("dragging_dizzy", DRAG_DIZZY_MS),
@@ -665,8 +665,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         def _run_drag_release_chain(self) -> None:
             """Play release -> dizzy -> protest, then hand back to the base state.
 
-            Every stage is a single-frame clip, so the chain is driven by timers;
-            any new grab (or a manifest without the stage clips) aborts quietly.
+            Each stage's hold matches how long that clip's motion actually runs
+            (see DRAG_RELEASE_STAGES); the chain stays timer driven so a new grab
+            or a manifest without the stage clips aborts quietly.
             """
             self.drag_chain_id += 1
             token = self.drag_chain_id
