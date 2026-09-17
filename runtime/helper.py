@@ -39,6 +39,11 @@ DRAG_RELEASE_STAGES = (
     ("dragging_dizzy", DRAG_DIZZY_MS),
     ("dragging_protest", DRAG_PROTEST_MS),
 )
+# The drag clip is a 241 frame dangling loop. Rendering it from frame 0 looks
+# identical to the idle pose, so start partway into the loop: the first visible
+# frame already reads as "held", and the character keeps swinging while the
+# pointer moves it.
+DRAG_ANIMATION_START_FRAME = 36
 # A decoded 412x344 ARGB32 frame costs ~0.55 MB, so keeping every frame of a
 # 24 fps set resident would need well over a gigabyte. Frames are read from disk
 # once as compressed bytes and decoded through a bounded cache instead.
@@ -641,9 +646,23 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 return
             self.dragging = True
             self.drag_chain_id += 1
-            self.animation_timer.stop()
             self.micro_timer.stop()
-            self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+            played = self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+            if not played:
+                self.animation_timer.stop()
+                return
+            # The dangling loop has to keep advancing while the pointer moves the
+            # window, otherwise the pet stays on its first frame and looks frozen.
+            # Reduced motion keeps the previous frozen behaviour.
+            clip = self.model.active_clip
+            if clip.frames:
+                self.model.frame_index = min(len(clip.frames) - 1, DRAG_ANIMATION_START_FRAME)
+                self.model.frame_elapsed_ms = 0
+            if self.reduced_motion or not clip.loop:
+                self.animation_timer.stop()
+            else:
+                self.last_tick_ms = self._now_ms()
+                self.animation_timer.start(self._animation_interval_ms())
 
         def _finish_drag(self) -> None:
             if not self.dragging:

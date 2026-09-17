@@ -2,6 +2,21 @@
 
 ## Unreleased
 
+### Fixed
+
+- The post-drop reaction plays in full again. The chain still held each stage
+  for 300 ms, a number written when every stage was a single-frame pose; once
+  the assets returned to 24 fps that is only about seven frames, so the landing
+  bounce was clipped and the turn stopped in its first quadrant. The holds are
+  now derived from the motion each clip actually contains (1320 / 620 / 1850 ms
+  for release / daze / protest) in both the Qt and the macOS helper, with a
+  regression test that reads the shipped manifest so neither side can drift from
+  the art without failing CI.
+- The pet animates while it is being dragged. `dragging` is a 241 frame dangling
+  loop, but both helpers stopped the frame timer at drag start, so the character
+  sat on the frame that reads as the idle pose. The loop now starts partway in
+  and keeps advancing; reduced motion keeps the previous frozen behaviour.
+
 ## 0.1.14
 
 ### Changed
