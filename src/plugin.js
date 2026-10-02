@@ -27,7 +27,7 @@ export const FRAME_ENDPOINT = '/plugins/dsh-dafeiyu/frame'
 
 const here = dirname(fileURLToPath(import.meta.url))
 const assetsRoot = resolve(here, '..', 'assets')
-export const Config = Schema.object({
+const configSchema = Schema.object({
   enabled: Schema.boolean().default(true).description('启用桌面大肥鱼'),
   scale: Schema.number().min(0.55).max(1.4).step(0.05).default(1).role('slider').description('角色大小'),
   bubbleScale: Schema.number().min(0.8).max(1.2).step(0.05).default(1).role('slider').description('气泡大小'),
@@ -39,14 +39,28 @@ export const Config = Schema.object({
   reducedMotion: Schema.boolean().default(false).description('减少走动、循环帧和程序化晃动'),
   soundEnabled: Schema.boolean().default(true).description('任务完成或出错时播放提示音'),
   bubbleMode: Schema.union([
+    Schema.const('hover').description('悬停时显示'),
     Schema.const('always').description('常驻显示'),
     Schema.const('hidden').description('完全隐藏'),
     Schema.const('custom').description('自定义显示状态'),
-  ]).default('always').description('气泡显示模式'),
+  ]).default('hover').description('气泡显示模式'),
   bubbleStates: Schema.array(Schema.string()).default(['SUCCESS', 'ERROR', 'WAITING']).description('自定义模式下显示气泡的状态'),
   includeSubagents: Schema.boolean().default(false).description('允许子 Agent 抢占宠物状态'),
   webOverlay: Schema.boolean().default(false).description('在 DSH 页面右下角显示轻量桌宠（可与桌面窗口同时开启）'),
+  clickThrough: Schema.boolean().default(false).description('鼠标穿透：开启后点击大肥鱼会直接穿透到下面的窗口'),
+  clickThroughHotkey: Schema.string().default('Ctrl+Alt+F').description('切换鼠标穿透的全局快捷键（例：Ctrl+Alt+F）'),
 }).description('由 DeepSeek Harness 状态驱动的桌面大肥鱼伴侣')
+
+// DSH only offers an entry in the settings directory when its schema yields a
+// "volatile form": describe() skips every entry whose schema has no field
+// marked volatile ("editable without remounting"). Without this flag the entry
+// is absent from that directory, so the settings page has nothing to read or
+// write and every save fails. Newer schemastery exposes .volatile(); the
+// bundled 3.18.1 predates it and the host only inspects the plain
+// `meta.volatile` property, so set that flag directly.
+configSchema.meta.volatile = true
+
+export const Config = configSchema
 
 const defaults = Object.freeze({
   enabled: true,
@@ -55,10 +69,12 @@ const defaults = Object.freeze({
   activityLevel: 'normal',
   reducedMotion: false,
   soundEnabled: true,
-  bubbleMode: 'always',
+  bubbleMode: 'hover',
   bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
   includeSubagents: false,
   webOverlay: false,
+  clickThrough: false,
+  clickThroughHotkey: 'Ctrl+Alt+F',
 })
 
 function publicConfig(config = {}) {
@@ -73,6 +89,10 @@ function publicConfig(config = {}) {
     bubbleStates: Array.isArray(config.bubbleStates) ? config.bubbleStates : defaults.bubbleStates,
     includeSubagents: config.includeSubagents ?? defaults.includeSubagents,
     webOverlay: config.webOverlay === true,
+    clickThrough: config.clickThrough === true,
+    clickThroughHotkey: typeof config.clickThroughHotkey === 'string' && config.clickThroughHotkey.trim()
+      ? config.clickThroughHotkey
+      : defaults.clickThroughHotkey,
   }
 }
 
@@ -80,6 +100,140 @@ function localSettingsScope(value) {
   return {
     get: () => value,
     watch: () => () => {},
+  }
+}
+
+function errorText(error) {
+  return error instanceof Error ? error.message : String(error)
+}
+
+// Current DSH has no `settings.register()`: a plugin exports a Config schema,
+// DSH projects it into a form, edits are written through `settings.update()`,
+// and every edit is announced as `settings/document-updated`. This adapter
+// keeps the small { get, watch, update } surface the rest of this file is
+// written against, and returns undefined when the service is older or this
+// entry is not in the settings directory - callers then fall back to the
+// read-only snapshot, which is exactly how the plugin behaved before.
+function createLiveSettingsScope(ctx, base, logger) {
+  const service = ctx.settings
+  if (!service || typeof service.describe !== 'function' || typeof service.update !== 'function') {
+    return undefined
+  }
+  const watchers = new Set()
+  let namespace
+  let value = { ...base }
+
+  // Keys no other plugin's config is likely to carry; used as a second way to
+  // recognise our own entry when the namespace string is not self-describing.
+  const fingerprint = ['bubbleMode', 'clickThroughHotkey', 'includeSubagents', 'webOverlay']
+  const isOurs = (entry) => {
+    if (typeof entry?.ns !== 'string') return false
+    if (entry.ns.includes(pkg.name)) return true
+    const candidate = entry.value
+    return candidate !== null
+      && typeof candidate === 'object'
+      && fingerprint.every((key) => key in candidate)
+  }
+
+  // There is no "my own namespace" accessor and the branding is opaque, so the
+  // entry is identified by package name (the namespace is documented as the
+  // profile entry id) with a config fingerprint as a fallback. A wrong guess is
+  // inert: the scope stays read-only and the warning below lists what was on
+  // offer, so a mismatch costs one log line to diagnose rather than a mystery.
+  const locate = () => {
+    let entries
+    try {
+      entries = service.describe()
+    } catch (error) {
+      logger.warn?.(`dsh-dafeiyu could not read the settings directory: ${errorText(error)}`)
+      return undefined
+    }
+    if (!Array.isArray(entries)) return undefined
+    return entries.find(isOurs)
+  }
+
+  // Values this plugin has already applied to the running helper but that the
+  // host has not confirmed yet. DSH does not reconcile the running composition
+  // for a config write, so the live descriptor keeps reporting the old value
+  // until the next start; without this the next describe() would push the stale
+  // value back to the pet. An entry is dropped as soon as the live value agrees.
+  const optimistic = new Map()
+
+  const compose = (descriptor) => {
+    const user = descriptor?.value && typeof descriptor.value === 'object' ? descriptor.value : {}
+    const next = { ...base, ...user }
+    for (const [key, expected] of optimistic) {
+      if (JSON.stringify(next[key]) === JSON.stringify(expected)) optimistic.delete(key)
+      else next[key] = expected
+    }
+    return next
+  }
+
+  const adopt = (descriptor) => {
+    if (!descriptor) return false
+    namespace = descriptor.ns
+    const next = compose(descriptor)
+    if (JSON.stringify(next) === JSON.stringify(value)) return false
+    value = next
+    return true
+  }
+
+  adopt(locate())
+  if (namespace === undefined) {
+    let available = []
+    try {
+      available = (service.describe() ?? []).map((entry) => entry?.ns).filter((ns) => typeof ns === 'string')
+    } catch {
+      // Reported by the warning below either way.
+    }
+    logger.warn?.(
+      'dsh-dafeiyu is not in the DSH settings directory; its settings stay read-only until DSH restarts'
+      + ` (available namespaces: ${available.join(', ') || 'none'})`,
+    )
+  }
+
+  const notify = () => {
+    for (const watcher of watchers) {
+      try {
+        watcher(value)
+      } catch (error) {
+        logger.error?.(`dsh-dafeiyu failed to apply settings: ${errorText(error)}`)
+      }
+    }
+  }
+
+  const off = ctx.on?.('settings/document-updated', (ns) => {
+    // Another plugin's entry must not restart the pet.
+    if (namespace !== undefined && ns !== namespace) return
+    if (adopt(locate())) notify()
+  })
+
+  return {
+    get: () => value,
+    watch: (watcher) => {
+      watchers.add(watcher)
+      return () => watchers.delete(watcher)
+    },
+    update: async (patch) => {
+      if (namespace === undefined && !adopt(locate())) {
+        throw new Error('this plugin entry is not in the DSH settings directory')
+      }
+      await service.update(namespace, patch)
+      // Persisting is not enough to make a change take effect here: DSH does not
+      // reconcile the running composition for a config write, so the live value
+      // stays stale until the next start and the caller would read the old one
+      // straight back. Stand behind the value we just persisted and let the
+      // watchers push it to the helper — the same shape as the pet's own context
+      // menu, which applies a change in place and only then reports it to the
+      // host. compose() keeps these values winning over the stale descriptor
+      // until the host catches up.
+      for (const [key, expected] of Object.entries(patch)) optimistic.set(key, expected)
+      if (adopt(locate() ?? { ns: namespace })) notify()
+    },
+    dispose: () => {
+      off?.()
+      watchers.clear()
+    },
   }
 }
 
@@ -133,6 +287,14 @@ export function createConfigHandler(settings) {
     }
     if (req.method !== 'PATCH') {
       jsonResponse(res, 405, { error: 'method not allowed' })
+      return
+    }
+    if (typeof settings.update !== 'function') {
+      // The read-only fallback is in use, so nothing the user changes here can
+      // be stored. Say that instead of failing with a TypeError.
+      jsonResponse(res, 503, {
+        error: 'DSH settings are read-only for this plugin instance; restart DSH and try again',
+      })
       return
     }
     try {
@@ -281,10 +443,7 @@ function mount(ctx, config = {}, eventCtx = ctx) {
 function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
   const base = publicConfig(config)
   const eventStream = createEventStream()
-  const settings = ctx.settings?.register?.('dsh-dafeiyu', Config, {
-    base,
-    applies: 'live',
-  }) ?? localSettingsScope(base)
+  const settings = createLiveSettingsScope(ctx, base, logger) ?? localSettingsScope(base)
 
   let bridge
   let reducer
@@ -311,6 +470,8 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       soundEnabled: next.soundEnabled !== false,
       bubbleMode: next.bubbleMode ?? defaults.bubbleMode,
       bubbleStates: Array.isArray(next.bubbleStates) ? next.bubbleStates : defaults.bubbleStates,
+      clickThrough: next.clickThrough === true,
+      clickThroughHotkey: next.clickThroughHotkey ?? defaults.clickThroughHotkey,
     }))
   }
 
@@ -340,6 +501,8 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         DSH_DAFEIYU_SOUND_ENABLED: resolved.soundEnabled !== false ? '1' : '0',
         DSH_DAFEIYU_BUBBLE_MODE: String(resolved.bubbleMode ?? defaults.bubbleMode),
         DSH_DAFEIYU_BUBBLE_STATES: (Array.isArray(resolved.bubbleStates) ? resolved.bubbleStates : defaults.bubbleStates).join(','),
+        DSH_DAFEIYU_CLICK_THROUGH: resolved.clickThrough === true ? '1' : '0',
+        DSH_DAFEIYU_CLICK_THROUGH_HOTKEY: String(resolved.clickThroughHotkey ?? defaults.clickThroughHotkey),
         DSH_DAFEIYU_WEBUI_URL: String(config.webuiUrl ?? process.env.DSH_DAFEIYU_WEBUI_URL ?? 'http://127.0.0.1:3080/'),
       },
       onSettingsChange: (report) => {
@@ -348,6 +511,9 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         if (Number.isFinite(report.scale)) patch.scale = Math.min(1.4, Math.max(0.55, report.scale))
         if (Number.isFinite(report.bubbleScale)) patch.bubbleScale = Math.min(1.2, Math.max(0.8, report.bubbleScale))
         if (typeof report.reducedMotion === 'boolean') patch.reducedMotion = report.reducedMotion
+        // The global hotkey can flip passthrough without the settings page, so
+        // the helper reports it back and the host stores the new value.
+        if (typeof report.clickThrough === 'boolean') patch.clickThrough = report.clickThrough
         if (Object.keys(patch).length === 0) return
         void Promise.resolve(settings.update(patch)).catch((error) => {
           logger.warn?.(`dsh-dafeiyu failed to persist helper settings: ${error instanceof Error ? error.message : String(error)}`)
@@ -463,6 +629,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
     offEvent?.()
     offDisposed?.()
     unwatch()
+    settings.dispose?.()
     stopRuntime('dsh-host-stop')
   })
 }
@@ -480,4 +647,6 @@ export {
   CompanionReducer,
   CompanionState,
   HelperProcess,
+  createLiveSettingsScope,
+  publicConfig,
 }

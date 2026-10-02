@@ -306,11 +306,13 @@ DSH Agent events can change its work state.
 | Enable BigFish | Show or stop the desktop companion immediately |
 | Character size | Scale the character from 55% to 140%; the context menu includes a 60% mini preset |
 | Bubble size | Scale the status bubble from 80% to 120% while keeping status text readable |
-| Bubble visibility | Always show, hide completely, or choose which states show the bubble |
+| Bubble visibility | Defaults to "on hover": the card appears while the pointer is on BigFish and collapses when it leaves. "Always", "hidden", and per-state custom remain available |
 | Activity level | Control the frequency of idle blinks and micro-animations |
 | Reduced motion | Reduce walking, looping frames, and procedural movement |
 | Notification sound | Play or mute BigFish's original sound when a task succeeds or fails |
 | Include subagents | Allow subagent sessions to participate in status priority; off by default |
+| Mouse passthrough | Clicks go straight through BigFish to the window underneath; the pet keeps drawing and stays on top |
+| Passthrough hotkey | Global shortcut that toggles passthrough, `Ctrl+Alt+F` by default |
 
 DSH persists these settings, so a normal plugin update does not require reconfiguration.
 
@@ -318,7 +320,15 @@ DSH persists these settings, so a normal plugin update does not require reconfig
 
 - **Drag:** move BigFish; its position is saved automatically. Releasing it plays brief release, dizzy, and protest reactions, skipped automatically when reduced motion is enabled.
 - **Click or double-click:** trigger brief head-pat, poke, or tail reactions, then return to the latest DSH state.
-- **Right-click:** change size, bubble size, reduce motion, open WebUI, hide for now, or close for this run.
+- **Status card:** hidden by default; it appears while the pointer is over BigFish (or on a click) and
+  collapses once the pointer leaves, so no card is parked on the desktop. Switch the setting back to
+  "always" to pin it, or to "hidden" to silence it completely.
+- **Right-click:** change size, bubble size, reduce motion, mouse passthrough, open WebUI, hide for now, or close for this run.
+- **Mouse passthrough:** press `Ctrl+Alt+F` (rebindable in Settings) to toggle it. While it is on,
+  BigFish receives no mouse input at all — clicks reach the window underneath and the pet can no
+  longer be dragged or poked. Press the shortcut again to restore it; the bubble reports each
+  change. If another program already owns the shortcut the Helper says so in the log, and the
+  Settings page switch always remains usable.
 - **Hide for now:** hides the window without disabling the plugin.
 - **Close for this run:** closes the current Helper and suppresses restart until the next DSH launch.
 

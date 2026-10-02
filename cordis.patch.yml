@@ -8,10 +8,12 @@
         activityLevel: normal
         reducedMotion: false
         soundEnabled: true
-        bubbleMode: always
+        bubbleMode: hover
         bubbleStates:
           - SUCCESS
           - ERROR
           - WAITING
         includeSubagents: false
         webOverlay: false
+        clickThrough: false
+        clickThroughHotkey: Ctrl+Alt+F

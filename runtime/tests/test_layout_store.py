@@ -5,7 +5,15 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from runtime.layout_store import DEFAULT_LAYOUT, default_layout_path, load_layout, normalise_layout, save_layout
+from runtime.helper import BUBBLE_MODES as HELPER_BUBBLE_MODES
+from runtime.layout_store import (
+    BUBBLE_MODES,
+    DEFAULT_LAYOUT,
+    default_layout_path,
+    load_layout,
+    normalise_layout,
+    save_layout,
+)
 
 
 class LayoutStoreTests(unittest.TestCase):
@@ -28,7 +36,7 @@ class LayoutStoreTests(unittest.TestCase):
                 "scale": 1.4,
                 "bubbleScale": 1.0,
                 "reducedMotion": True,
-                "bubbleMode": "always",
+                "bubbleMode": "hover",
                 "bubbleStates": ["SUCCESS", "ERROR", "WAITING"],
             })
             self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["scale"], 1.4)
@@ -39,7 +47,7 @@ class LayoutStoreTests(unittest.TestCase):
 
     def test_bubble_mode_and_states_are_normalised(self) -> None:
         self.assertEqual(normalise_layout({"bubbleMode": "hidden"})["bubbleMode"], "hidden")
-        self.assertEqual(normalise_layout({"bubbleMode": "invalid"})["bubbleMode"], "always")
+        self.assertEqual(normalise_layout({"bubbleMode": "invalid"})["bubbleMode"], "hover")
         self.assertEqual(normalise_layout({"bubbleStates": ["SUCCESS", "ERROR"]})["bubbleStates"], ["SUCCESS", "ERROR"])
         self.assertEqual(normalise_layout({"bubbleStates": "bad"})["bubbleStates"], ["SUCCESS", "ERROR", "WAITING"])
 
@@ -59,6 +67,37 @@ class LayoutStoreTests(unittest.TestCase):
     def test_character_scale_supports_the_mini_range(self) -> None:
         self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.55)
         self.assertEqual(normalise_layout({"scale": 0.6})["scale"], 0.6)
+
+
+class BubbleModeTests(unittest.TestCase):
+    """The hover-only card is the default, so it has to survive every entry point."""
+
+    def test_status_card_starts_hidden_until_hovered(self) -> None:
+        self.assertEqual(DEFAULT_LAYOUT["bubbleMode"], "hover")
+
+    def test_the_two_mode_lists_agree(self) -> None:
+        # The helper validates the environment value against its own list and the
+        # store validates the file against this one; a mode accepted by only one of
+        # them would silently snap back to this file's value.
+        self.assertEqual(set(HELPER_BUBBLE_MODES), BUBBLE_MODES)
+        self.assertIn(DEFAULT_LAYOUT["bubbleMode"], BUBBLE_MODES)
+
+    def test_every_mode_survives_normalisation(self) -> None:
+        for mode in sorted(BUBBLE_MODES):
+            with self.subTest(mode=mode):
+                self.assertEqual(normalise_layout({"bubbleMode": mode})["bubbleMode"], mode)
+
+    def test_hover_survives_a_save_and_load_round_trip(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "layout.json"
+            save_layout(path, {**DEFAULT_LAYOUT, "bubbleMode": "hover", "petX": 12, "petY": 34})
+            self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["bubbleMode"], "hover")
+            reloaded = load_layout(path)
+            self.assertEqual(reloaded["bubbleMode"], "hover")
+            self.assertEqual((reloaded["petX"], reloaded["petY"]), (12, 34))
+
+    def test_missing_file_uses_the_hover_default(self) -> None:
+        self.assertEqual(load_layout(Path("/nonexistent/layout.json"))["bubbleMode"], "hover")
 
 
 if __name__ == "__main__":

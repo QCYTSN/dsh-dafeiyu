@@ -118,7 +118,6 @@ test('live settings keep the active project state without restarting the helper'
   const eventLog = join(directory, 'events.jsonl')
   const listeners = new Map()
   let dispose
-  let settingsListener
   let settingsValue = {
     enabled: true,
     scale: 1,
@@ -128,15 +127,16 @@ test('live settings keep the active project state without restarting the helper'
     soundEnabled: true,
     includeSubagents: false,
   }
+  // Current DSH has no settings.register(): the plugin reads the directory with
+  // describe() and is told about edits through settings/document-updated.
   const settings = {
-    get: () => ({ ...settingsValue }),
-    watch(callback) {
-      settingsListener = callback
-      return () => { settingsListener = undefined }
+    describe: () => [{ ns: 'dsh-dafeiyu', value: { ...settingsValue } }],
+    async update(_ns, patch) {
+      settingsValue = { ...settingsValue, ...patch }
     },
   }
   const ctx = {
-    settings: { register: () => settings },
+    settings,
     logger: { debug() {}, info() {}, warn() {}, error() {} },
     on(name, callback) {
       listeners.set(name, callback)
@@ -155,7 +155,7 @@ test('live settings keep the active project state without restarting the helper'
     data: { todos: [{ content: '继续保留这个任务', status: 'in_progress' }] },
   })
   settingsValue = { ...settingsValue, scale: 0.9, bubbleScale: 0.8, soundEnabled: false }
-  settingsListener(settingsValue)
+  listeners.get('settings/document-updated')('dsh-dafeiyu', 2)
   listeners.get('session/event')(activeSession, {
     type: 'tool/call',
     seq: 3,
@@ -181,8 +181,8 @@ test('helper context-menu changes persist through the DSH settings service', asy
   const fixture = join(dirname(fileURLToPath(import.meta.url)), 'fixtures', 'settings-helper.js')
   const listeners = new Map()
   let dispose
-  let settingsListener
   let persisted
+  let persistedNamespace
   let settingsValue = {
     enabled: true,
     scale: 1,
@@ -195,19 +195,15 @@ test('helper context-menu changes persist through the DSH settings service', asy
     includeSubagents: false,
   }
   const settings = {
-    get: () => ({ ...settingsValue }),
-    watch(callback) {
-      settingsListener = callback
-      return () => { settingsListener = undefined }
-    },
-    async update(patch) {
+    describe: () => [{ ns: 'dsh-dafeiyu', value: { ...settingsValue } }],
+    async update(ns, patch) {
       persisted = patch
+      persistedNamespace = ns
       settingsValue = { ...settingsValue, ...patch }
-      settingsListener?.({ ...settingsValue })
     },
   }
   const ctx = {
-    settings: { register: () => settings },
+    settings,
     logger: { debug() {}, info() {}, warn() {}, error() {} },
     on(name, callback) {
       listeners.set(name, callback)
@@ -226,6 +222,7 @@ test('helper context-menu changes persist through the DSH settings service', asy
     },
   })
   await waitFor(() => persisted !== undefined)
+  assert.equal(persistedNamespace, 'dsh-dafeiyu')
   assert.deepEqual(persisted, {
     scale: 0.6,
     bubbleScale: 0.9,

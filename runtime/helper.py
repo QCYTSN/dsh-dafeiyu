@@ -23,10 +23,12 @@ try:
     from .animation_model import AnimationModel, crossfade_duration
     from .layout_store import default_layout_path, load_layout, save_layout
     from .asset_paths import bundle_root
+    from .global_hotkey import DEFAULT_HOTKEY, GlobalHotkey, describe_hotkey
 except ImportError:
     from animation_model import AnimationModel, crossfade_duration
     from layout_store import default_layout_path, load_layout, save_layout
     from asset_paths import bundle_root
+    from global_hotkey import DEFAULT_HOTKEY, GlobalHotkey, describe_hotkey
 
 
 PROTOCOL_VERSION = 1
@@ -43,6 +45,13 @@ DRAG_RELEASE_STAGES = (
 # 24 fps set resident would need well over a gigabyte. Frames are read from disk
 # once as compressed bytes and decoded through a bounded cache instead.
 DECODED_FRAME_CACHE = 24
+# Bubble modes. "hover" is the default: the card is hidden until the pointer is
+# on the pet.
+BUBBLE_MODES = ("hover", "always", "hidden", "custom")
+# How often the hover card re-checks the real pointer position while in "hover"
+# mode. Revealing is event driven and immediate; this only has to be fast
+# enough that collapsing after the pointer leaves looks instant.
+BUBBLE_HOVER_POLL_MS = 120
 
 
 def configure_qt_platform() -> None:
@@ -242,7 +251,17 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     configure_qt_platform()
     try:
         from PySide6.QtCore import QAbstractNativeEventFilter, QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
-        from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
+        from PySide6.QtGui import (
+            QColor,
+            QCursor,
+            QDesktopServices,
+            QFont,
+            QFontMetrics,
+            QMouseEvent,
+            QPainter,
+            QPen,
+            QPixmap,
+        )
         from PySide6.QtWidgets import QApplication, QMenu, QWidget
     except ImportError:
         print(
@@ -255,6 +274,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     class Inbox(QObject):
         message = Signal(dict)
         closed = Signal()
+        # The global hotkey fires on its own thread; this signal is the hop
+        # back onto the GUI thread, where widget state may be touched.
+        hotkey = Signal()
 
     manifest_path = bundle_root() / "assets" / "pet-manifest.json"
     asset_root = manifest_path.parent / "pet"
@@ -351,8 +373,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             configured_bubble_mode = os.environ.get("DSH_DAFEIYU_BUBBLE_MODE")
             self.bubble_mode = (
                 configured_bubble_mode
-                if configured_bubble_mode in {"always", "hidden", "custom"}
-                else self.layout.get("bubbleMode", "always")
+                if configured_bubble_mode in BUBBLE_MODES
+                else self.layout.get("bubbleMode", BUBBLE_MODES[0])
             )
             configured_bubble_states = os.environ.get("DSH_DAFEIYU_BUBBLE_STATES")
             if configured_bubble_states is not None:
@@ -416,13 +438,38 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if not self.reduced_motion:
                 self._schedule_micro()
             self.snapshot_saved = False
+            # Mouse passthrough. When it is on the native window carries
+            # WS_EX_TRANSPARENT (Qt's WindowTransparentForInput), so clicks land
+            # on whatever is underneath instead of on the fish. Because the
+            # window can no longer be clicked, the global hotkey owned by
+            # run_visual is the way back out; the DSH settings page is the
+            # fallback when the binding is unavailable.
+            self.click_through = os.environ.get("DSH_DAFEIYU_CLICK_THROUGH") == "1"
+            self.click_through_hotkey = (
+                os.environ.get("DSH_DAFEIYU_CLICK_THROUGH_HOTKEY") or DEFAULT_HOTKEY
+            )
+            self.hotkey: GlobalHotkey | None = None
+            # Hover-revealed status card. The pointer entering the pet (or
+            # pressing on it) expands the window to make room for the card; a
+            # poller collapses it again once the pointer is really gone.
+            self.bubble_hovered = False
+            self.bubble_hover_timer = QTimer(self)
+            self.bubble_hover_timer.setInterval(BUBBLE_HOVER_POLL_MS)
+            self.bubble_hover_timer.timeout.connect(self._sync_hover_from_pointer)
+            self.bubble_hover_timer.start()
             self.setWindowTitle("DSH 大肥鱼")
-            self.setWindowFlags(
+            window_flags = (
                 Qt.WindowType.FramelessWindowHint
                 | Qt.WindowType.WindowStaysOnTopHint
                 | Qt.WindowType.Tool
             )
+            if self.click_through:
+                window_flags |= Qt.WindowType.WindowTransparentForInput
+            self.setWindowFlags(window_flags)
             self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            # Hover must not depend on a button being held, and a move event is
+            # the most reliable signal that the pointer really is on the pet.
+            self.setMouseTracking(True)
             self._apply_window_size()
             QTimer.singleShot(0, self._restore_visible_position)
 
@@ -521,13 +568,91 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 if not self.reduced_motion:
                     self._schedule_micro()
             bubble_mode = message.get("bubbleMode")
-            if bubble_mode in {"always", "hidden", "custom"}:
+            if bubble_mode in BUBBLE_MODES:
                 self.bubble_mode = bubble_mode
             bubble_states = message.get("bubbleStates")
             if isinstance(bubble_states, list):
                 self.bubble_states = [str(state) for state in bubble_states if isinstance(state, str)]
+            click_through = message.get("clickThrough")
+            if isinstance(click_through, bool):
+                self._apply_click_through(click_through)
+            click_through_hotkey = message.get("clickThroughHotkey")
+            if isinstance(click_through_hotkey, str) and click_through_hotkey != self.click_through_hotkey:
+                self._set_click_through_hotkey(click_through_hotkey)
             self._sync_bubble_size()
             self._save_layout()
+
+        def _apply_click_through(self, enabled: bool) -> None:
+            """Add or remove ``WS_EX_TRANSPARENT`` on the pet window.
+
+            Qt only pushes window flags to the native window while the widget is
+            being shown, so a visible window has to be re-shown. ``setWindowFlag``
+            hides it in the process, which is why the position is restored
+            explicitly: the fish must not jump when the mode is toggled.
+            """
+            enabled = bool(enabled)
+            if enabled == self.click_through:
+                return
+            self.click_through = enabled
+            visible = self.isVisible()
+            position = self.pos()
+            self.setWindowFlag(Qt.WindowType.WindowTransparentForInput, enabled)
+            if visible:
+                self.move(position)
+                self.show()
+                self.raise_()
+            self.glove.pressed = False
+            if enabled:
+                reset_native_cursor()
+                # Drop the hover card too: the window stops being a mouse
+                # target, so the card must not stay pinned on screen.
+                self._collapse_bubble()
+            self._announce_click_through()
+
+        def toggle_click_through(self) -> None:
+            """Flip the mode from the global hotkey or the context menu."""
+            self._apply_click_through(not self.click_through)
+            # Report back so the host persists it and the settings page follows
+            # along; a later CONFIG with the same value is a no-op here.
+            emit_reply("settings", clickThrough=self.click_through)
+
+        def _set_click_through_hotkey(self, spec: str) -> None:
+            """Rebind the toggle shortcut and say whether it actually took."""
+            self.click_through_hotkey = spec
+            registered = self.hotkey.rebind(spec) if self.hotkey is not None else False
+            label = describe_hotkey(spec)
+            if registered and label:
+                self._show_overlay("穿透快捷键已更新", f"现在是 {label}", "SUCCESS", 2200)
+            elif not label:
+                self._show_overlay(
+                    "快捷键无法识别",
+                    "请用 Ctrl+Alt+F 这样带修饰键的组合",
+                    "ERROR",
+                    3200,
+                )
+            else:
+                self._show_overlay(
+                    "快捷键注册失败",
+                    f"{label} 可能已被其它软件占用，请换一个",
+                    "ERROR",
+                    3200,
+                )
+            self.update()
+
+        def _announce_click_through(self) -> None:
+            """Explain the new mode, including how to undo it."""
+            if self.click_through:
+                label = describe_hotkey(self.click_through_hotkey)
+                how = f"{label} 或 DSH 设置页" if label else "DSH 设置页"
+                self._show_overlay(
+                    "鼠标穿透已开启",
+                    f"点击会直接穿过去，按 {how} 就能关掉",
+                    "WORKING",
+                    3200,
+                )
+            else:
+                self._show_overlay("鼠标穿透已关闭", "又可以摸摸我啦", "SUCCESS", 1800)
+            self.update()
 
         def _apply_glove(self, closed: bool) -> None:
             """Closed fist while the button is held, open hand otherwise.
@@ -542,6 +667,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def enterEvent(self, event: Any) -> None:
             self._apply_glove(False)
+            self._reveal_bubble()
             super().enterEvent(event)
 
         def leaveEvent(self, event: Any) -> None:
@@ -714,6 +840,11 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.micro_timer.start(random.randint(lower, upper))
 
         def _bubble_visible(self) -> bool:
+            # "hover" is the default: nothing on screen until the pointer
+            # arrives, so the pet stays out of the way while the card is not
+            # being read. The other modes never consult the hover state.
+            if self.bubble_mode == "hover":
+                return self.bubble_hovered
             if self.bubble_mode == "hidden":
                 return False
             if self.bubble_mode == "always":
@@ -722,6 +853,48 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 return any(task.get("state") in self.bubble_states for task in self.tasks)
             state = self.overlay_state or self.status_state or self.model.base_state or "IDLE"
             return state in self.bubble_states
+
+        def _pointer_on_pet(self) -> bool:
+            return self.isVisible() and self.rect().contains(self.mapFromGlobal(QCursor.pos()))
+
+        def _sync_hover_from_pointer(self) -> None:
+            """Own the hover card from the real pointer position.
+
+            enter/leave events cannot be the only source of truth: growing or
+            moving the window under a stationary pointer can make Windows report
+            a leave with no matching enter, which would drop the card while the
+            pointer is still on the fish. Polling settles it, and because both
+            resizes keep the pet's screen position the state never oscillates.
+            """
+            if self.bubble_mode != "hover":
+                return
+            # A passthrough window is not there as far as the mouse is concerned,
+            # so it must not light up the card either. Without this the poller
+            # would react to the pointer where no mouse event could ever arrive.
+            inside = not self.click_through and self._pointer_on_pet()
+            if inside == self.bubble_hovered:
+                return
+            if inside:
+                self._reveal_bubble()
+            else:
+                self._collapse_bubble()
+
+        def _reveal_bubble(self) -> None:
+            """Make room for the card because the pointer is on the pet."""
+            if self.bubble_hovered:
+                return
+            self.bubble_hovered = True
+            self._sync_bubble_size()
+            self.update()
+
+        def _collapse_bubble(self) -> None:
+            if not self.bubble_hovered:
+                return
+            self.bubble_hovered = False
+            # Hiding shrinks the window, but the pet keeps its screen position
+            # (see _move_to_pet), so the pointer stays outside while it shrinks.
+            self._sync_bubble_size()
+            self.update()
 
         def _sync_bubble_size(self) -> None:
             old_size = (self.width(), self.height())
@@ -1213,12 +1386,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def mousePressEvent(self, event: QMouseEvent) -> None:
             if event.button() == Qt.MouseButton.LeftButton:
+                # Clicking counts as asking to see the card, even if the
+                # pointer arrived without an enter event.
+                self._reveal_bubble()
                 self._apply_glove(True)
                 self.drag_origin = event.globalPosition().toPoint()
                 self.pet_origin = QPoint(self.pet_x, self.pet_y)
                 self.dragging = False
 
         def mouseMoveEvent(self, event: QMouseEvent) -> None:
+            # Mouse tracking is on, so this also covers plain hovering: it
+            # reveals the card even if the enter event was missed.
+            self._reveal_bubble()
             if self.drag_origin is not None and self.pet_origin is not None:
                 if not self.dragging and (event.globalPosition().toPoint() - self.drag_origin).manhattanLength() > 5:
                     self._begin_drag()
@@ -1282,6 +1461,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
+            hotkey_label = describe_hotkey(self.click_through_hotkey)
+            click_through_action = menu.addAction(
+                f"鼠标穿透（{hotkey_label}）" if hotkey_label else "鼠标穿透"
+            )
+            click_through_action.setCheckable(True)
+            click_through_action.setChecked(self.click_through)
             open_webui_action = menu.addAction("打开 WebUI")
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
@@ -1304,6 +1489,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()
+            elif selected == click_through_action:
+                self.toggle_click_through()
             elif selected == open_webui_action:
                 QDesktopServices.openUrl(QUrl(self.webui_url))
             elif selected == hide_action:
@@ -1321,6 +1508,17 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     application.installNativeEventFilter(glove_filter)
     inbox.message.connect(window.apply_message)
     inbox.closed.connect(application.quit)
+    inbox.hotkey.connect(window.toggle_click_through)
+    # The hotkey must outlive the pet's ability to be clicked: without it, a
+    # passthrough window could only be recovered from the DSH settings page.
+    window.hotkey = GlobalHotkey(
+        window.click_through_hotkey,
+        inbox.hotkey.emit,
+        on_error=lambda message: print(f"dsh-dafeiyu: {message}", file=sys.stderr, flush=True),
+    )
+    if window.hotkey.start():
+        label = describe_hotkey(window.click_through_hotkey)
+        print(f"dsh-dafeiyu: {label} toggles mouse passthrough", file=sys.stderr, flush=True)
 
     def read_stdin() -> None:
         for line in sys.stdin:
@@ -1340,6 +1538,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
     window.show()
     emit_reply("ready")
     code = application.exec()
+    if window.hotkey is not None:
+        window.hotkey.stop()
     recorder.close()
     return code
 

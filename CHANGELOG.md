@@ -2,6 +2,54 @@
 
 ## Unreleased
 
+### Added
+
+- Mouse passthrough: a new `clickThrough` setting applies `WS_EX_TRANSPARENT` to
+  the pet window, so clicks land on whatever is beneath the fish. A global hotkey
+  (`clickThroughHotkey`, default `Ctrl+Alt+F`) toggles it; the binding is
+  registered with `RegisterHotKey` on a dedicated message-loop thread, which keeps
+  working while the window itself ignores the mouse and does not depend on Qt's
+  event pump.
+- A `hover` bubble mode, now the default: the status card is hidden until the
+  pointer is on the pet and collapses once it leaves. `always`, `hidden`, and
+  `custom` are unchanged, so the previous behaviour is one dropdown entry away.
+
+### Changed
+
+- The settings card applies a change immediately and then persists it, the same
+  shape as the pet's own context menu. The window grows upward to make room for
+  the card and shrinks back while the character keeps its screen position, so the
+  pointer stays inside across both resizes.
+
+### Fixed
+
+- The settings card reaches the Plugins settings section again. It registered into
+  `settings.plugin.item`, a seat that no longer exists; `slots.inject` waits
+  forever for such a declaration, so the card vanished with no error anywhere. It
+  now registers into `settings.plugins.tab` - a list entry taking
+  `id`/`order`/`label` and declaring no inject face.
+- Settings can be saved again. Current DSH removed `settings.register()`: the API
+  is `describe` / `update` / `replace` / `mutate` plus the
+  `settings/document-updated` event. The plugin still called the old entry point,
+  so it silently fell back to a read-only snapshot and every write failed with
+  `settings.update is not a function`.
+- The config entry is listed in the DSH settings directory again.
+  `settings.describe()` skips every entry whose schema yields no *volatile form* -
+  a schema with no field marked volatile - so the plugin had no entry at all and
+  every write was refused with "not in the DSH settings directory". The Config
+  schema is now marked volatile, which is the current spelling of the old
+  `applies: 'live'` registration.
+- The status card no longer drops itself while the pointer is still on the fish.
+  Show/hide is owned by the real pointer position rather than by enter/leave
+  events, which can report a leave with no matching enter when the window grows
+  under a stationary pointer. It also stays hidden while passthrough is on,
+  because the window is no longer a mouse target at all.
+- Ship `runtime/asset_paths.py`. `runtime/helper.py` imports it, but the `files`
+  whitelist omitted it, so the published tarball could not run the helper from
+  source; only the frozen binary worked.
+- The helper's own layout file no longer re-introduces `always` for installations
+  that never chose a bubble mode.
+
 ## 0.1.14
 
 ### Changed
