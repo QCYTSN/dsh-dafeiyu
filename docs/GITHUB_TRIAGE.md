@@ -9,9 +9,9 @@
 | PR | 审查结论 | 本轮处理与验收条件 |
 | --- | --- | --- |
 | [#74 素材帧率说明](https://github.com/QCYTSN/dsh-dafeiyu/pull/74) | 内容正确，可解决 | 中英文 README 与 ASSET_LICENSE 改为原生 24 fps；主 README 同时重写。发布文档后可关闭重复 PR。 |
-| [#75 拖拽与释放动画](https://github.com/QCYTSN/dsh-dafeiyu/pull/75) | 可采纳 | 已纳入 Python / Swift 动画修改及测试：拖拽保持循环、从第 36 帧进入；释放动作时长对应当前 24 fps 素材。需通过 macOS CI 后发布。感谢 SamuelIiu。 |
+| [#75 拖拽与释放动画](https://github.com/QCYTSN/dsh-dafeiyu/pull/75) | 可采纳 | 已纳入 Python / Swift 动画修改及测试：拖拽保持循环、从第 36 帧进入；释放动作时长对应当前 24 fps 素材。三平台 CI 已通过，待发布。感谢 SamuelIiu。 |
 | [#79 鼠标穿透、悬停气泡、设置兼容](https://github.com/QCYTSN/dsh-dafeiyu/pull/79) | 范围较大，建议拆分 | 本轮独立修复了新设置 slot、DSH 0.2 配置和漏打包的 asset_paths.py。未纳入整套鼠标穿透／悬停行为。其根 Config volatile 标记会把整个对象变成引用，且设置 namespace 的猜测存在误认风险；当前实现逐字段标记，并使用 Loader 条目 ID。穿透部分还需验证热键、退出清理及平台差异。感谢 ZzuMrW 提供线索。 |
-| [#82 macOS 小气泡字号](https://github.com/QCYTSN/dsh-dafeiyu/pull/82) | 可采纳 | 已纳入保持基本字号的修改，同时将相同原则用于 Qt。需 macOS CI 和实机观察。感谢 bosprimigenious。 |
+| [#82 macOS 小气泡字号](https://github.com/QCYTSN/dsh-dafeiyu/pull/82) | 可采纳 | 已纳入保持基本字号的修改，同时将相同原则用于 Qt。macOS CI 已通过，仍需实机观察字号效果。感谢 bosprimigenious。 |
 | [#84 macOS 允许部分移出屏幕](https://github.com/QCYTSN/dsh-dafeiyu/pull/84) | 方向正确，边界计算需要调整 | 原 PR 使用整个窗口的宽度计算保留区域，宽气泡可能仍在屏幕内而角色完全消失。当前按角色自身尺寸限制，每个方向至少保留 35%，新增几何测试；需 macOS 实机验证多屏拖动和恢复。感谢 bosprimigenious。 |
 
 ## 仍开放的 11 个 issue
@@ -37,6 +37,7 @@
 - 浏览器真实渲染检查通过初始余额、来源切换、实时过期结果和关闭显示；使用受控 Host 响应。
 - 使用已发布 DSH 0.2.0-rc.2 的真实 Cordis Loader 与 SettingsForms 验证自定义条目 ID、实时更新、保存后重新加载；文件写入由隔离测试适配器承接。
 - 未使用用户的真实凭据查询余额；API Key 和账户服务分别使用受控响应测试。
-- macOS AppKit 和官方桌面应用的完整端到端运行仍需 CI／实机，不能等同于隔离服务测试。
+- [三平台 CI](https://github.com/QCYTSN/dsh-dafeiyu/actions/runs/37465829356)已通过：104 项 JavaScript、42 项 Python、36 项 Swift 测试；Linux 与 macOS Helper 构建、打包后图形启动和 stdin EOF 退出均通过。macOS 包含 arm64 / x86_64 架构与签名检查。
+- 官方桌面应用完整端到端操作、macOS 多屏拖动和字号效果仍需实机复验，不能等同于隔离服务测试或 CI 启动检查。
 
 建议发布后优先复验 #77、#78、#81、#83；#73 为文档项。#80、#39 和 #22 保留开放，直到收到对应证据或补齐验收。

@@ -1,8 +1,31 @@
-# Windows MVP acceptance baseline
+# Acceptance records
+
+## 2026-10-06 · Balance and dual-client branch (Unreleased)
+
+Baseline: GitHub `main` at `9c0588c` / 0.1.14. Current assets remain the
+`dsh-pet` 24 fps set. No npm release or version tag was published.
+
+- 104 JavaScript, 42 Python and 36 Swift tests passed in
+  [GitHub CI](https://github.com/QCYTSN/dsh-dafeiyu/actions/runs/37465829356).
+- Published DSH 0.2.0-rc.2 Loader / SettingsForms integration passed exact
+  namespace, live edit, stored patch and remount checks with isolated storage.
+- A real browser rendered the settings panel with controlled Host responses:
+  initial balance, source switching, stale SSE data and disabling the feature.
+- Windows Qt Helper was built locally, displayed sample balance in its native
+  window and passed shutdown / stdin EOF checks before and after npm extraction.
+  Build paths were isolated to prevent unrelated UCRT DLLs entering the bundle.
+- Linux x64 and macOS Universal Helpers built and passed graphical snapshots
+  and stdin EOF checks before and after npm extraction. macOS arm64 / x86_64
+  slices, bundle version and ad-hoc signature were verified in CI.
+- Real user credentials were not queried. Official Desktop's complete user
+  flow and macOS multi-monitor dragging / font appearance need real-machine
+  follow-up. Source detection and `dsh://open` navigation were tested in isolation.
+
+## Windows MVP acceptance baseline
 
 Date: 2026-08-14
 
-## Environment
+### Environment
 
 - Windows 10 build 26200
 - Node.js 24.15.0
@@ -21,7 +44,7 @@ Date: 2026-08-14
 `0.1.0-alpha.6` 补充了中文和英文 GitHub 用户文档、两张 DSH 实机截图及五种
 桌面状态图；运行时代码仅同步插件版本号，沿用 alpha.5 已验收的 Windows Helper。
 
-## Functional acceptance
+### Functional acceptance
 
 - Real DSH session sequence: `IDLE → THINKING → THINKING → WORKING → SUCCESS`.
 - DSH Web settings card rendered with three checkboxes, one size slider and one activity selector.
@@ -31,12 +54,12 @@ Date: 2026-08-14
 - Forced DSH Host termination and normal helper shutdown both left zero helper processes.
 - Browser console, DSH Host stderr and helper stderr were empty in the final acceptance runs.
 
-## Package baseline
+### Package baseline
 
 - npm archive: approximately 54.2 MB compressed and 54.6 MB unpacked.
 - Windows helper executable: approximately 50.9 MB.
 
-## Runtime baseline
+### Runtime baseline
 
 - Warm Windows helper readiness: 1.195 seconds.
 - PyInstaller parent and visual child combined working set: 74.2 MB.
