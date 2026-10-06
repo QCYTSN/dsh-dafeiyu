@@ -1,4 +1,4 @@
-import Foundation
+import CoreGraphics
 
 enum PetGeometry {
     /// Clamp the character itself, including when its card is wider than it.
