@@ -5,6 +5,10 @@ import { fileURLToPath } from 'node:url'
 import Schema from '@deepseek-ai/schemastery'
 import { CompanionReducer } from './companion-reducer.js'
 import { HelperProcess } from './helper-process.js'
+import { createSettingsScope } from './settings-scope.js'
+import { resolveClientTarget } from './client-target.js'
+import { isLocalRequest, jsonResponse } from './local-http.js'
+import { BALANCE_ENDPOINT, createBalanceQuery, createBalanceMonitor, createBalanceHandler, balanceProviderNamespace } from './balance.js'
 import {
   CompanionMessageKind,
   CompanionState,
@@ -24,6 +28,7 @@ export const CONFIG_ENDPOINT = '/plugins/dsh-dafeiyu/config'
 export const EVENTS_ENDPOINT = '/plugins/dsh-dafeiyu/events'
 export const MANIFEST_ENDPOINT = '/plugins/dsh-dafeiyu/manifest'
 export const FRAME_ENDPOINT = '/plugins/dsh-dafeiyu/frame'
+export { BALANCE_ENDPOINT }
 
 const here = dirname(fileURLToPath(import.meta.url))
 const assetsRoot = resolve(here, '..', 'assets')
@@ -46,7 +51,14 @@ export const Config = Schema.object({
   bubbleStates: Schema.array(Schema.string()).default(['SUCCESS', 'ERROR', 'WAITING']).description('自定义模式下显示气泡的状态'),
   includeSubagents: Schema.boolean().default(false).description('允许子 Agent 抢占宠物状态'),
   webOverlay: Schema.boolean().default(false).description('在 DSH 页面右下角显示轻量桌宠（可与桌面窗口同时开启）'),
+  clientTarget: Schema.union(['auto', 'web', 'desktop']).default('auto').description('打开 DSH 的目标客户端（自动识别 WebUI／桌面端）'),
+  balanceEnabled: Schema.boolean().default(true).description('在状态气泡和设置页显示 DeepSeek 余额'),
+  balanceSource: Schema.union(['auto', 'api-key', 'account']).default('auto').description('余额来源：自动优先 API Key，也可选择已登录账户'),
 }).description('由 DeepSeek Harness 状态驱动的桌面大肥鱼伴侣')
+
+// Mark fields, rather than the root object: current DSH passes each volatile
+// field as a live reference, while the config object remains an object.
+for (const [key, field] of Object.entries(Config.dict)) Config.dict[key] = field.volatile()
 
 const defaults = Object.freeze({
   enabled: true,
@@ -59,6 +71,9 @@ const defaults = Object.freeze({
   bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
   includeSubagents: false,
   webOverlay: false,
+  clientTarget: 'auto',
+  balanceEnabled: true,
+  balanceSource: 'auto',
 })
 
 function publicConfig(config = {}) {
@@ -73,28 +88,10 @@ function publicConfig(config = {}) {
     bubbleStates: Array.isArray(config.bubbleStates) ? config.bubbleStates : defaults.bubbleStates,
     includeSubagents: config.includeSubagents ?? defaults.includeSubagents,
     webOverlay: config.webOverlay === true,
+    clientTarget: config.clientTarget ?? defaults.clientTarget,
+    balanceEnabled: config.balanceEnabled !== false,
+    balanceSource: config.balanceSource ?? defaults.balanceSource,
   }
-}
-
-function localSettingsScope(value) {
-  return {
-    get: () => value,
-    watch: () => () => {},
-  }
-}
-
-function jsonResponse(res, status, body) {
-  const payload = JSON.stringify(body)
-  res.writeHead(status, {
-    'content-type': 'application/json; charset=utf-8',
-    'cache-control': 'no-store',
-    'content-length': Buffer.byteLength(payload),
-  })
-  res.end(payload)
-}
-
-function isLoopback(address) {
-  return address === '127.0.0.1' || address === '::1' || address === '::ffff:127.0.0.1'
 }
 
 async function readPatch(req) {
@@ -114,18 +111,9 @@ async function readPatch(req) {
 
 export function createConfigHandler(settings) {
   return async (req, res) => {
-    if (!isLoopback(req.socket?.remoteAddress)) {
+    if (!isLocalRequest(req)) {
       jsonResponse(res, 403, { error: 'local access only' })
       return
-    }
-    const origin = req.headers?.origin
-    if (origin) {
-      let originHost
-      try { originHost = new URL(origin).host } catch {}
-      if (!originHost || originHost !== req.headers.host) {
-        jsonResponse(res, 403, { error: 'origin mismatch' })
-        return
-      }
     }
     if (req.method === 'GET') {
       jsonResponse(res, 200, settings.get())
@@ -133,6 +121,10 @@ export function createConfigHandler(settings) {
     }
     if (req.method !== 'PATCH') {
       jsonResponse(res, 405, { error: 'method not allowed' })
+      return
+    }
+    if (typeof settings.update !== 'function') {
+      jsonResponse(res, 503, { error: 'settings are read-only; restart DSH or use a supported host version' })
       return
     }
     try {
@@ -156,7 +148,7 @@ export function createEventStream() {
     },
     broadcast(message) {
       if (message?.kind === 'hello' || message?.kind === 'state' || message?.kind === 'task'
-        || message?.kind === 'tasks' || message?.kind === 'config') {
+        || message?.kind === 'tasks' || message?.kind === 'config' || message?.kind === 'balance') {
         snapshot.set(message.kind, message)
       }
       const payload = `data: ${JSON.stringify(message)}\n\n`
@@ -180,18 +172,9 @@ export function createEventStream() {
 
 export function createEventsHandler(stream) {
   return (req, res) => {
-    if (!isLoopback(req.socket?.remoteAddress)) {
+    if (!isLocalRequest(req)) {
       jsonResponse(res, 403, { error: 'local access only' })
       return
-    }
-    const origin = req.headers?.origin
-    if (origin) {
-      let originHost
-      try { originHost = new URL(origin).host } catch {}
-      if (!originHost || originHost !== req.headers.host) {
-        jsonResponse(res, 403, { error: 'origin mismatch' })
-        return
-      }
     }
     res.writeHead(200, {
       'content-type': 'text/event-stream; charset=utf-8',
@@ -218,24 +201,16 @@ export function createAssetRoutes() {
   for (const clip of Object.values(manifest.clips ?? {})) {
     for (const frame of clip.frames ?? []) frames.add(frame)
   }
-  const allowed = (req) => {
-    if (!isLoopback(req.socket?.remoteAddress)) return false
-    const origin = req.headers?.origin
-    if (!origin) return true
-    let originHost
-    try { originHost = new URL(origin).host } catch { return false }
-    return originHost === req.headers.host
-  }
   return {
     manifestHandler(req, res) {
-      if (!allowed(req)) {
+      if (!isLocalRequest(req)) {
         jsonResponse(res, 403, { error: 'local access only' })
         return
       }
       jsonResponse(res, 200, manifest)
     },
     frameHandler(req, res) {
-      if (!allowed(req)) {
+      if (!isLocalRequest(req)) {
         jsonResponse(res, 403, { error: 'local access only' })
         return
       }
@@ -279,16 +254,20 @@ function mount(ctx, config = {}, eventCtx = ctx) {
 }
 
 function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
-  const base = publicConfig(config)
   const eventStream = createEventStream()
-  const settings = ctx.settings?.register?.('dsh-dafeiyu', Config, {
-    base,
-    applies: 'live',
-  }) ?? localSettingsScope(base)
+  const settings = createSettingsScope(ctx, Config, config, publicConfig)
 
   let bridge
   let reducer
   let restartTimer
+  const balance = createBalanceMonitor({
+    query: createBalanceQuery(ctx),
+    onChange(snapshot) {
+      const message = createMessage(CompanionMessageKind.BALANCE, snapshot)
+      if (bridge) bridge.send(message)
+      else eventStream.broadcast(message)
+    },
+  })
 
   const stopRuntime = (reason = 'settings-change') => {
     bridge?.stop(reason)
@@ -311,6 +290,8 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       soundEnabled: next.soundEnabled !== false,
       bubbleMode: next.bubbleMode ?? defaults.bubbleMode,
       bubbleStates: Array.isArray(next.bubbleStates) ? next.bubbleStates : defaults.bubbleStates,
+      openUrl: resolveClientTarget({ ...config, ...next }).url,
+      openLabel: resolveClientTarget({ ...config, ...next }).label,
     }))
   }
 
@@ -340,7 +321,8 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         DSH_DAFEIYU_SOUND_ENABLED: resolved.soundEnabled !== false ? '1' : '0',
         DSH_DAFEIYU_BUBBLE_MODE: String(resolved.bubbleMode ?? defaults.bubbleMode),
         DSH_DAFEIYU_BUBBLE_STATES: (Array.isArray(resolved.bubbleStates) ? resolved.bubbleStates : defaults.bubbleStates).join(','),
-        DSH_DAFEIYU_WEBUI_URL: String(config.webuiUrl ?? process.env.DSH_DAFEIYU_WEBUI_URL ?? 'http://127.0.0.1:3080/'),
+        DSH_DAFEIYU_WEBUI_URL: resolveClientTarget({ ...config, ...resolved }).url,
+        DSH_DAFEIYU_OPEN_LABEL: resolveClientTarget({ ...config, ...resolved }).label,
       },
       onSettingsChange: (report) => {
         if (typeof settings.update !== 'function') return
@@ -376,10 +358,12 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       message: '我在这儿等新任务哦',
       detail: 'DSH · 等待下一次任务',
     }))
+    if (balance.get().status !== 'disabled') bridge.send(createMessage(CompanionMessageKind.BALANCE, balance.get()))
     logger.info?.('dsh-dafeiyu companion bridge started')
   }
 
   startRuntime(settings.get())
+  balance.configure(settings.get().enabled !== false && settings.get().balanceEnabled, settings.get().balanceSource)
 
   // The companion intentionally observes every DSH session. Loader entries may
   // live inside a scoped composition, so use the unscoped root bus and dispose
@@ -411,6 +395,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
     // restart the pet.  Starting a previously-disabled runtime is debounced
     // to avoid spawning repeatedly while settings settle.
     try {
+      balance.configure(next.enabled !== false && next.balanceEnabled, next.balanceSource)
       if (next.enabled === false) {
         if (restartTimer) {
           clearTimeout(restartTimer)
@@ -434,6 +419,17 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       logger.error?.(`dsh-dafeiyu failed to apply settings: ${error instanceof Error ? error.message : String(error)}`)
     }
   })
+  // A credential or account change invalidates the old display immediately.
+  const refreshBalance = () => {
+    const next = settings.get()
+    balance.configure(next.enabled !== false && next.balanceEnabled, next.balanceSource, true)
+  }
+  const offCredential = eventCtx.on('credentials/reference-updated', refreshBalance, { global: true })
+  const offAccount = eventCtx.on('deepseek-account/signed-out', refreshBalance, { global: true })
+  const offAccountCredential = eventCtx.on('credentials/record-updated', refreshBalance, { global: true })
+  const offProvider = eventCtx.on('settings/document-updated', (ns) => {
+    if (['llm-deepseek', 'llm-deepseek-api-key', balanceProviderNamespace(ctx)].includes(ns)) refreshBalance()
+  }, { global: true })
   if (typeof ctx.inject === 'function') {
     ctx.inject(['webServer'], (httpCtx) => {
       httpCtx.effect(
@@ -443,6 +439,10 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       httpCtx.effect(
         () => httpCtx.webServer.register({ kind: 'exact', path: EVENTS_ENDPOINT, handler: createEventsHandler(eventStream) }),
         'dsh-dafeiyu: local event stream',
+      )
+      httpCtx.effect(
+        () => httpCtx.webServer.register({ kind: 'exact', path: BALANCE_ENDPOINT, handler: createBalanceHandler(balance) }),
+        'dsh-dafeiyu: local balance endpoint',
       )
       const assetRoutes = createAssetRoutes()
       if (assetRoutes) {
@@ -462,16 +462,20 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
     restartTimer = undefined
     offEvent?.()
     offDisposed?.()
+    offCredential?.()
+    offAccount?.()
+    offAccountCredential?.()
+    offProvider?.()
     unwatch()
+    settings.dispose?.()
+    balance.stop()
     stopRuntime('dsh-host-stop')
   })
 }
 
 export function apply(ctx, config = {}) {
-  if (typeof ctx.inject === 'function') {
-    ctx.inject(['settings'], (settingsCtx) => mount(settingsCtx, config, ctx))
-    return
-  }
+  // Settings is already a declared dependency. Keep observers on this fiber
+  // so Loader's fiber-scoped volatile updates reach them.
   mount(ctx, config)
 }
 

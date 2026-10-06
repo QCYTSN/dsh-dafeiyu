@@ -9,6 +9,15 @@ from runtime.helper import DRAG_RELEASE_STAGES
 ROOT = Path(__file__).resolve().parents[2]
 MANIFEST = json.loads((ROOT / "assets" / "pet-manifest.json").read_text(encoding="utf-8"))
 
+# Frames each straight-through drag-release stage needs to finish its motion,
+# measured from the shipped art (see the note on DRAG_MOTION_FRAMES in the test
+# below). The daze stage is excluded: it is a single static pose held for
+# readability, so its hold is not a motion budget.
+DRAG_MOTION_FRAMES = {
+    "dragging_release": 30,  # 49-frame bounce; the arc settles around frame 30
+    "dragging_protest": 42,  # 96-frame turn; motion completes around frame 42
+}
+
 
 class AnimationModelTests(unittest.TestCase):
     def test_working_activity_selects_a_persistent_loop(self) -> None:
@@ -86,6 +95,51 @@ class AnimationModelTests(unittest.TestCase):
             ["dragging_release", "dragging_dizzy", "dragging_protest"],
         )
         self.assertTrue(all(hold_ms > 0 for _, hold_ms in DRAG_RELEASE_STAGES))
+
+    def test_drag_release_holds_cover_the_shipped_clips(self) -> None:
+        """Every hold must outlast the motion of the clip it shows.
+
+        The chain used to hold each stage for 300 ms, which was written when the
+        stage clips were single-frame poses. Once the shipped art became real
+        24 fps animations, a 300 ms hold showed only ~7 frames: the landing bounce
+        was clipped and the turn stopped in its first quadrant. Re-derive the
+        numbers below if the art is re-exported.
+        """
+        expected_frames = {"dragging_release": 49, "dragging_dizzy": 1, "dragging_protest": 96}
+        for name, clamp in expected_frames.items():
+            clip = MANIFEST["clips"][name]
+            frames = len(clip["frames"])
+            self.assertEqual(
+                frames,
+                clamp,
+                f"{name} is {frames} frames, not the {clamp} the holds were derived from",
+            )
+            self.assertEqual(
+                clip["frameMs"],
+                42,
+                f"{name} is {clip['frameMs']} ms/frame, not the 24 fps the holds assume",
+            )
+
+        holds = dict(DRAG_RELEASE_STAGES)
+        for name, motion_frames in DRAG_MOTION_FRAMES.items():
+            clip = MANIFEST["clips"][name]
+            needed_ms = motion_frames * clip["frameMs"]
+            self.assertGreaterEqual(
+                holds[name],
+                needed_ms,
+                f"{name} is held {holds[name]} ms but its motion needs {needed_ms} ms",
+            )
+            self.assertLessEqual(
+                holds[name],
+                clip["frameMs"] * len(clip["frames"]),
+                f"{name} is held {holds[name]} ms, longer than the clip itself",
+            )
+
+        # The daze stage stays a single pose for the procedural wobble, so its
+        # hold is a readability choice; keep it short enough for the whole
+        # reaction to stay under four seconds.
+        self.assertTrue(MANIFEST["clips"]["dragging_dizzy"]["loop"])
+        self.assertLessEqual(sum(holds.values()), 4000)
 
     def test_single_frame_drag_stage_survives_advance_until_cleared(self) -> None:
         model = AnimationModel(MANIFEST)

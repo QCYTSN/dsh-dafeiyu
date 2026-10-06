@@ -43,7 +43,9 @@ final class PetController: NSObject {
     let manifest: [String: Any]
     let assetRoot: URL
     let layoutURL: URL
-    let webuiURL: String
+    var webuiURL: String
+    var openLabel = ProcessInfo.processInfo.environment["DSH_DAFEIYU_OPEN_LABEL"] ?? "打开 DSH"
+    var balanceSummary = ""
     let eventLogURL: URL?
     let snapshotURL: URL?
 
@@ -190,11 +192,12 @@ final class PetController: NSObject {
     private var petHeight: CGFloat { maxFrameHeight * scale }
 
     private var cardHeightPoints: CGFloat {
+        let footer: CGFloat = balanceSummary.isEmpty ? 0 : 28
         if tasks.count >= 2 {
             let rows = min(tasks.count, 3)
-            return (58 + CGFloat(rows) * 26) * bubbleScale
+            return (58 + CGFloat(rows) * 26 + footer) * bubbleScale
         }
-        return 84 * bubbleScale
+        return (84 + footer) * bubbleScale
     }
 
     private var cardWidthPoints: CGFloat { 420 * bubbleScale }
@@ -231,17 +234,18 @@ final class PetController: NSObject {
     func moveToPet(_ x: CGFloat, _ y: CGFloat) {
         guard let panel = panel else { return }
         let size = windowSize()
-        let geometry = screenContaining(NSPoint(x: x, y: y))?.visibleFrame ?? NSScreen.main?.visibleFrame
-        let minX = geometry?.minX ?? 0
-        let maxX = max(minX, (geometry?.maxX ?? minX + size.width) - size.width + 1)
+        let geometry = screenContaining(NSPoint(x: x + petWidth / 2, y: y + petHeight / 2))?.visibleFrame
+            ?? panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
+            ?? NSRect(origin: .zero, size: size)
+        let position = PetGeometry.clamp(NSPoint(x: x, y: y), petSize: NSSize(width: petWidth, height: petHeight), screen: geometry)
+        let minX = geometry.minX - (size.width - petWidth * 0.35)
+        let maxX = geometry.maxX - petWidth * 0.35
         let centerOffsetX = (size.width - petWidth) / 2
-        let windowX = min(max(x - centerOffsetX, minX), maxX)
-        let offsetX = min(max(x - windowX, 0), size.width - petWidth)
+        let windowX = min(max(position.x - centerOffsetX, minX), maxX)
+        let offsetX = min(max(position.x - windowX, 0), size.width - petWidth)
         self.petX = windowX + offsetX
 
-        let minY = geometry?.minY ?? 0
-        let maxY = max(minY, (geometry?.maxY ?? minY + size.height) - size.height + 1)
-        let windowY = min(max(y - 8, minY), maxY)
+        let windowY = position.y - 8
         self.petY = windowY + 8
 
         panel.setFrameOrigin(NSPoint(x: windowX, y: windowY))
@@ -426,9 +430,21 @@ final class PetController: NSObject {
         let rect = petRect()
         dragPetOffsetX = rect.minX
         dragPetOffsetY = rect.minY
-        animTimer?.invalidate()
         microTimer?.invalidate()
-        _ = model.playOverlay("dragging")
+        // `dragging` is a dangling loop: keep it advancing while the pointer
+        // moves the window, otherwise the pet sits on its first frame and looks
+        // frozen. Reduced motion keeps the previous frozen behaviour.
+        guard model.playOverlay("dragging") else {
+            animTimer?.invalidate()
+            contentView?.needsDisplay = true
+            return
+        }
+        model.seekActiveClip(toFrame: AnimationModel.dragAnimationStartFrame)
+        if reducedMotion || !model.activeClip.loop {
+            animTimer?.invalidate()
+        } else {
+            restartAnimTimer()
+        }
         contentView?.needsDisplay = true
     }
 
@@ -514,7 +530,7 @@ final class PetController: NSObject {
         reduced.state = reducedMotion ? .on : .off
         menu.addItem(reduced)
 
-        let openWeb = NSMenuItem(title: "打开 WebUI", action: #selector(openWebUI(_:)), keyEquivalent: "")
+        let openWeb = NSMenuItem(title: openLabel, action: #selector(openWebUI(_:)), keyEquivalent: "")
         openWeb.target = self
         menu.addItem(openWeb)
 
@@ -605,6 +621,10 @@ final class PetController: NSObject {
             contentView?.needsDisplay = true
         case "config":
             applyConfig(message)
+        case "balance":
+            balanceSummary = String((message["summary"] as? String ?? "").prefix(200))
+            resizeAndReposition()
+            contentView?.needsDisplay = true
         default:
             break
         }
@@ -668,6 +688,8 @@ final class PetController: NSObject {
     }
 
     private func applyConfig(_ message: [String: Any]) {
+        if let url = message["openUrl"] as? String { webuiURL = url }
+        if let label = message["openLabel"] as? String { openLabel = label }
         var changed = false
         if let value = Self.doubleValue(message["scale"]), value != scale {
             scale = Self.clampedScale(value)
@@ -984,6 +1006,15 @@ final class PetController: NSObject {
             drawTaskCard(rect: rect)
         } else if let card = currentCard() {
             drawStatusCard(rect: rect, card: card)
+        } else if !balanceSummary.isEmpty {
+            drawStatusCard(rect: rect, card: ("大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"))
+        }
+        if !balanceSummary.isEmpty {
+            drawText(balanceSummary,
+                     in: NSRect(x: rect.minX + 16 * bubbleScale, y: rect.maxY - 31 * bubbleScale,
+                                width: rect.width - 32 * bubbleScale, height: 23 * bubbleScale),
+                     font: NSFont.systemFont(ofSize: 9 * max(1, bubbleScale)),
+                     color: Self.hex("#53616F"))
         }
     }
 
@@ -1004,13 +1035,17 @@ final class PetController: NSObject {
         cardPath.lineWidth = 1
         cardPath.stroke()
 
-        let iconCenter = NSPoint(x: rect.maxX - 34 * s, y: rect.midY)
+        let iconCenter = NSPoint(x: rect.maxX - 34 * s, y: rect.minY + 42 * s)
         drawStatusIcon(center: iconCenter, state: card.state, scale: s)
 
         let textX = rect.minX + 16 * s
         let textWidth = max(40, rect.width - 102 * s)
-        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * s), weight: .semibold)
-        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * s))
+        // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
+        // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
+        // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。
+        let fontScale = min(1.2, max(1.0, s))
+        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * fontScale), weight: .semibold)
+        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * fontScale))
         drawText(
             card.title,
             in: NSRect(x: textX, y: rect.minY + 15 * s, width: textWidth, height: max(12, 27 * s)),
@@ -1083,8 +1118,12 @@ final class PetController: NSObject {
 
         let textX = rect.minX + 16 * s
         let textWidth = max(40, rect.width - 32 * s)
-        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * s), weight: .semibold)
-        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * s))
+        // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
+        // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
+        // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。
+        let fontScale = min(1.2, max(1.0, s))
+        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * fontScale), weight: .semibold)
+        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * fontScale))
         drawText(
             "\(tasks.count) 个任务进行中",
             in: NSRect(x: textX, y: rect.minY + 10 * s, width: textWidth, height: max(12, 22 * s)),

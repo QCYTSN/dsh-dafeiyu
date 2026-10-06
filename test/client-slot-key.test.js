@@ -3,18 +3,20 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 
-test('client registers settings.plugin.item with a key for DSH keyed slots', async () => {
+test('client registers the current DSH settings tab with a legacy keyed fallback', async () => {
   const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
 
   let capturedOptions
+  const registrations = []
   const ctx = {
     slots: {
       inject(name, register) {
-        assert.equal(name, 'settings.plugin.item')
+        assert.ok(['settings.plugins.tab', 'settings.plugin.item'].includes(name))
         register()
       },
       register(options) {
         capturedOptions = options
+        registrations.push(options)
         return {}
       },
     },
@@ -49,6 +51,8 @@ test('client registers settings.plugin.item with a key for DSH keyed slots', asy
   assert.equal(capturedOptions.name, 'settings.plugin.item')
   assert.equal(capturedOptions.key, 'dsh-dafeiyu')
   assert.equal(capturedOptions.id, 'dsh-dafeiyu')
+  assert.equal(registrations[0].name, 'settings.plugins.tab')
+  assert.equal(registrations[0].label(), '大肥鱼')
 })
 
 test('client apply does not throw when the slot contract changes or fails', async () => {
@@ -87,7 +91,7 @@ test('client apply does not throw when the slot contract changes or fails', asyn
     slots: {
       inject(name, register) {
         injectAttempted += 1
-        assert.equal(name, 'settings.plugin.item')
+        assert.ok(['settings.plugins.tab', 'settings.plugin.item'].includes(name))
         register() // simulate DSH invoking the card registration later
       },
       register() {
@@ -98,8 +102,8 @@ test('client apply does not throw when the slot contract changes or fails', asyn
   }
 
   assert.doesNotThrow(() => client.apply(ctx))
-  assert.equal(injectAttempted, 1)
-  assert.equal(registerAttempted, 1)
+  assert.equal(injectAttempted, 2)
+  assert.equal(registerAttempted, 2)
 })
 
 test('client apply also contains a synchronous inject failure', async () => {

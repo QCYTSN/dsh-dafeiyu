@@ -65,6 +65,12 @@ try {
   await waitUntil(() => hasReply(standardOutput, 'ready'), 'ready handshake')
   child.stdin.write(`${JSON.stringify({
     protocolVersion: 1,
+    kind: 'balance',
+    timestamp: Date.now(),
+    summary: 'API 余额 ¥12.3456',
+  })}\n`)
+  child.stdin.write(`${JSON.stringify({
+    protocolVersion: 1,
     kind: 'state',
     timestamp: Date.now(),
     state: 'WORKING',
