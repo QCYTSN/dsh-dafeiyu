@@ -12,7 +12,7 @@
 
 BigFish starts and stops with its DSH Host. A transparent, frameless native window keeps the Agent's task status visible while you work in other apps.
 
-> The current stable npm release is **0.1.14**. **Balance display, DSH 0.2 settings compatibility, and official Desktop navigation** on this branch are **Unreleased**. Those features currently require a source build; installing 0.1.14 does not include them. See the [Changelog](CHANGELOG.md).
+> **0.1.15** adds balance display, DSH 0.2 plugin management support, and official Desktop navigation. Desktop users can install directly in the app without running npm, Python, or a separate Helper. See the [Changelog](CHANGELOG.md).
 
 <img src="docs/images/balance-preview.png" width="460" alt="BigFish displays API balance below the current task">
 
@@ -22,7 +22,7 @@ BigFish starts and stops with its DSH Host. A transparent, frameless native wind
 
 - Real session states: thinking, searching, editing, running, verifying, waiting, success, and errors.
 - Project and step information, multiple tasks, and progress supplied by DSH.
-- DeepSeek balances in the native status card and settings page, with separate API-key and signed-in account sources. **Unreleased**.
+- DeepSeek balances in the native status card and settings page, with separate API-key and signed-in account sources.
 - The shared Web client supports browser WebUI and official Desktop, each with its own plugin profile.
 - Dragging, head pats, body pokes, tail interaction, size controls, sounds, and reduced motion.
 - An optional lightweight companion inside the DSH page, disabled by default.
@@ -31,10 +31,10 @@ BigFish observes DSH session events. It does not read your screen. Reasoning eff
 
 ## Choose your client
 
-| Client | Plugin profile | Settings | Native menu navigation (Unreleased) |
+| Client | Plugin profile | Settings (DSH 0.2) | Native menu navigation |
 | --- | --- | --- | --- |
-| Browser WebUI | `web` | Settings → Plugins → 大肥鱼 | WebUI; default `http://127.0.0.1:3080/` |
-| Official Desktop | `desktop` | In-app Settings → Plugins → 大肥鱼 | Focus the app through `dsh://open` |
+| Browser WebUI | `web` | Sidebar Plugins → dsh-dafeiyu | WebUI; default `http://127.0.0.1:3080/` |
+| Official Desktop | `desktop` | Sidebar Plugins → dsh-dafeiyu | Focus the app through `dsh://open` |
 
 Installing into `web` does not install into `desktop`. Running both Hosts with BigFish enabled starts two native companions; disable it in one profile if needed. Community desktop wrappers may still use the `web` profile.
 
@@ -69,7 +69,14 @@ pnpm dsh web
 
 ### Official Desktop
 
-Prefer the app's plugin manager: install the npm package `dsh-dafeiyu` and restart as instructed. Keep the detailed installation log if it fails.
+Install directly in the app:
+
+1. Open the official DeepSeek Harness Desktop app and select **Plugins** in the sidebar.
+2. Select **Add plugin**, enter `dsh-dafeiyu`, and select **Install**.
+3. After installation, select **Enable now**. BigFish appears on your desktop.
+4. Open **dsh-dafeiyu** in the plugin list to adjust the character, bubble, and balance settings. Changes apply live.
+
+The app supplies its own installation environment; users need neither Node.js nor npm commands. Follow any refresh or restart prompt. If installation fails, expand **View installation details** and keep the log.
 
 For command-line installation:
 
@@ -81,7 +88,7 @@ For command-line installation:
    dsh plugin --profile desktop add dsh-dafeiyu
    ```
 
-4. Reopen Desktop and select 大肥鱼 in Settings → Plugins.
+4. Reopen Desktop and select dsh-dafeiyu under sidebar Plugins.
 
 The `dsh` command above must belong to Desktop. A standalone npm or `npx @deepseek-ai/dsh` CLI cannot modify the official Desktop profile. See the [official Desktop documentation](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.md#bundled-command-runtime).
 
@@ -91,13 +98,15 @@ Download a `.tgz` from [Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases
 
 ```powershell
 # WebUI; replace the path with your downloaded file
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
 
 # Official Desktop; use its bundled CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
 ```
 
-## Balance display · Unreleased
+Desktop also accepts the full `.tgz` path in its **Add plugin** field.
+
+## Balance display
 
 Balance appears in the native status card footer and the settings page. The settings page shows total, granted, and topped-up amounts, plus manual refresh. Both clients share the Host's query and cache.
 
@@ -125,8 +134,8 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | Bubble mode | Always, hidden, or selected states |
 | Subagents | Include subagent activity in displayed states |
 | In-page companion | Show a lightweight character inside DSH |
-| Client target | Auto, WebUI, or official Desktop; Unreleased |
-| Balance / source | Enable queries and choose the source; Unreleased |
+| Client target | Auto, WebUI, or official Desktop |
+| Balance / source | Enable queries and choose the source |
 
 Settings apply live. The native context menu offers size, motion, client navigation, and hide/close for the current run. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
 
@@ -138,11 +147,13 @@ Settings apply live. The native context menu offers size, motion, client navigat
 | Linux x64 | Bundled Qt Helper; graphical desktop and glibc 2.35+ required; Ubuntu 24.04 has recorded acceptance results |
 | macOS 12+ | Native Swift / AppKit Universal Helper; experimental |
 
-Release packages include the Helper. A normal installation needs neither Python nor a separately launched companion. Source development requires building the Helper. macOS still needs real-machine validation; font and partial-offscreen fixes are listed under Unreleased.
+Release packages include the Helper. A normal installation needs neither Python nor a separately launched companion. Source development requires building the Helper. macOS font and partial-offscreen fixes pass CI; their appearance and multi-monitor behavior still need real-machine validation.
 
 The native window appears on the machine running the Host. A remote server or a Host without a graphical desktop cannot show a native window on your browser's machine. The optional in-page companion can appear in the browser.
 
 ## Update and troubleshoot
+
+Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu` again, and enable it to install the newer release. Alternatively use Desktop's bundled CLI below.
 
 Quit the target Host, update, and restart:
 
@@ -156,7 +167,7 @@ dsh plugin --profile desktop update dsh-dafeiyu
 
 Desktop's plugin manager is also supported. Rollback, removal, Windows `EPERM`, and restoring settings after a DSH migration are covered in [Updating and rollback](docs/UPDATING.md), currently in Chinese.
 
-- DSH 0.2 settings: this branch adapts the new settings tab and live configuration API; stable 0.1.14 does not include the fix.
+- DSH 0.2 settings: upgrade to 0.1.15 and open sidebar Plugins → dsh-dafeiyu. Previous Hosts retain their older settings entry.
 - Installation reports only `[exit 1]`: include the detailed plugin-manager log, such as `hub.log`, DSH version, OS, and install method.
 - Balance unavailable: check DSH's credentials and gateway endpoint support.
 - Companion missing: check the profile, enable switch, and the Host's graphical desktop.

@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises'
 import { runInNewContext } from 'node:vm'
 import test from 'node:test'
 
-test('client registers the current DSH settings tab with a legacy keyed fallback', async () => {
+test('client exposes its own bundle configuration and preserves older settings entries', async () => {
   const source = await readFile(new URL('../lib/client.js', import.meta.url), 'utf8')
 
   let capturedOptions
@@ -11,22 +11,22 @@ test('client registers the current DSH settings tab with a legacy keyed fallback
   const ctx = {
     slots: {
       inject(name, register) {
-        assert.ok(['settings.plugins.tab', 'settings.plugin.item'].includes(name))
+        assert.ok(['plugins.bundle.config', 'settings.plugins.tab', 'settings.plugin.item'].includes(name))
         register()
       },
-      register(options) {
+      register(options, component) {
         capturedOptions = options
-        registrations.push(options)
+        registrations.push({ ...options, component })
         return {}
       },
     },
   }
 
   const React = {
-    createElement() {},
+    createElement(type, props, ...children) { return { type, props, children } },
     useEffect() {},
-    useRef() { return { current: undefined } },
-    useState() { return [] },
+    useRef(initial) { return { current: initial } },
+    useState(initial) { return [initial, () => {}] },
   }
 
   let client
@@ -51,8 +51,14 @@ test('client registers the current DSH settings tab with a legacy keyed fallback
   assert.equal(capturedOptions.name, 'settings.plugin.item')
   assert.equal(capturedOptions.key, 'dsh-dafeiyu')
   assert.equal(capturedOptions.id, 'dsh-dafeiyu')
-  assert.equal(registrations[0].name, 'settings.plugins.tab')
-  assert.equal(registrations[0].label(), '大肥鱼')
+  assert.equal(registrations[0].name, 'plugins.bundle.config')
+  assert.equal(registrations[0].key, 'dsh-dafeiyu')
+  const page = registrations[0].component({ view: 'page' })
+  assert.equal(page.type, 'section')
+  assert.equal(page.props['data-testid'], 'dsh-dafeiyu-settings')
+  assert.equal(registrations[2].component().type, 'li')
+  assert.equal(registrations[1].name, 'settings.plugins.tab')
+  assert.equal(registrations[1].label(), '大肥鱼')
 })
 
 test('client apply does not throw when the slot contract changes or fails', async () => {
@@ -87,12 +93,13 @@ test('client apply does not throw when the slot contract changes or fails', asyn
   // never fail the whole WebUI load.
   let registerAttempted = 0
   let injectAttempted = 0
+  const deferred = []
   const ctx = {
     slots: {
       inject(name, register) {
         injectAttempted += 1
-        assert.ok(['settings.plugins.tab', 'settings.plugin.item'].includes(name))
-        register() // simulate DSH invoking the card registration later
+        assert.ok(['plugins.bundle.config', 'settings.plugins.tab', 'settings.plugin.item'].includes(name))
+        deferred.push(register)
       },
       register() {
         registerAttempted += 1
@@ -102,8 +109,10 @@ test('client apply does not throw when the slot contract changes or fails', asyn
   }
 
   assert.doesNotThrow(() => client.apply(ctx))
-  assert.equal(injectAttempted, 2)
-  assert.equal(registerAttempted, 2)
+  assert.equal(injectAttempted, 3)
+  assert.equal(registerAttempted, 0)
+  for (const register of deferred) assert.doesNotThrow(register)
+  assert.equal(registerAttempted, 3)
 })
 
 test('client apply also contains a synchronous inject failure', async () => {

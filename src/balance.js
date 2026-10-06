@@ -13,10 +13,20 @@ function balanceError(code) {
 }
 
 function amount(value) {
-  if (typeof value !== 'string' || !/^-?\d{1,16}(?:\.\d{1,12})?$/.test(value)) {
+  // DSH's account service preserves decimal strings, including exponent notation.
+  const match = typeof value === 'string' && value.length <= 128
+    && /^(-?)(\d*)(?:\.(\d*))?(?:e([+-]?\d+))?$/i.exec(value)
+  if (!match || !(match[2] || match[3])) {
     throw balanceError('INVALID_RESPONSE')
   }
-  return value
+  const [, sign, whole, fraction = '', power = '0'] = match
+  const exponent = Number(power)
+  if (!Number.isSafeInteger(exponent) || Math.abs(exponent) > 128) throw balanceError('INVALID_RESPONSE')
+  const digits = whole + fraction
+  const point = whole.length + exponent
+  if (point <= 0) return sign + '0.' + '0'.repeat(-point) + digits
+  if (point >= digits.length) return sign + digits + '0'.repeat(point - digits.length)
+  return sign + digits.slice(0, point) + '.' + digits.slice(point)
 }
 
 function sumAmounts(left, right) {

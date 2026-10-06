@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 0.1.15 · 2026-10-06
 
 ### Added
 
@@ -14,6 +14,12 @@
 
 ### Fixed
 
+- Register the companion settings and balance panel in `plugins.bundle.config`
+  so they appear on the installed package's page in the official Desktop and
+  WebUI plugin managers. Retain older settings entries for previous Hosts.
+- Accept the signed-in account service's decimal precision and exponent
+  notation without rounding during recharge / bonus summation. Bound decimal
+  expansion so malformed amounts cannot trigger unbounded allocations.
 - Isolate Windows Helper build paths so unrelated image tools' older UCRT
   DLLs are not bundled and do not prevent the frozen QtCore from loading.
 - Adapt live settings to DSH 0.2's Loader references, exact entry namespaces,

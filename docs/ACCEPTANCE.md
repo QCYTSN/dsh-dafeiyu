@@ -1,5 +1,35 @@
 # Acceptance records
 
+## 2026-10-06 · Official Windows Desktop / 0.1.15
+
+Tested the existing DeepSeek Harness Desktop **0.2.0-rc.2** installation on
+Windows using its own `desktop` profile and in-app Plugins page.
+
+- Installed a local 0.1.15 archive through Add plugin and Enable now. The
+  bundle ran and its native companion appeared without a separate npm or
+  Python installation by the user.
+- Added `plugins.bundle.config` after discovering the previous settings-tab
+  registration did not appear in the installed package's detail page.
+- Queried the signed-in account through DSH's account service. Fixed support
+  for its full decimal precision and exponent notation. The recharge amount
+  matched DSH's own account page at that page's displayed precision.
+- Visually checked the native status card's balance footer and the settings
+  balance table. Private account screenshots and amounts are not included here.
+- Changed reduced motion in the app and verified the Host accepted it live.
+  Configuration was retained across a complete app restart.
+- Disabled the companion in its settings and observed zero Helper processes;
+  enabled it again and observed the native window return.
+- The native menu automatically offered Open DSH Desktop and opened the
+  existing desktop application through `dsh://open`.
+- Complete app shutdown left zero Helper processes.
+- All **105 JavaScript tests** passed locally, including the new decimal and
+  current / older slot registration regression checks. The preceding main
+  build also passed 42 Python and 36 Swift tests in CI.
+
+This acceptance does not include a new paid model task, a real Desktop API-key
+account, or macOS multi-monitor testing. API-key responses and session events
+remain covered by the isolated tests below.
+
 ## 2026-10-06 · Balance and dual-client branch (Unreleased)
 
 Baseline: GitHub `main` at `9c0588c` / 0.1.14. Current assets remain the

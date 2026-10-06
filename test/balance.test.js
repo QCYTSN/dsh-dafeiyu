@@ -26,7 +26,7 @@ test('balance query uses the configured credential and gateway without returning
 test('logged-in account balance keeps recharge and bonus currencies separate and sums decimals exactly', async () => {
   const account = {
     getState: async () => ({ status: 'credential-stored' }),
-    getBalance: async () => ({ status: 'ready', value: [{ currency: 'CNY', balance: '0.1' }, { currency: 'USD', balance: '1.0000' }], bonusWallets: [{ currency: 'CNY', balance: '0.2' }] }),
+    getBalance: async () => ({ status: 'ready', value: [{ currency: 'CNY', balance: '1e-1' }, { currency: 'USD', balance: '1.0000' }], bonusWallets: [{ currency: 'CNY', balance: '.2' }] }),
   }
   const query = createBalanceQuery({ get: (name) => name === 'deepseekAccount' ? account : undefined }, { environment: {} })
   const value = await query('account')
@@ -35,6 +35,16 @@ test('logged-in account balance keeps recharge and bonus currencies separate and
     { currency: 'CNY', toppedUp: '0.1', granted: '0.2', total: '0.3' },
     { currency: 'USD', toppedUp: '1.0000', granted: '0', total: '1.0000' },
   ])
+})
+
+test('balance decimals preserve account precision and reject unbounded exponent expansion', () => {
+  const parse = (total) => parseApiBalance({ ...wire, balance_infos: [{ ...wire.balance_infos[0], total_balance: total }] }).balances[0].total
+  assert.equal(parse('4.1421234567890123456E+1'), '41.421234567890123456')
+  assert.equal(parse('-1e-18'), '-0.000000000000000001')
+  assert.equal(parse('0.'), '0')
+  for (const value of ['.', 'e2', 'Infinity', '1e99999999', '1e-99999999', '1'.repeat(129), ' 1']) {
+    assert.throws(() => parse(value), { code: 'INVALID_RESPONSE' })
+  }
 })
 
 test('missing credentials and invalid API responses never become a fake zero balance', async () => {

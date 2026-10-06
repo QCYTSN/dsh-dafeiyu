@@ -12,7 +12,7 @@
 
 大肥鱼由 DSH 插件启动，随 DSH 一起退出。透明、无边框、始终置顶的原生窗口，让你在编辑器、浏览器或其他应用中也能看到 Agent 的工作状态。
 
-> npm 当前稳定版为 **0.1.14**。本分支新增的**余额显示、DSH 0.2 设置兼容和官方桌面端入口识别**尚未发布；以下相关说明对应 `Unreleased`，发布前需从源码使用。已发布功能见 [Changelog](CHANGELOG.md)。
+> **0.1.15** 新增余额显示，适配 DSH 0.2 插件管理与官方桌面端。桌面端用户可直接在应用中安装，无需自己运行 npm、Python 或 Helper。详见 [更新日志](CHANGELOG.md)。
 
 <img src="docs/images/balance-preview.png" width="460" alt="大肥鱼在任务状态卡底部显示 API 余额">
 
@@ -22,7 +22,7 @@
 
 - 显示真实任务状态：思考、查找、修改、执行、验证、等待确认、完成和错误。
 - 展示项目、步骤、多任务和 DSH 提供的待办进度；没有真实进度时显示阶段。
-- 在状态气泡和设置页显示 DeepSeek 余额，区分 API Key 与已登录账户。**Unreleased**。
+- 在状态气泡和设置页显示 DeepSeek 余额，区分 API Key 与已登录账户。
 - 兼容 WebUI 与官方桌面端的共享客户端；两个客户端使用各自的插件配置。
 - 支持拖动、摸头、戳身体、碰尾巴，以及大小、气泡、声音和减少动态设置。
 - 可选在 DSH 页面右下角显示轻量角色，默认关闭。
@@ -31,10 +31,10 @@
 
 ## 先选你的 DSH 客户端
 
-| 使用方式 | 安装位置 | 设置入口 | 角色右键菜单的打开目标（Unreleased） |
+| 使用方式 | 安装位置 | 设置入口（DSH 0.2） | 角色右键菜单的打开目标 |
 | --- | --- | --- | --- |
-| 浏览器 WebUI | `web` profile | DSH 设置 → 插件 → 大肥鱼 | WebUI，默认 `http://127.0.0.1:3080/` |
-| 官方桌面端 | `desktop` profile | 应用内设置 → 插件 → 大肥鱼 | 通过 `dsh://open` 唤起桌面应用 |
+| 浏览器 WebUI | `web` profile | 左侧插件 → dsh-dafeiyu | WebUI，默认 `http://127.0.0.1:3080/` |
+| 官方桌面端 | `desktop` profile | 左侧插件 → dsh-dafeiyu | 通过 `dsh://open` 唤起桌面应用 |
 
 **WebUI 中安装的插件不会自动出现在桌面端。** 两边都启用会各自启动原生角色，可以在其中一个 profile 关闭“大肥鱼”。第三方桌面包装器可能仍使用 `web` profile，请以它的实际启动方式为准。
 
@@ -69,7 +69,14 @@ pnpm dsh web
 
 ### 官方桌面端
 
-推荐在应用的**插件管理页面**安装 npm 包 `dsh-dafeiyu`，按提示重启应用。若安装失败，保留插件管理日志后按下面的方法排查。
+推荐直接在应用内安装：
+
+1. 打开官方 DeepSeek Harness 桌面应用，点击左侧 **插件**。
+2. 点击 **添加插件**，输入 `dsh-dafeiyu`，点击 **安装**。
+3. 安装成功后点击 **立即启用**，大肥鱼会出现在桌面上。
+4. 在插件列表打开 **dsh-dafeiyu**，调整角色、气泡和余额设置，修改实时生效。
+
+这套流程使用桌面应用自带的安装环境，用户无需安装 Node.js 或执行 npm 命令。若应用提示刷新或重启，按提示操作；失败时展开 **查看安装详情** 并保留日志。
 
 使用命令安装时：
 
@@ -81,7 +88,7 @@ pnpm dsh web
    dsh plugin --profile desktop add dsh-dafeiyu
    ```
 
-4. 重新打开桌面应用，在设置 → 插件 → 大肥鱼调整角色。
+4. 重新打开桌面应用，在左侧插件 → dsh-dafeiyu 调整角色。
 
 **这里的 `dsh` 必须来自桌面应用。** 独立安装的 npm / `npx @deepseek-ai/dsh` CLI 不能修改官方桌面端的 profile。请参考 [DSH 官方桌面端说明](https://github.com/deepseek-ai/deepseek-harness/blob/master/apps/desktop/README.zh.md#bundled-command-runtime)。
 
@@ -91,13 +98,15 @@ pnpm dsh web
 
 ```powershell
 # WebUI；文件路径替换为实际下载路径
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
 
 # 官方桌面端；必须使用应用自带的 dsh
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
 ```
 
-## 余额显示 · Unreleased
+桌面端也可在 **添加插件** 的输入框填写 `.tgz` 的完整路径。
+
+## 余额显示
 
 余额默认出现在**大肥鱼状态气泡底部和设置页**，查询逻辑由两个客户端共用。设置页可查看总余额、赠送和充值，并手动刷新。
 
@@ -129,8 +138,8 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
 | 气泡显示 | 常驻、隐藏，或仅在指定状态显示 |
 | 子 Agent | 允许子 Agent 状态参与显示 |
 | 页面内角色 | 在 DSH 页面右下角显示轻量角色 |
-| 打开目标 | 自动、WebUI 或官方桌面端；Unreleased |
-| 显示余额 / 余额来源 | 开关与选择余额查询来源；Unreleased |
+| 打开目标 | 自动、WebUI 或官方桌面端 |
+| 显示余额 / 余额来源 | 开关与选择余额查询来源 |
 
 设置页修改实时生效。右键菜单可调整大小、减少动态、打开对应 DSH 客户端，或仅在本次运行隐藏／关闭角色。
 
@@ -144,7 +153,7 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
 | Linux x64 | 随包提供 Qt Helper，需要图形桌面；glibc 2.35+，Ubuntu 24.04 有验收记录 |
 | macOS 12+ | 原生 Swift / AppKit Helper，Universal 构建；实验性支持 |
 
-标准安装包已包含 Helper，**不需要自己安装 Python 或运行 Helper**。从源码使用时需自行构建。macOS 支持仍需真实机器验证；小字号和拖动边缘修复见 Unreleased。
+标准安装包已包含 Helper，**不需要自己安装 Python 或运行 Helper**。从源码使用时需自行构建。macOS 小字号与拖动边缘已修复并通过 CI，仍需真实机器验证视觉效果与多屏操作。
 
 原生角色显示在 **Host 所在的桌面**：远程服务器、无图形环境和浏览器客户端不在同一台机器时，请先确认 Host 的运行位置。页面内角色可在浏览器中显示。
 
@@ -156,7 +165,7 @@ WebUI 用户完全退出 DSH 后执行：
 npx -y @deepseek-ai/dsh plugin --profile web update dsh-dafeiyu
 ```
 
-官方桌面端优先通过应用内插件管理更新，或使用应用自带的命令：
+官方桌面端 **0.2.0-rc.2 暂不支持应用内自动更新**。在插件页面卸载大肥鱼，再添加 `dsh-dafeiyu` 并立即启用，即可安装新版；也可以完全退出应用后使用自带的命令：
 
 ```powershell
 dsh plugin --profile desktop update dsh-dafeiyu
@@ -164,7 +173,7 @@ dsh plugin --profile desktop update dsh-dafeiyu
 
 然后重新启动对应客户端。回退、移除、DSH 迁移后恢复大小，以及 Windows `EPERM` 的处理见 [更新与回退](docs/UPDATING.md)。
 
-- DSH 0.2 设置页变化：本分支已适配新的设置页与实时配置接口，当前 npm 0.1.14 尚未包含该修复。
+- DSH 0.2 设置页变化：升级到 0.1.15，通过左侧插件 → dsh-dafeiyu 打开设置；较旧 Host 保留原设置入口。
 - 桌面端安装只显示 `[exit 1]`：该信息不足以确定原因，请附上插件安装详细日志（如 `hub.log`）、DSH 版本、系统和安装方式。
 - 余额查询失败：检查 DSH 中的凭据及所用网关是否支持余额接口。
 - 角色不出现：检查 profile、插件是否启用，以及 Host 是否有可用图形桌面。
