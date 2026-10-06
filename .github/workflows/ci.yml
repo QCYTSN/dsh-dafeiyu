@@ -44,6 +44,12 @@ jobs:
       - name: Run JavaScript tests
         run: npm test
 
+      - name: Verify published DSH 0.2 settings integration
+        if: runner.os == 'Linux'
+        run: |
+          npm install --prefix .build/dsh-settings-smoke --ignore-scripts --no-audit --no-fund --no-package-lock @deepseek-ai/dsh@0.2.0-rc.2
+          node scripts/test-dsh-settings.mjs .build/dsh-settings-smoke
+
       - name: Run Python tests
         run: python -m unittest discover -s runtime/tests -t .
 

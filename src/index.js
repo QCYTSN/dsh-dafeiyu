@@ -26,6 +26,7 @@ export const CONFIG_ENDPOINT = plugin.CONFIG_ENDPOINT
 export const EVENTS_ENDPOINT = plugin.EVENTS_ENDPOINT
 export const MANIFEST_ENDPOINT = plugin.MANIFEST_ENDPOINT
 export const FRAME_ENDPOINT = plugin.FRAME_ENDPOINT
+export const BALANCE_ENDPOINT = plugin.BALANCE_ENDPOINT
 export const createConfigHandler = plugin.createConfigHandler
 export const createEventStream = plugin.createEventStream
 export const createEventsHandler = plugin.createEventsHandler

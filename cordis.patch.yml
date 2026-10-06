@@ -15,3 +15,6 @@
           - WAITING
         includeSubagents: false
         webOverlay: false
+        clientTarget: auto
+        balanceEnabled: true
+        balanceSource: auto

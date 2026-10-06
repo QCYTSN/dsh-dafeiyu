@@ -19,6 +19,7 @@ PACKAGE_VERSION="$(node -p "require('$ROOT/package.json').version")"
 SOURCES=(
   "$DIR/Sources/AnimationModel.swift" \
   "$DIR/Sources/LayoutStore.swift" \
+  "$DIR/Sources/PetGeometry.swift" \
   "$DIR/Sources/Permissions.swift" \
   "$DIR/Sources/PetController.swift" \
   "$DIR/Sources/PetView.swift" \

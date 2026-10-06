@@ -2,6 +2,44 @@
 
 ## Unreleased
 
+### Added
+
+- Show DeepSeek balance in the native status bubble and settings page. Share
+  one Host cache across clients; support the configured API key and signed-in
+  account, separate CNY / USD and recharge / bonus amounts, and mark stale
+  results after failed refreshes. Keep credentials and raw upstream errors out
+  of client messages.
+- Detect WebUI or official Desktop for native-menu navigation, with an explicit
+  override. Desktop uses `dsh://open`; the two profiles share the implementation.
+
+### Fixed
+
+- Isolate Windows Helper build paths so unrelated image tools' older UCRT
+  DLLs are not bundled and do not prevent the frozen QtCore from loading.
+- Adapt live settings to DSH 0.2's Loader references, exact entry namespaces,
+  persistence API, and `settings.plugins.tab`, retaining the older settings
+  registration contract. Upgrade bundled schemastery / cosmokit to versions
+  that implement live references. Addresses [#77](https://github.com/QCYTSN/dsh-dafeiyu/issues/77).
+- Include `runtime/asset_paths.py` in npm archives so Python source execution
+  can resolve the current assets. This was identified during review of
+  [#79](https://github.com/QCYTSN/dsh-dafeiyu/pull/79).
+- Keep the drag loop running and align post-drop animation holds with the
+  shipped 24 fps art, from SamuelIiu's [#75](https://github.com/QCYTSN/dsh-dafeiyu/pull/75).
+- Retain base font sizes when shrinking native status bubbles, incorporating
+  bosprimigenious's macOS [#82](https://github.com/QCYTSN/dsh-dafeiyu/pull/82).
+- Allow macOS partial-offscreen placement while leaving at least 35% of the
+  character grabbable on each axis, adjusting the geometry proposed in
+  [#84](https://github.com/QCYTSN/dsh-dafeiyu/pull/84).
+
+### Documentation
+
+- Rewrite Chinese / English READMEs for browser WebUI and official Desktop,
+  including `npx`, the bundled Desktop CLI, balance sources, and platform limits.
+- Explain upgrade, rollback, and recovery of historical settings after DSH
+  migrations. Add an evidence-based issue / PR triage record.
+- Correct asset provenance to native 24 fps, addressing
+  [#74](https://github.com/QCYTSN/dsh-dafeiyu/pull/74).
+
 ## 0.1.14
 
 ### Changed

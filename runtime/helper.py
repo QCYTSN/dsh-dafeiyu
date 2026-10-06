@@ -31,14 +31,19 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
-DRAG_RELEASE_MS = 300
-DRAG_DIZZY_MS = 840
-DRAG_PROTEST_MS = 300
+DRAG_RELEASE_MS = 1320
+DRAG_DIZZY_MS = 620
+DRAG_PROTEST_MS = 1850
 DRAG_RELEASE_STAGES = (
     ("dragging_release", DRAG_RELEASE_MS),
     ("dragging_dizzy", DRAG_DIZZY_MS),
     ("dragging_protest", DRAG_PROTEST_MS),
 )
+# The drag clip is a 241 frame dangling loop. Rendering it from frame 0 looks
+# identical to the idle pose, so start partway into the loop: the first visible
+# frame already reads as "held", and the character keeps swinging while the
+# pointer moves it.
+DRAG_ANIMATION_START_FRAME = 36
 # A decoded 412x344 ARGB32 frame costs ~0.55 MB, so keeping every frame of a
 # 24 fps set resident would need well over a gigabyte. Frames are read from disk
 # once as compressed bytes and decoded through a bounded cache instead.
@@ -244,9 +249,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         from PySide6.QtCore import QAbstractNativeEventFilter, QObject, QPoint, QRectF, Qt, QTimer, QUrl, Signal
         from PySide6.QtGui import QColor, QDesktopServices, QFont, QFontMetrics, QMouseEvent, QPainter, QPen, QPixmap
         from PySide6.QtWidgets import QApplication, QMenu, QWidget
-    except ImportError:
+    except ImportError as error:
         print(
-            "PySide6 is required for visual mode. Run with --headless for protocol tests.",
+            f"PySide6 is required for visual mode ({error}). Run with --headless for protocol tests.",
             file=sys.stderr,
         )
         recorder.close()
@@ -393,6 +398,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.task = ""
             self.tasks: list[dict[str, Any]] = []
             self.webui_url = os.environ.get("DSH_DAFEIYU_WEBUI_URL", "http://127.0.0.1:3080/")
+            self.open_label = os.environ.get("DSH_DAFEIYU_OPEN_LABEL", "打开 DSH")
+            self.balance_summary = ""
             self.shake_timer: QTimer | None = None
             self.shake_origin: QPoint | None = None
             self.shake_count = 0
@@ -448,6 +455,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._sync_bubble_size()
             elif kind == "config":
                 self._apply_config(message)
+            elif kind == "balance":
+                self.balance_summary = str(message.get("summary", ""))[:200]
+                self._sync_bubble_size()
             elif kind in {"state", "pulse"}:
                 state = str(message.get("state", "IDLE"))
                 self.display_state = state
@@ -502,6 +512,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._schedule_micro()
 
         def _apply_config(self, message: dict[str, Any]) -> None:
+            if isinstance(message.get("openUrl"), str):
+                self.webui_url = message["openUrl"]
+            if isinstance(message.get("openLabel"), str):
+                self.open_label = message["openLabel"]
             """Apply a live CONFIG message without restarting the window."""
             scale = message.get("scale")
             if isinstance(scale, (int, float)) and not isinstance(scale, bool):
@@ -641,9 +655,23 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 return
             self.dragging = True
             self.drag_chain_id += 1
-            self.animation_timer.stop()
             self.micro_timer.stop()
-            self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+            played = self._play_model_overlay("dragging", allow_fade=False, repaint=False)
+            if not played:
+                self.animation_timer.stop()
+                return
+            # The dangling loop has to keep advancing while the pointer moves the
+            # window, otherwise the pet stays on its first frame and looks frozen.
+            # Reduced motion keeps the previous frozen behaviour.
+            clip = self.model.active_clip
+            if clip.frames:
+                self.model.frame_index = min(len(clip.frames) - 1, DRAG_ANIMATION_START_FRAME)
+                self.model.frame_elapsed_ms = 0
+            if self.reduced_motion or not clip.loop:
+                self.animation_timer.stop()
+            else:
+                self.last_tick_ms = self._now_ms()
+                self.animation_timer.start(self._animation_interval_ms())
 
         def _finish_drag(self) -> None:
             if not self.dragging:
@@ -665,8 +693,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         def _run_drag_release_chain(self) -> None:
             """Play release -> dizzy -> protest, then hand back to the base state.
 
-            Every stage is a single-frame clip, so the chain is driven by timers;
-            any new grab (or a manifest without the stage clips) aborts quietly.
+            Each stage's hold matches how long that clip's motion actually runs
+            (see DRAG_RELEASE_STAGES); the chain stays timer driven so a new grab
+            or a manifest without the stage clips aborts quietly.
             """
             self.drag_chain_id += 1
             token = self.drag_chain_id
@@ -891,6 +920,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.status_deadline_ms is None or now_ms < self.status_deadline_ms
             ):
                 return self.status_message, self.status_detail, self.status_state
+            if self.balance_summary:
+                return "大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"
             return None
 
         @staticmethod
@@ -936,10 +967,11 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
 
         def _card_height(self) -> int:
+            footer = 28 if self.balance_summary else 0
             if len(self.tasks) >= 2:
                 rows = min(len(self.tasks), 3)
-                return round((58 + rows * 26) * self.bubble_scale)
-            return round(84 * self.bubble_scale)
+                return round((58 + rows * 26 + footer) * self.bubble_scale)
+            return round((84 + footer) * self.bubble_scale)
 
         def _draw_card_background(
             self,
@@ -979,10 +1011,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             s: float,
         ) -> None:
             title_font = QFont("Microsoft YaHei UI")
-            title_font.setPointSizeF(max(8.0, 11.0 * s))
+            title_font.setPointSizeF(11.0 * max(1.0, s))
             title_font.setWeight(QFont.Weight.DemiBold)
             detail_font = QFont("Microsoft YaHei UI")
-            detail_font.setPointSizeF(max(7.0, 9.0 * s))
+            detail_font.setPointSizeF(9.0 * max(1.0, s))
             text_x = card_x + round(16 * s)
             text_width = max(40, card_width - round(32 * s))
             painter.setFont(title_font)
@@ -1092,7 +1124,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 bubble_height = card_y + card_height + 19
                 self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
                 icon_center_x = card_x + card_width - round(39 * s)
-                icon_center_y = card_y + card_height // 2
+                icon_center_y = card_y + round(42 * s)
                 painter.save()
                 painter.translate(icon_center_x, icon_center_y)
                 painter.scale(s, s)
@@ -1103,10 +1135,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 text_x = card_x + round(24 * s)
                 text_width = max(40, card_width - round(102 * s))
                 title_font = QFont("Microsoft YaHei UI")
-                title_font.setPointSizeF(max(8.0, 11.0 * s))
+                title_font.setPointSizeF(11.0 * max(1.0, s))
                 title_font.setWeight(QFont.Weight.DemiBold)
                 detail_font = QFont("Microsoft YaHei UI")
-                detail_font.setPointSizeF(max(7.0, 9.0 * s))
+                detail_font.setPointSizeF(9.0 * max(1.0, s))
                 painter.setFont(title_font)
                 painter.setPen(QColor("#25282D"))
                 title_text = QFontMetrics(title_font).elidedText(
@@ -1137,6 +1169,16 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter,
                     detail_text,
                 )
+
+            if self.balance_summary and self._bubble_visible():
+                balance_font = QFont("Microsoft YaHei UI")
+                balance_font.setPointSizeF(9.0 * max(1.0, s))
+                painter.setFont(balance_font)
+                painter.setPen(QColor("#53616F"))
+                text_width = card_width - round(32 * s)
+                text = QFontMetrics(balance_font).elidedText(self.balance_summary, Qt.TextElideMode.ElideRight, text_width)
+                painter.drawText(card_x + round(16 * s), card_y + card_height - round(31 * s),
+                                 text_width, round(23 * s), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, text)
 
             pixmap = self._pixmap(self.model.frame)
             phase = time.monotonic()
@@ -1282,7 +1324,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
-            open_webui_action = menu.addAction("打开 WebUI")
+            open_webui_action = menu.addAction(self.open_label)
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
             exit_action = menu.addAction("本次关闭")
