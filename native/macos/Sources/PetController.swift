@@ -234,7 +234,8 @@ final class PetController: NSObject {
     func moveToPet(_ x: CGFloat, _ y: CGFloat) {
         guard let panel = panel else { return }
         let size = windowSize()
-        let geometry = screenContaining(NSPoint(x: x, y: y))?.visibleFrame ?? NSScreen.main?.visibleFrame
+        let geometry = screenContaining(NSPoint(x: x + petWidth / 2, y: y + petHeight / 2))?.visibleFrame
+            ?? panel.screen?.visibleFrame ?? NSScreen.main?.visibleFrame
             ?? NSRect(origin: .zero, size: size)
         let position = PetGeometry.clamp(NSPoint(x: x, y: y), petSize: NSSize(width: petWidth, height: petHeight), screen: geometry)
         let minX = geometry.minX - (size.width - petWidth * 0.35)
