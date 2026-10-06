@@ -42,7 +42,7 @@ The package's `platform: web` client declaration also applies to official Deskto
 
 ## Install
 
-Fully quit the target DSH Host before adding, updating, or removing the package, then restart it.
+For command-line installation, updates, or removal, fully quit the target DSH Host first and restart it afterward. When using Desktop's in-app plugin manager, follow its restart prompts.
 
 ### Browser WebUI
 
