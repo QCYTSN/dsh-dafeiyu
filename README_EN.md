@@ -72,11 +72,13 @@ pnpm dsh web
 Install directly in the app:
 
 1. Open the official DeepSeek Harness Desktop app and select **Plugins** in the sidebar.
-2. Select **Add plugin**, enter `dsh-dafeiyu`, and select **Install**.
+2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.15`, and select **Install**.
 3. After installation, select **Enable now**. BigFish appears on your desktop.
 4. Open **dsh-dafeiyu** in the plugin list to adjust the character, bubble, and balance settings. Changes apply live.
 
 The app supplies its own installation environment; users need neither Node.js nor npm commands. Follow any refresh or restart prompt. If installation fails, expand **View installation details** and keep the log.
+
+Entering only `dsh-dafeiyu` selects the installation source's latest version. Immediately after a release, the default source may still return an older version; specifying the version avoids that mismatch. Check the installed version on its detail page.
 
 For command-line installation:
 

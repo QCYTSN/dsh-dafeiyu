@@ -22,9 +22,18 @@ Windows using its own `desktop` profile and in-app Plugins page.
 - The native menu automatically offered Open DSH Desktop and opened the
   existing desktop application through `dsh://open`.
 - Complete app shutdown left zero Helper processes.
+- After the release workflow succeeded, installed the public npm package
+  through the same Add plugin UI. The bare package name initially selected
+  0.1.14 from the default source; specifying `dsh-dafeiyu@0.1.15` installed
+  0.1.15 successfully. The profile now records a registry version rather than
+  a local test archive.
 - All **105 JavaScript tests** passed locally, including the new decimal and
   current / older slot registration regression checks. The preceding main
   build also passed 42 Python and 36 Swift tests in CI.
+- [0.1.15 release CI](https://github.com/QCYTSN/dsh-dafeiyu/actions/runs/37480096423)
+  passed all three platform builds, final archive checks, npm trusted
+  publishing and GitHub Release creation. npm's public `latest` tag was
+  verified as 0.1.15 after propagation.
 
 This acceptance does not include a new paid model task, a real Desktop API-key
 account, or macOS multi-monitor testing. API-key responses and session events
