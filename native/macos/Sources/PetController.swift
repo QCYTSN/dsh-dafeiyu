@@ -233,15 +233,22 @@ final class PetController: NSObject {
         let size = windowSize()
         let geometry = screenContaining(NSPoint(x: x, y: y))?.visibleFrame ?? NSScreen.main?.visibleFrame
         let minX = geometry?.minX ?? 0
-        let maxX = max(minX, (geometry?.maxX ?? minX + size.width) - size.width + 1)
+        let maxX = geometry?.maxX ?? minX + size.width
+        let minY = geometry?.minY ?? 0
+        let maxY = geometry?.maxY ?? minY + size.height
+
+        // 允许宠物部分移出屏幕边缘：只保证「足以抓取」的最小可见部分留在屏幕内。
+        // 此前要求整个窗口都在 visibleFrame 内，导致用户把它拖到屏幕外之后，
+        // 任何触发的重新定位（窗口尺寸变化、恢复位置）都会把它弹回屏幕。
+        // 注意：下限必须按【宠物自身尺寸】算，而不是窗口尺寸 —— 窗口底部还有
+        // 气泡卡占用的空白区，按窗口算会放行到宠物完全离屏、再也抓不回来。
+        let keepX = petWidth * 0.35
+        let keepY = petHeight * 0.35
         let centerOffsetX = (size.width - petWidth) / 2
-        let windowX = min(max(x - centerOffsetX, minX), maxX)
+        let windowX = min(max(x - centerOffsetX, minX - (size.width - keepX)), maxX - keepX)
         let offsetX = min(max(x - windowX, 0), size.width - petWidth)
         self.petX = windowX + offsetX
-
-        let minY = geometry?.minY ?? 0
-        let maxY = max(minY, (geometry?.maxY ?? minY + size.height) - size.height + 1)
-        let windowY = min(max(y - 8, minY), maxY)
+        let windowY = min(max(y - 8, minY - (petHeight - keepY)), maxY - keepY)
         self.petY = windowY + 8
 
         panel.setFrameOrigin(NSPoint(x: windowX, y: windowY))
