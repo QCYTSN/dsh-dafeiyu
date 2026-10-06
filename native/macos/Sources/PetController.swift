@@ -1009,8 +1009,12 @@ final class PetController: NSObject {
 
         let textX = rect.minX + 16 * s
         let textWidth = max(40, rect.width - 102 * s)
-        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * s), weight: .semibold)
-        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * s))
+        // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
+        // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
+        // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。
+        let fontScale = min(1.2, max(1.0, s))
+        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * fontScale), weight: .semibold)
+        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * fontScale))
         drawText(
             card.title,
             in: NSRect(x: textX, y: rect.minY + 15 * s, width: textWidth, height: max(12, 27 * s)),
@@ -1083,8 +1087,12 @@ final class PetController: NSObject {
 
         let textX = rect.minX + 16 * s
         let textWidth = max(40, rect.width - 32 * s)
-        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * s), weight: .semibold)
-        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * s))
+        // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
+        // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
+        // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。
+        let fontScale = min(1.2, max(1.0, s))
+        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * fontScale), weight: .semibold)
+        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * fontScale))
         drawText(
             "\(tasks.count) 个任务进行中",
             in: NSRect(x: textX, y: rect.minY + 10 * s, width: textWidth, height: max(12, 22 * s)),
