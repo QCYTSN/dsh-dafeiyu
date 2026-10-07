@@ -12,7 +12,7 @@
 
 BigFish starts and stops with its DSH Host. A transparent, frameless native window keeps the Agent's task status visible while you work in other apps.
 
-> **0.1.15** adds balance display, DSH 0.2 plugin management support, and official Desktop navigation. Desktop users can install directly in the app without running npm, Python, or a separate Helper. See the [Changelog](CHANGELOG.md).
+> **0.1.16** fixes abrupt animation handoffs, frame ghosting and overly frequent idle actions, restoring upstream entrances and exits. Balance display, DSH 0.2 plugin management and official Desktop remain supported. Install directly in the app. See the [Changelog](CHANGELOG.md).
 
 <img src="docs/images/balance-preview.png" width="460" alt="BigFish displays API balance below the current task">
 
@@ -72,7 +72,7 @@ pnpm dsh web
 Install directly in the app:
 
 1. Open the official DeepSeek Harness Desktop app and select **Plugins** in the sidebar.
-2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.15`, and select **Install**.
+2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.16`, and select **Install**.
 3. After installation, select **Enable now**. BigFish appears on your desktop.
 4. Open **dsh-dafeiyu** in the plugin list to adjust the character, bubble, and balance settings. Changes apply live.
 
@@ -100,10 +100,10 @@ Download a `.tgz` from [Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases
 
 ```powershell
 # WebUI; replace the path with your downloaded file
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.16.tgz"
 
 # Official Desktop; use its bundled CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.16.tgz"
 ```
 
 Desktop also accepts the full `.tgz` path in its **Add plugin** field.
@@ -130,8 +130,8 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | --- | --- |
 | Enable BigFish | Toggle the native companion for this profile |
 | Character / bubble size | Independent sizing; small bubbles retain base font sizes |
-| Quiet / normal / lively | Idle micro-animation frequency |
-| Reduced motion | Reduce movement and procedural motion |
+| Quiet / normal / lively | Rest for 45–90 / 25–45 / 12–22 seconds after each idle action |
+| Reduced motion | Hold the character pose, stop idle / touch animation, keep live status updates |
 | Sounds | Notifications for completion and errors |
 | Bubble mode | Always, hidden, or selected states |
 | Subagents | Include subagent activity in displayed states |
@@ -194,7 +194,7 @@ GitHub Actions builds platform Helpers and publishes releases. See [Releasing](d
 
 ## Assets and licensing
 
-Current animations come from [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet), converted to transparent WebP frames at their native **24 fps**. The manifest contains 16 clips and 2,600 frames on a 412 × 344 canvas.
+Current animations come from [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet), converted to transparent WebP frames at their native **24 fps**. The manifest contains 16 clips and 3,444 frames on a 412 × 344 canvas, with the upstream revision, video checksums and frame windows recorded. See the [animation behavior reference](docs/animation-behavior.md) for triggers and handoffs.
 
 Code and character assets have different licenses. Read [ASSET_LICENSE.md](ASSET_LICENSE.md), the [source asset license](assets/dsh-pet-LICENSE.txt), and [LICENSE](LICENSE). Earlier assets and community dragging images remain archived under `legacy/` and are excluded from the current npm package.
 

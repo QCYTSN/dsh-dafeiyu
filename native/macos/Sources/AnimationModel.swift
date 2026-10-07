@@ -10,57 +10,31 @@ final class AnimationModel {
         let frames: [String]
         let frameMs: Int
         let loop: Bool
-        let motion: String?
     }
 
     static let states: Set<String> = [
         "IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED",
     ]
 
-    /// Drag-release reaction chain: clip name + hold time in ms. Shared with
-    /// the UI layer so the sequence is testable and stays aligned with the
-    /// manifest-registered stage clips (mirrors `DRAG_RELEASE_STAGES` in
-    /// `runtime/helper.py`).
-    ///
-    /// Each hold covers the motion its clip actually contains at the shipped
-    /// 42 ms/frame: `dragging_release` is a 49-frame bounce that settles around
-    /// frame 30, and `dragging_protest` is a 96-frame turn that completes around
-    /// frame 42. Shorter holds truncate the bounce and stop the turn in its
-    /// first quadrant. `dragging_dizzy` is a single static pose, so its hold is
-    /// a readability choice; it stays short enough to keep the whole reaction
-    /// under four seconds.
-    static let dragReleaseStages: [(clipName: String, holdMs: Int)] = [
-        ("dragging_release", 1320),
-        ("dragging_dizzy", 620),
-        ("dragging_protest", 1850),
-    ]
+    private static let dragClips: Set<String> = ["dragging", "dragging_release"]
+    private static let interactionClips: Set<String> = ["head_pat", "poke", "tail"]
 
-    /// The drag clip is a 241 frame dangling loop; frame 0 looks identical to
-    /// the idle pose, so a drag starts partway in and keeps advancing.
-    static let dragAnimationStartFrame = 36
-
-    private static let nonCrossfadeClips: Set<String> = [
-        "blink",
-        "glance",
-        "dragging",
-        "dragging_release",
-        "dragging_dizzy",
-        "dragging_protest",
-    ]
-
-    /// Same rules as the Python `crossfade_duration`: expression frames stay
-    /// crisp, dragging switches atomically.
+    /// Fade clip changes only; never blend successive 24 fps video frames.
     static func crossfadeDuration(previousClip: String, currentClip: String) -> Double? {
-        if nonCrossfadeClips.contains(previousClip) || nonCrossfadeClips.contains(currentClip) {
+        if previousClip == currentClip || dragClips.contains(previousClip) || dragClips.contains(currentClip) {
             return nil
         }
-        return previousClip != currentClip ? 0.10 : 0.045
+        return 0.10
     }
 
     private(set) var clips: [String: Clip] = [:]
     private var stateMap: [String: String] = [:]
     private var workingActivityMap: [String: String] = [:]
     private(set) var idleMicroClips: [String] = []
+    private var idleMicroIntervalsMs: [String: [Int]] = [:]
+    private var interactionCooldownMs = 1200
+    private var lastInteractionMs: Int?
+    private var lastIdleMicro: String?
 
     private(set) var baseState = "IDLE"
     private(set) var baseActivity: String?
@@ -82,14 +56,17 @@ final class AnimationModel {
                     name: name,
                     frames: frames,
                     frameMs: Self.asInt(v["frameMs"], fallback: 180),
-                    loop: (v["loop"] as? Bool) ?? false,
-                    motion: v["motion"] as? String
+                    loop: (v["loop"] as? Bool) ?? false
                 )
             }
         }
         if let map = manifest["stateMap"] as? [String: String] { stateMap = map }
         if let map = manifest["workingActivityMap"] as? [String: String] { workingActivityMap = map }
         if let micros = manifest["idleMicroClips"] as? [String] { idleMicroClips = micros }
+        idleMicroIntervalsMs = manifest["idleMicroIntervalsMs"] as? [String: [Int]] ?? [
+            "quiet": [45000, 90000], "normal": [25000, 45000], "lively": [12000, 22000],
+        ]
+        interactionCooldownMs = Self.asInt(manifest["interactionCooldownMs"], fallback: 1200)
         if let idleClip = stateMap["IDLE"], !idleClip.isEmpty {
             baseClipName = idleClip
             activeClipName = idleClip
@@ -97,11 +74,21 @@ final class AnimationModel {
     }
 
     var activeClip: Clip {
-        clips[activeClipName] ?? Clip(name: activeClipName, frames: [], frameMs: 180, loop: false, motion: nil)
+        clips[activeClipName] ?? Clip(name: activeClipName, frames: [], frameMs: 180, loop: false)
     }
 
     var frame: String {
         activeClip.frames.isEmpty ? "" : activeClip.frames[frameIndex]
+    }
+
+    var overlayRemainingMs: Int {
+        guard overlayClipName != nil, !activeClip.loop else { return 0 }
+        return (activeClip.frames.count - frameIndex) * activeClip.frameMs - frameElapsedMs
+    }
+
+    func idleMicroInterval(activityLevel: String) -> ClosedRange<Int> {
+        let pair = idleMicroIntervalsMs[activityLevel] ?? idleMicroIntervalsMs["normal"] ?? [25000, 45000]
+        return pair[0]...pair[1]
     }
 
     func applyState(_ state: String, activity: String? = nil) {
@@ -109,24 +96,31 @@ final class AnimationModel {
         baseState = state
         baseActivity = activity
         baseClipName = clip(for: state, activity: activity)
-        pulseState = nil
-        pulseDeadlineMs = nil
-        pulseClipName = nil
+        if state != "IDLE" {
+            pulseState = nil
+            pulseDeadlineMs = nil
+            pulseClipName = nil
+            if !Self.dragClips.contains(overlayClipName ?? "") { overlayClipName = nil }
+        }
         if overlayClipName == nil {
-            activate(baseClipName)
+            activate(underlayClipName)
         }
     }
 
-    func applyPulse(state: String, ttlMs: Int, nowMs: Int, resumeState: String?, resumeActivity: String?) {
+    func applyPulse(state: String, ttlMs: Int, nowMs: Int, resumeState: String?, resumeActivity: String?, completeClip: Bool = true) {
         guard Self.states.contains(state), ttlMs > 0 else { return }
         if let resume = resumeState, Self.states.contains(resume) {
             baseState = resume
             baseActivity = resumeActivity
             baseClipName = clip(for: resume, activity: resumeActivity)
         }
+        let previousDeadline = pulseState == state ? pulseDeadlineMs : nil
         pulseState = state
-        pulseDeadlineMs = nowMs + ttlMs
         pulseClipName = clip(for: state, activity: nil)
+        let pulseClip = clips[pulseClipName ?? ""]
+        let duration = completeClip ? (pulseClip?.frames.count ?? 0) * (pulseClip?.frameMs ?? 0) : 0
+        pulseDeadlineMs = max(nowMs + ttlMs, previousDeadline ?? nowMs + duration)
+        if !Self.dragClips.contains(overlayClipName ?? "") { overlayClipName = nil }
         if overlayClipName == nil {
             activate(pulseClipName ?? baseClipName)
         }
@@ -145,53 +139,57 @@ final class AnimationModel {
         activate(underlayClipName)
     }
 
-    /// Jump inside the clip that is playing right now, for loops whose first
-    /// frame is not the pose the interaction should start on.
-    func seekActiveClip(toFrame frame: Int) {
-        let clip = activeClip
-        guard !clip.frames.isEmpty else { return }
-        frameIndex = min(max(0, frame), clip.frames.count - 1)
-        frameElapsedMs = 0
+    @discardableResult
+    func playInteraction(_ clipName: String, nowMs: Int) -> Bool {
+        guard Self.interactionClips.contains(clipName), pulseState == nil else { return false }
+        let current = overlayClipName ?? ""
+        guard !Self.interactionClips.contains(current), !Self.dragClips.contains(current) else { return false }
+        if let last = lastInteractionMs, nowMs - last < interactionCooldownMs { return false }
+        guard playOverlay(clipName) else { return false }
+        lastInteractionMs = nowMs
+        return true
     }
 
     @discardableResult
     func playIdleMicro(index: Int = 0) -> Bool {
         guard baseState == "IDLE", overlayClipName == nil, pulseState == nil else { return false }
         guard !idleMicroClips.isEmpty else { return false }
-        return playOverlay(idleMicroClips[index % idleMicroClips.count])
+        var name = idleMicroClips[index % idleMicroClips.count]
+        if idleMicroClips.count > 1, name == lastIdleMicro {
+            name = idleMicroClips[(index + 1) % idleMicroClips.count]
+        }
+        lastIdleMicro = name
+        return playOverlay(name)
     }
 
     func advance(elapsedMs: Int, nowMs: Int) {
         guard elapsedMs >= 0 else { return }
+        var elapsed = elapsedMs
         if let deadline = pulseDeadlineMs, nowMs >= deadline {
             pulseState = nil
             pulseDeadlineMs = nil
             pulseClipName = nil
             if overlayClipName == nil {
                 activate(baseClipName)
+                elapsed = 0
             }
         }
 
         let clip = activeClip
-        guard clip.frames.count > 1 else { return }
-        frameElapsedMs += elapsedMs
-        while frameElapsedMs >= clip.frameMs {
-            frameElapsedMs -= clip.frameMs
-            if frameIndex + 1 < clip.frames.count {
-                frameIndex += 1
-                continue
-            }
-            if clip.loop {
-                frameIndex = 0
-                continue
-            }
-            if overlayClipName != nil {
-                overlayClipName = nil
-                activate(underlayClipName)
-            } else {
-                frameIndex = clip.frames.count - 1
-            }
-            break
+        guard !clip.frames.isEmpty else { return }
+        let total = frameElapsedMs + elapsed
+        let nextFrame = frameIndex + total / clip.frameMs
+        frameElapsedMs = total % clip.frameMs
+        if nextFrame < clip.frames.count {
+            frameIndex = nextFrame
+        } else if clip.loop {
+            frameIndex = nextFrame % clip.frames.count
+        } else if overlayClipName != nil {
+            overlayClipName = nil
+            activate(underlayClipName)
+        } else {
+            frameIndex = clip.frames.count - 1
+            frameElapsedMs = 0
         }
     }
 

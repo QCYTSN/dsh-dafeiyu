@@ -29,6 +29,7 @@ this script is a maintainer tool, not part of the runtime.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import shutil
 import subprocess
@@ -43,27 +44,30 @@ QUALITY = 68
 PAD = 12
 ALPHA_THRESHOLD = 8
 
-# (clip key, source file name, loop, (start_sec, end_sec) or None for full, motion)
-# Overlay clips trim to their centre action; state loops keep the full 10s cycle
-# whose first and last frames are the identical standard standing pose, which is
-# also what reduced-motion mode displays (looped clips freeze on frame 0).
+# (clip key, source file name, loop, (start_sec, end_sec) or None for full)
+# Keep the source's entrance and return-to-rest poses. Taking only the middle
+# of a click/eating action leaves hands, bubbles or tokens onscreen at the cut.
+# Dragging is the exception: loop only the suspended portion, then play the
+# source's complete landing once on mouse-up.
 SELECTION = [
-    ("idle", "待机呼吸休闲.webm", True, None, None),
-    ("waiting", "东张西望.webm", True, None, None),
-    ("thinking", "工作状态-思考冒泡.webm", True, None, None),
-    ("working", "工作状态-忙碌点按.webm", True, None, None),
-    ("working_search", "工作状态-原地踱步张望.webm", True, None, None),
-    ("working_command", "工作状态-清点归档.webm", True, None, None),
-    ("success", "工作状态-雀跃庆祝.webm", True, None, None),
-    ("error", "工作状态-垂头叹气冒汗.webm", True, None, None),
-    ("dragging", "被鼠标拖拽悬空反馈.webm", True, None, None),
-    ("dragging_release", "被鼠标拖拽悬空反馈.webm", False, (8.0, 10.04), None),
-    ("dragging_dizzy", "被鼠标拖拽悬空反馈.webm", True, (0.0, 1 / FPS), "dizzy"),
-    ("dragging_protest", "点击回应-傲娇生气.webm", False, (3.0, 7.0), None),
-    ("head_pat", "点击回应-挠痒咯咯笑.webm", False, (3.0, 7.0), None),
-    ("poke", "点击回应-元气挥手.webm", False, (3.0, 7.0), None),
-    ("tail", "鲸鱼吐泡泡特效.webm", False, (3.0, 7.0), None),
-    ("eat_token", "吃Token.webm", False, (2.5, 7.5), None),
+    ("idle", "待机呼吸休闲.webm", True, None),
+    ("waiting", "工作状态-原地踱步张望.webm", True, None),
+    ("thinking", "工作状态-思考冒泡.webm", True, None),
+    ("working", "工作状态-忙碌点按.webm", True, None),
+    ("working_search", "工作状态-原地踱步张望.webm", True, None),
+    ("working_command", "工作状态-清点归档.webm", True, None),
+    ("success", "工作状态-雀跃庆祝.webm", False, None),
+    # This upstream clip ends crouching, without a return to the first pose.
+    # Hold its final pose instead of snapping back to standing every five seconds.
+    ("error", "工作状态-垂头叹气冒汗.webm", False, None),
+    ("dragging", "被鼠标拖拽悬空反馈.webm", True, (2.0, 8.0)),
+    ("dragging_release", "被鼠标拖拽悬空反馈.webm", False, (8.0, 10.04)),
+    ("head_pat", "点击回应-挠痒咯咯笑.webm", False, None),
+    ("poke", "点击回应-元气挥手.webm", False, None),
+    ("tail", "鲸鱼吐泡泡特效.webm", False, None),
+    ("eat_token", "吃Token.webm", False, None),
+    ("idle_stretch", "超大伸懒腰.webm", False, None),
+    ("idle_yawn", "哈欠连天.webm", False, None),
 ]
 
 STATE_MAP = {
@@ -82,7 +86,13 @@ WORKING_ACTIVITY_MAP = {
     "testing": "working_command",
     "using-tool": "working",
 }
-IDLE_MICRO_CLIPS = ["eat_token"]
+IDLE_MICRO_CLIPS = ["idle_stretch", "idle_yawn", "eat_token"]
+IDLE_MICRO_INTERVALS_MS = {
+    "quiet": [45000, 90000],
+    "normal": [25000, 45000],
+    "lively": [12000, 22000],
+}
+UPSTREAM_COMMIT = "549fff2ea33c2acfb16612c76912c6137da4a758"
 
 _OPAQUE = bytes(1 if value > ALPHA_THRESHOLD else 0 for value in range(256))
 
@@ -167,22 +177,25 @@ def main() -> int:
     parser.add_argument("--source", type=Path, required=True, help="dsh-pet assets/webm directory")
     parser.add_argument("--ffmpeg", type=Path, required=True, help="ffmpeg bin directory")
     parser.add_argument("--out", type=Path, required=True, help="repository root")
+    parser.add_argument("--source-commit", default=UPSTREAM_COMMIT, help="upstream revision used for the source files")
     args = parser.parse_args()
 
     ffmpeg = args.ffmpeg / "ffmpeg.exe"
     if not ffmpeg.exists():
         ffmpeg = args.ffmpeg / "ffmpeg"
-    pet_root = args.out / "assets" / "pet"
+    pet_root = args.out.resolve() / "assets" / "pet"
+    if pet_root.is_symlink() or not pet_root.resolve().is_relative_to(args.out.resolve()):
+        raise RuntimeError("asset output must stay inside the selected repository")
     manifest_path = args.out / "assets" / "pet-manifest.json"
 
-    missing = sorted({name for _, name, _, _, _ in SELECTION if not (args.source / name).exists()})
+    missing = sorted({name for _, name, _, _ in SELECTION if not (args.source / name).exists()})
     if missing:
         print(f"missing source clips: {missing}", file=sys.stderr)
         return 1
 
     boxes = []
     sources = {}
-    for _, name, _, _, _ in SELECTION:
+    for _, name, _, _ in SELECTION:
         if name not in sources:
             sources[name] = frame_count_and_box(ffmpeg, args.source / name)
             print(f"measured {name}: {sources[name][0]} frames")
@@ -194,7 +207,7 @@ def main() -> int:
         shutil.rmtree(pet_root)
     encoded: dict[str, list[Path]] = {}
     clips: dict[str, dict] = {}
-    for key, name, loop, window, motion in SELECTION:
+    for key, name, loop, window in SELECTION:
         if name not in encoded:
             encoded[name] = encode_webp(ffmpeg, args.source / name, crop, pet_root / f"_src_{len(encoded)}")
         start = int(round((window[0] if window else 0.0) * FPS))
@@ -209,9 +222,15 @@ def main() -> int:
             # slices still see the full range.
             shutil.copyfile(str(frame), str(target))
             clip_frames.append(f"{key}/{target.name}")
-        clip: dict = {"frames": clip_frames, "frameMs": FRAME_MS, "loop": loop}
-        if motion:
-            clip["motion"] = motion
+        clip: dict = {
+            "frames": clip_frames, "frameMs": FRAME_MS, "loop": loop,
+            "source": {
+                "file": name,
+                "sha256": hashlib.sha256((args.source / name).read_bytes()).hexdigest(),
+                "startFrame": start, "endFrame": end,
+                "frameCount": sources[name][0],
+            },
+        }
         clips[key] = clip
         total_kb = sum(p.stat().st_size for p in clip_dir.glob("*.webp")) // 1024
         print(f"clip {key}: {len(clip_frames)} frames, {total_kb} KB")
@@ -224,10 +243,18 @@ def main() -> int:
         "baseSize": crop[2],
         "maxFrameWidth": crop[2],
         "maxFrameHeight": crop[3],
+        "assetSource": {
+            "repository": "https://github.com/PC2005-cloud/dsh-pet",
+            "commit": args.source_commit,
+            "directory": "dsh-pet/assets/webm",
+            "fps": FPS, "crop": list(crop), "webpQuality": QUALITY,
+        },
         "clips": clips,
         "stateMap": STATE_MAP,
         "workingActivityMap": WORKING_ACTIVITY_MAP,
         "idleMicroClips": IDLE_MICRO_CLIPS,
+        "idleMicroIntervalsMs": IDLE_MICRO_INTERVALS_MS,
+        "interactionCooldownMs": 1200,
     }
     manifest_path.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     total_mb = sum(p.stat().st_size for p in pet_root.rglob("*.webp")) // (1024 * 1024)

@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import math
 import os
 import random
 import sys
@@ -31,19 +30,6 @@ except ImportError:
 
 PROTOCOL_VERSION = 1
 STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONNECTED"}
-DRAG_RELEASE_MS = 1320
-DRAG_DIZZY_MS = 620
-DRAG_PROTEST_MS = 1850
-DRAG_RELEASE_STAGES = (
-    ("dragging_release", DRAG_RELEASE_MS),
-    ("dragging_dizzy", DRAG_DIZZY_MS),
-    ("dragging_protest", DRAG_PROTEST_MS),
-)
-# The drag clip is a 241 frame dangling loop. Rendering it from frame 0 looks
-# identical to the idle pose, so start partway into the loop: the first visible
-# frame already reads as "held", and the character keeps swinging while the
-# pointer moves it.
-DRAG_ANIMATION_START_FRAME = 36
 # A decoded 412x344 ARGB32 frame costs ~0.55 MB, so keeping every frame of a
 # 24 fps set resident would need well over a gigabyte. Frames are read from disk
 # once as compressed bytes and decoded through a bounded cache instead.
@@ -408,7 +394,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.pet_x = 0
             self.pet_y = 0
             self.dragging = False
-            self.drag_chain_id = 0
             self.last_tick_ms = self._now_ms()
             self.fade_from_pixmap: QPixmap | None = None
             self.fade_started = 0.0
@@ -459,6 +444,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.balance_summary = str(message.get("summary", ""))[:200]
                 self._sync_bubble_size()
             elif kind in {"state", "pulse"}:
+                previous_base_state = self.model.base_state
                 state = str(message.get("state", "IDLE"))
                 self.display_state = state
                 if kind == "pulse":
@@ -470,7 +456,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                         self._now_ms(),
                         resume_state,
                         message.get("resumeActivity"),
+                        complete_clip=not self.reduced_motion,
                     )
+                    ttl_ms = self.model.pulse_deadline_ms - self._now_ms()
                     self._show_status(
                         str(message.get("resumeMessage", self.LABELS.get(resume_state, resume_state))),
                         str(message.get("resumeDetail", "")),
@@ -496,6 +484,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                         state,
                         None if persistent else 4200,
                     )
+                if previous_base_state != self.model.base_state and not self.reduced_motion:
+                    self._schedule_micro()
             self._sync_frame_transition(previous_frame, previous_clip)
             self._sync_bubble_size()
             self.update()
@@ -507,7 +497,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.animation_timer.setInterval(self._animation_interval_ms())
             if enabled:
                 self.micro_timer.stop()
-                self._cancel_drag_release_chain()
+                if not self.dragging:
+                    self.model.clear_overlay()
             else:
                 self._schedule_micro()
 
@@ -594,7 +585,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             had_pulse = self.model.pulse_state is not None
             previous_frame = self.model.frame
             previous_clip = self.model.active_clip_name
-            model_elapsed = 0 if self.reduced_motion and self.model.active_clip.loop else elapsed_ms
+            model_elapsed = 0 if self.reduced_motion else elapsed_ms
             self.model.advance(model_elapsed, now_ms)
             self._sync_frame_transition(previous_frame, previous_clip)
             if had_pulse and self.model.pulse_state is None:
@@ -623,6 +614,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
         ) -> None:
             current_frame = self.model.frame
             if current_frame == previous_frame:
+                return
+            # Preserve an in-progress clip fade while its new video advances.
+            if allow_fade and previous_clip == self.model.active_clip_name:
                 return
             duration = crossfade_duration(previous_clip, self.model.active_clip_name) if allow_fade else None
             if duration is None:
@@ -654,19 +648,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if self.dragging:
                 return
             self.dragging = True
-            self.drag_chain_id += 1
             self.micro_timer.stop()
             played = self._play_model_overlay("dragging", allow_fade=False, repaint=False)
             if not played:
                 self.animation_timer.stop()
                 return
-            # The dangling loop has to keep advancing while the pointer moves the
-            # window, otherwise the pet stays on its first frame and looks frozen.
-            # Reduced motion keeps the previous frozen behaviour.
             clip = self.model.active_clip
-            if clip.frames:
-                self.model.frame_index = min(len(clip.frames) - 1, DRAG_ANIMATION_START_FRAME)
-                self.model.frame_elapsed_ms = 0
             if self.reduced_motion or not clip.loop:
                 self.animation_timer.stop()
             else:
@@ -681,66 +668,21 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             previous_clip = self.model.active_clip_name
             # Expire an underlying pulse before revealing it after a long drag.
             self.model.advance(0, now_ms)
-            self.model.clear_overlay()
+            if self.reduced_motion or not self.model.play_overlay("dragging_release"):
+                self.model.clear_overlay()
             self._sync_frame_transition(previous_frame, previous_clip, allow_fade=False)
             self.dragging = False
             self.last_tick_ms = now_ms
             self.animation_timer.start(self._animation_interval_ms())
             if not self.reduced_motion:
                 self._schedule_micro()
-                self._run_drag_release_chain()
-
-        def _run_drag_release_chain(self) -> None:
-            """Play release -> dizzy -> protest, then hand back to the base state.
-
-            Each stage's hold matches how long that clip's motion actually runs
-            (see DRAG_RELEASE_STAGES); the chain stays timer driven so a new grab
-            or a manifest without the stage clips aborts quietly.
-            """
-            self.drag_chain_id += 1
-            token = self.drag_chain_id
-
-            def play(index: int) -> None:
-                if token != self.drag_chain_id or self.dragging:
-                    return
-                if self.reduced_motion or index >= len(DRAG_RELEASE_STAGES):
-                    self._clear_drag_overlay()
-                    return
-                clip_name, hold_ms = DRAG_RELEASE_STAGES[index]
-                if not self._play_model_overlay(clip_name, allow_fade=False):
-                    self._clear_drag_overlay()
-                    return
-                QTimer.singleShot(hold_ms, lambda: play(index + 1))
-
-            QTimer.singleShot(0, lambda: play(0))
-
-        def _clear_drag_overlay(self) -> None:
-            if self.dragging:
-                return
-            previous_frame = self.model.frame
-            previous_clip = self.model.active_clip_name
-            self.model.clear_overlay()
-            self._sync_frame_transition(previous_frame, previous_clip)
-            self.update()
-
-        def _cancel_drag_release_chain(self) -> None:
-            self.drag_chain_id += 1
-            if not self.dragging and self.model.active_clip_name in {
-                name for name, _ in DRAG_RELEASE_STAGES
-            }:
-                self._clear_drag_overlay()
 
         def _schedule_micro(self) -> None:
             if self.reduced_motion:
                 self.micro_timer.stop()
                 return
-            intervals = {
-                "quiet": (12000, 24000),
-                "normal": (6500, 12500),
-                "lively": (3500, 8000),
-            }
-            lower, upper = intervals.get(self.activity_level, intervals["normal"])
-            self.micro_timer.start(random.randint(lower, upper))
+            lower, upper = self.model.idle_micro_interval(self.activity_level)
+            self.micro_timer.start(self.model.overlay_remaining_ms + random.randint(lower, upper))
 
         def _bubble_visible(self) -> bool:
             if self.bubble_mode == "hidden":
@@ -1181,45 +1123,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                                  text_width, round(23 * s), Qt.AlignmentFlag.AlignLeft | Qt.AlignmentFlag.AlignVCenter, text)
 
             pixmap = self._pixmap(self.model.frame)
-            phase = time.monotonic()
-            motion = self.model.active_clip.motion
-            if self.reduced_motion:
-                motion = None
-            scale_extra = 1.0
-            angle = 0.0
-            offset_x = 0
-            offset_y = 0
-            clip_name = self.model.active_clip_name
-            if motion == "breathe":
-                # 独立版同款：缩放呼吸 + 轻摇摆（无位移）
-                scale_extra = 1.0 + 0.02 * math.sin(phase * 2.5)
-                angle = math.sin(phase * 2.5) * 1.5
-            elif motion == "think":
-                offset_y = math.sin(phase * 2.8) * 3
-                angle = math.sin(phase * 1.3) * 0.8
-            elif motion == "work":
-                offset_x = math.sin(phase * 5.4) * 3
-                angle = math.sin(phase * 3.1) * 1.0
-            elif motion == "wait":
-                offset_y = math.sin(phase * 1.8) * 1
-                angle = math.sin(phase * 1.2) * 0.8
-            elif motion == "bounce":
-                offset_y = -abs(math.sin(phase * 5.2)) * 8
-                scale_extra = 1.0 + 0.02 * math.sin(phase * 5.2)
-            elif motion in {"shake", "dizzy"}:
-                offset_x = math.sin(phase * 11.0) * 4
-                angle = math.sin(phase * 11.0) * 1.5
-            elif motion == "float":
-                offset_y = math.sin(phase * 3.0) * 4
-                angle = math.sin(phase * 1.6) * 1.0
-            # Give walking clips a light bob and quick sway without changing frame timing.
-            if clip_name in ("working_search", "working_command"):
-                offset_y = -abs(math.sin(phase * 4.5)) * 5
-                angle = math.sin(phase * 9.0) * 2.5
-
-            # Scale procedural offsets with the character while retaining subpixel motion.
-            offset_x = offset_x * self.scale
-            offset_y = offset_y * self.scale
 
             fade_alpha = 1.0
             if self.fade_from_pixmap is not None and not self.fade_from_pixmap.isNull():
@@ -1230,21 +1133,14 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self.fade_from_pixmap = None
 
             def draw_pet(pix: QPixmap, alpha: float) -> None:
-                base_width = pix.width() * self.scale
-                base_height = pix.height() * self.scale
-                pw = base_width * scale_extra
-                ph = base_height * scale_extra
-                x = self._pet_offset_x(base_width) + (base_width - pw) / 2 + offset_x
-                y = self.height() - ph - 8 + offset_y
+                pw = pix.width() * self.scale
+                ph = pix.height() * self.scale
+                x = self._pet_offset_x(pw)
+                y = self.height() - ph - 8
                 if bubble_height > y:
                     y = bubble_height
-                cx = x + pw / 2
-                cy = y + ph / 2
                 painter.save()
                 painter.setOpacity(alpha)
-                painter.translate(cx, cy)
-                painter.rotate(angle)
-                painter.translate(-cx, -cy)
                 painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
                 painter.restore()
 
@@ -1291,19 +1187,24 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             relative_x = max(0.0, x - pet_x)
             relative_y = max(0.0, y - pet_y)
             if relative_y < pet_height * 0.45:
-                self._play_model_overlay("head_pat")
-                self._show_overlay("摸摸也不能让我少干活哦~", self.status_detail, self.status_state, 1800)
+                self._play_interaction("head_pat", "摸摸也不能让我少干活哦~")
             elif relative_x > pet_width * 0.72:
-                self._play_model_overlay("tail")
-                self._show_overlay("尾巴不是进度条啦！", self.status_detail, self.status_state, 1500)
+                self._play_interaction("tail", "尾巴不是进度条啦！")
             else:
-                self._play_model_overlay("poke")
-                self._show_overlay("戳我干嘛，任务还在跑呢", self.status_detail, self.status_state, 1500)
+                self._play_interaction("poke", "戳我干嘛，任务还在跑呢")
+
+        def _play_interaction(self, clip_name: str, message: str) -> None:
+            previous_frame, previous_clip = self.model.frame, self.model.active_clip_name
+            if not self.reduced_motion and not self.model.play_interaction(clip_name, self._now_ms()):
+                return
+            self._sync_frame_transition(previous_frame, previous_clip)
+            self._show_overlay(message, self.status_detail, self.status_state, 1800)
+            self._schedule_micro()
+            self.update()
 
         def mouseDoubleClickEvent(self, event: QMouseEvent) -> None:
             if event.button() == Qt.MouseButton.LeftButton:
-                self._play_model_overlay("head_pat")
-                self._show_overlay("好啦好啦，知道你喜欢我~", self.status_detail, self.status_state, 1800)
+                self._play_interaction("head_pat", "好啦好啦，知道你喜欢我~")
 
         def contextMenuEvent(self, event: Any) -> None:
             menu = QMenu(self)

@@ -62,7 +62,7 @@ test('pet manifest allowlists every bundled runtime frame', async () => {
 
 test('state clips play full-motion loops at the source-native 24fps cadence', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  for (const clipName of ['idle', 'waiting', 'thinking', 'working', 'working_search', 'working_command', 'success', 'error', 'dragging']) {
+  for (const clipName of ['idle', 'waiting', 'thinking', 'working', 'working_search', 'working_command', 'dragging']) {
     const clip = manifest.clips[clipName]
     assert.ok(clip.frames.length >= 30, `${clipName} should import a full-motion sequence`)
     assert.equal(clip.frameMs, 42, `${clipName} should stay on the source-native 24fps cadence`)
@@ -73,18 +73,43 @@ test('state clips play full-motion loops at the source-native 24fps cadence', as
 
 test('touch overlays play once and hand control back to the base state', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  for (const clipName of ['dragging_release', 'dragging_protest', 'head_pat', 'poke', 'tail', 'eat_token']) {
+  for (const clipName of ['success', 'error', 'dragging_release', 'head_pat', 'poke', 'tail', 'eat_token', 'idle_stretch', 'idle_yawn']) {
     const clip = manifest.clips[clipName]
     assert.ok(clip, `${clipName} must stay registered for the helper overlays`)
     assert.equal(clip.loop, false, `${clipName} overlays must not loop`)
   }
 })
 
-test('drag daze stays procedural so reduced-motion devices keep a stable pose', async () => {
+test('source windows preserve entrances and exits, with a separate hanging loop and complete landing', async () => {
   const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
-  assert.equal(manifest.clips.dragging_dizzy.frames.length, 1)
-  assert.equal(manifest.clips.dragging_dizzy.motion, 'dizzy')
-  assert.equal(manifest.clips.dragging.motion, undefined)
+  for (const [name, clip] of Object.entries(manifest.clips)) {
+    assert.match(clip.source.sha256, /^[a-f0-9]{64}$/, name)
+    assert.equal(clip.source.endFrame - clip.source.startFrame, clip.frames.length, name)
+    assert.equal(clip.frameMs, 42, name)
+    assert.equal(clip.motion, undefined, `${name} must not reuse procedural motion`)
+    if (!name.startsWith('dragging')) {
+      assert.equal(clip.source.startFrame, 0, `${name} loses its entrance`)
+      assert.equal(clip.source.endFrame, clip.source.frameCount, `${name} loses its exit`)
+    }
+  }
+  const hang = manifest.clips.dragging.source
+  const landing = manifest.clips.dragging_release.source
+  assert.equal(hang.file, landing.file)
+  assert.equal(hang.sha256, landing.sha256)
+  assert.equal(hang.endFrame, landing.startFrame, 'the hang must stop where the landing begins')
+  assert.equal(landing.endFrame, landing.frameCount, 'the landing must return to rest')
+  assert.equal(manifest.clips.dragging_dizzy, undefined)
+  assert.equal(manifest.clips.dragging_protest, undefined)
+  assert.equal(manifest.clips.waiting.source.file, manifest.clips.working_search.source.file)
+})
+
+test('idle actions have a full rest interval after playback, in increasing activity order', async () => {
+  const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+  const { quiet, normal, lively } = manifest.idleMicroIntervalsMs
+  assert.ok(quiet[0] >= normal[1] && normal[0] >= lively[1])
+  assert.ok(lively[0] >= 12000)
+  assert.ok(manifest.idleMicroClips.length >= 2)
+  for (const name of manifest.idleMicroClips) assert.equal(manifest.clips[name].loop, false)
 })
 
 test('original notification sounds are valid short mono WAV files', async () => {

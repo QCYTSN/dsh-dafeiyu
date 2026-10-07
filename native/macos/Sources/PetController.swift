@@ -8,7 +8,7 @@ import UserNotifications
 ///   + `.floating` level, re-asserted every 2 s so the pet stays above
 ///   full-screen apps.
 /// - Faithful port of the Qt helper's status card, multi-task card, animation
-///   model, procedural motion, drag/click interactions, right-click menu,
+///   model, drag/click interactions, right-click menu,
 ///   idle micro-animations and layout persistence.
 /// - Apple official permission handling (UserNotifications + Accessibility).
 final class PetController: NSObject {
@@ -32,12 +32,6 @@ final class PetController: NSObject {
     ]
 
     static let persistentStates: Set<String> = ["THINKING", "WORKING", "WAITING", "ERROR"]
-
-    static let microIntervals: [String: (Double, Double)] = [
-        "quiet": (12, 24),
-        "normal": (6.5, 12.5),
-        "lively": (3.5, 8),
-    ]
 
     let model: AnimationModel
     let manifest: [String: Any]
@@ -96,7 +90,6 @@ final class PetController: NSObject {
     private var lastTickMs: Int
     private var dragPetOffsetX: CGFloat = 0
     private var dragPetOffsetY: CGFloat = 8
-    private var dragChainID = 0
     private var fadeFromFrame: String?
     private var fadeStarted: CFTimeInterval = 0
     private var fadeDuration: Double = 0.15
@@ -370,13 +363,16 @@ final class PetController: NSObject {
     private func scheduleMicro() {
         microTimer?.invalidate()
         guard !reducedMotion else { return }
-        let range = Self.microIntervals[activityLevel] ?? Self.microIntervals["normal"]!
-        let delay = Double.random(in: range.0...range.1)
+        let range = model.idleMicroInterval(activityLevel: activityLevel)
+        let delay = Double(model.overlayRemainingMs + Int.random(in: range)) / 1000
         microTimer = Timer.scheduledTimer(withTimeInterval: delay, repeats: false) { [weak self] _ in
             guard let self = self else { return }
             if !self.dragging {
+                let previousFrame = self.model.frame
+                let previousClip = self.model.activeClipName
                 let index = Int.random(in: 0..<max(1, self.model.idleMicroClips.count))
                 _ = self.model.playIdleMicro(index: index)
+                self.syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
                 self.contentView?.needsDisplay = true
             }
             self.scheduleMicro()
@@ -390,7 +386,7 @@ final class PetController: NSObject {
         let hadPulse = model.pulseState != nil
         let previousFrame = model.frame
         let previousClip = model.activeClipName
-        let modelElapsed = reducedMotion && model.activeClip.loop ? 0 : elapsed
+        let modelElapsed = reducedMotion ? 0 : elapsed
         model.advance(elapsedMs: modelElapsed, nowMs: now)
         syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
         if hadPulse && model.pulseState == nil {
@@ -408,6 +404,7 @@ final class PetController: NSObject {
     private func syncFrameTransition(previousFrame: String, previousClip: String) {
         let currentFrame = model.frame
         guard currentFrame != previousFrame else { return }
+        guard previousClip != model.activeClipName else { return }
         if let duration = AnimationModel.crossfadeDuration(previousClip: previousClip, currentClip: model.activeClipName) {
             fadeFromFrame = previousFrame
             fadeStarted = CACurrentMediaTime()
@@ -422,7 +419,7 @@ final class PetController: NSObject {
     func beginDrag() {
         guard !dragging else { return }
         dragging = true
-        dragChainID &+= 1
+        fadeFromFrame = nil
         // Remember where the pet sits inside the window when the drag starts.
         // During the drag the window moves directly; without re-anchoring the
         // pet it would slide inside the window at the same rate and stay
@@ -439,7 +436,6 @@ final class PetController: NSObject {
             contentView?.needsDisplay = true
             return
         }
-        model.seekActiveClip(toFrame: AnimationModel.dragAnimationStartFrame)
         if reducedMotion || !model.activeClip.loop {
             animTimer?.invalidate()
         } else {
@@ -462,13 +458,13 @@ final class PetController: NSObject {
         guard dragging else { return }
         let now = Self.nowMs()
         model.advance(elapsedMs: 0, nowMs: now)
-        model.clearOverlay()
+        if reducedMotion || !model.playOverlay("dragging_release") { model.clearOverlay() }
+        fadeFromFrame = nil
         dragging = false
         lastTickMs = now
         startAnimTimer()
         if !reducedMotion {
             scheduleMicro()
-            runDragReleaseChain()
         }
         saveLayout()
         contentView?.needsDisplay = true
@@ -476,24 +472,29 @@ final class PetController: NSObject {
 
     func handleClick(at point: NSPoint, clickCount: Int) {
         if clickCount >= 2 {
-            _ = model.playOverlay("head_pat")
-            showOverlay("好啦好啦，知道你喜欢我~", statusDetail, statusState, 1800)
-            contentView?.needsDisplay = true
+            playInteraction("head_pat", message: "好啦好啦，知道你喜欢我~")
             return
         }
         let rect = petRect()
         let relativeX = max(0, point.x - rect.minX)
         let relativeY = max(0, point.y - rect.minY)
         if relativeY < rect.height * 0.45 {
-            _ = model.playOverlay("head_pat")
-            showOverlay("摸摸也不能让我少干活哦~", statusDetail, statusState, 1800)
+            playInteraction("head_pat", message: "摸摸也不能让我少干活哦~")
         } else if relativeX > rect.width * 0.72 {
-            _ = model.playOverlay("tail")
-            showOverlay("尾巴不是进度条啦！", statusDetail, statusState, 1500)
+            playInteraction("tail", message: "尾巴不是进度条啦！")
         } else {
-            _ = model.playOverlay("poke")
-            showOverlay("戳我干嘛，任务还在跑呢", statusDetail, statusState, 1500)
+            playInteraction("poke", message: "戳我干嘛，任务还在跑呢")
         }
+        contentView?.needsDisplay = true
+    }
+
+    private func playInteraction(_ clipName: String, message: String) {
+        let previousFrame = model.frame
+        let previousClip = model.activeClipName
+        guard reducedMotion || model.playInteraction(clipName, nowMs: Self.nowMs()) else { return }
+        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
+        showOverlay(message, statusDetail, statusState, 1800)
+        scheduleMicro()
         contentView?.needsDisplay = true
     }
 
@@ -570,7 +571,8 @@ final class PetController: NSObject {
         restartAnimTimer()
         if enabled {
             microTimer?.invalidate()
-            cancelDragReleaseChain()
+            if !dragging { model.clearOverlay() }
+            fadeFromFrame = nil
         } else {
             scheduleMicro()
         }
@@ -605,6 +607,9 @@ final class PetController: NSObject {
 
     func apply(_ message: [String: Any]) {
         logEvent(message)
+        let previousFrame = model.frame
+        let previousClip = model.activeClipName
+        let previousState = model.baseState
         guard let kind = message["kind"] as? String else { return }
         switch kind {
         case "shutdown":
@@ -628,6 +633,8 @@ final class PetController: NSObject {
         default:
             break
         }
+        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
+        if previousState != model.baseState { scheduleMicro() }
         maybeSaveSnapshot()
     }
 
@@ -648,7 +655,7 @@ final class PetController: NSObject {
 
     private func handlePulse(_ message: [String: Any]) {
         let state = Self.stringValue(message["state"]) ?? "IDLE"
-        let ttl = max(250, Self.intValue(message["ttlMs"]) ?? 1800)
+        var ttl = max(250, Self.intValue(message["ttlMs"]) ?? 1800)
         let resumeState = Self.stringValue(message["resumeState"]) ?? model.baseState
         let resumeActivity = Self.stringValue(message["resumeActivity"])
         model.applyPulse(
@@ -656,8 +663,10 @@ final class PetController: NSObject {
             ttlMs: ttl,
             nowMs: Self.nowMs(),
             resumeState: resumeState,
-            resumeActivity: resumeActivity
+            resumeActivity: resumeActivity,
+            completeClip: !reducedMotion
         )
+        ttl = max(250, (model.pulseDeadlineMs ?? Self.nowMs()) - Self.nowMs())
         showStatus(
             Self.stringValue(message["resumeMessage"]) ?? Self.labels[resumeState] ?? resumeState,
             Self.stringValue(message["resumeDetail"]) ?? "",
@@ -769,50 +778,6 @@ final class PetController: NSObject {
         overlayDeadlineMs = nil
     }
 
-    private func runDragReleaseChain() {
-        dragChainID &+= 1
-        playDragReleaseStage(0, token: dragChainID)
-    }
-
-    private func playDragReleaseStage(_ index: Int, token: Int) {
-        guard token == dragChainID, !dragging else { return }
-        guard !reducedMotion, index < AnimationModel.dragReleaseStages.count else {
-            clearDragReleaseOverlay()
-            return
-        }
-
-        let stage = AnimationModel.dragReleaseStages[index]
-        let previousFrame = model.frame
-        let previousClip = model.activeClipName
-        guard model.playOverlay(stage.clipName) else {
-            clearDragReleaseOverlay()
-            return
-        }
-        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
-        contentView?.needsDisplay = true
-
-        DispatchQueue.main.asyncAfter(deadline: .now() + Double(stage.holdMs) / 1000.0) { [weak self] in
-            self?.playDragReleaseStage(index + 1, token: token)
-        }
-    }
-
-    private func clearDragReleaseOverlay() {
-        guard !dragging else { return }
-        let previousFrame = model.frame
-        let previousClip = model.activeClipName
-        model.clearOverlay()
-        syncFrameTransition(previousFrame: previousFrame, previousClip: previousClip)
-        contentView?.needsDisplay = true
-    }
-
-    private func cancelDragReleaseChain() {
-        dragChainID &+= 1
-        let releaseClips = Set(AnimationModel.dragReleaseStages.map { $0.clipName })
-        if !dragging, releaseClips.contains(model.activeClipName) {
-            clearDragReleaseOverlay()
-        }
-    }
-
     func currentCard() -> (title: String, detail: String, state: String)? {
         let now = Self.nowMs()
         if !overlayMessage.isEmpty, overlayDeadlineMs == nil || now < overlayDeadlineMs! {
@@ -897,49 +862,6 @@ final class PetController: NSObject {
 
     func drawPet(in view: NSView) {
         guard let image = frameImage(for: model.frame) else { return }
-        let phase = CACurrentMediaTime()
-        var motion = model.activeClip.motion
-        if reducedMotion {
-            motion = nil
-        }
-        var scaleExtra: CGFloat = 1
-        var angle: CGFloat = 0
-        var offsetX: CGFloat = 0
-        var offsetY: CGFloat = 0
-        let clipName = model.activeClipName
-
-        switch motion {
-        case "breathe":
-            scaleExtra = 1 + 0.02 * CGFloat(sin(phase * 2.5))
-            angle = CGFloat(sin(phase * 2.5)) * 1.5
-        case "think":
-            offsetY = CGFloat(sin(phase * 2.8)) * 3
-            angle = CGFloat(sin(phase * 1.3)) * 0.8
-        case "work":
-            offsetX = CGFloat(sin(phase * 5.4)) * 3
-            angle = CGFloat(sin(phase * 3.1)) * 1.0
-        case "wait":
-            offsetY = CGFloat(sin(phase * 1.8)) * 1
-            angle = CGFloat(sin(phase * 1.2)) * 0.8
-        case "bounce":
-            offsetY = -abs(CGFloat(sin(phase * 5.2))) * 8
-            scaleExtra = 1 + 0.02 * CGFloat(sin(phase * 5.2))
-        case "shake", "dizzy":
-            offsetX = CGFloat(sin(phase * 11.0)) * 4
-            angle = CGFloat(sin(phase * 11.0)) * 1.5
-        case "float":
-            offsetY = CGFloat(sin(phase * 3.0)) * 4
-            angle = CGFloat(sin(phase * 1.6)) * 1.0
-        default:
-            break
-        }
-        if clipName == "working_search" || clipName == "working_command" {
-            offsetY = -abs(CGFloat(sin(phase * 4.5))) * 5
-            angle = CGFloat(sin(phase * 9.0)) * 2.5
-        }
-        offsetX *= scale
-        offsetY *= scale
-
         var fadeAlpha: CGFloat = 1
         var fadeImage: NSImage?
         if let fromFrame = fadeFromFrame, let fromImage = frameImage(for: fromFrame) {
@@ -953,12 +875,10 @@ final class PetController: NSObject {
         }
 
         let pet = petRect()
-        let baseWidth = pet.width
-        let baseHeight = pet.height
-        let drawWidth = baseWidth * scaleExtra
-        let drawHeight = baseHeight * scaleExtra
-        let x = pet.minX + (baseWidth - drawWidth) / 2 + offsetX
-        var y = pet.minY + (baseHeight - drawHeight) / 2 + offsetY
+        let drawWidth = pet.width
+        let drawHeight = pet.height
+        let x = pet.minX
+        var y = pet.minY
         let card = bubbleRect()
         let bubbleBottom = card.maxY + 12
         if bubbleBottom > y {
@@ -975,9 +895,6 @@ final class PetController: NSObject {
             }
             ctx.saveGState()
             ctx.translateBy(x: centerX, y: centerY)
-            if angle != 0 {
-                ctx.rotate(by: angle * .pi / 180)
-            }
             // The content view is flipped (top-left origin). NSImage drawing
             // does not compensate for a flipped context, which would render
             // the pet vertically mirrored. Mirror about the image's own

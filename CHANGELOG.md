@@ -1,5 +1,34 @@
 # Changelog
 
+## 0.1.16 · 2026-10-07
+
+### Fixed
+
+- Keep the entrance and return-to-rest frames of upstream touch and idle
+  animations. Record the upstream revision, source SHA-256 and frame windows
+  in the manifest so the shipped art can be traced and reproduced.
+- Loop only the suspended part of dragging, then play the complete landing
+  on release. Remove the timed dizzy / protest chain and procedural sway
+  inherited from the previous character implementation.
+- Render successive 24 fps frames directly; reserve a short fade for clip
+  changes and let that fade finish while the new clip advances.
+- Play completion / temporary-error animations through their exit, coalesce
+  repeated completion events and allow new work to interrupt immediately.
+  Hold a persistent error's last pose instead of looping its incomplete exit.
+- Use the upstream hourglass animation for waiting. Restore full click / tail
+  / token sequences, reject repeated clicks during a gesture and preserve a
+  1.2-second click cooldown after state interruptions.
+- Mirror activity selection, one-shot clips, completion pulses and reduced
+  motion in the optional WebUI overlay; repeated events no longer reset it.
+
+### Changed
+
+- Add upstream stretch / yawn idle actions, avoid immediate repetitions and
+  schedule the next idle action after a full rest interval: quiet 45–90 s,
+  normal 25–45 s, lively 12–22 s. Agent work interrupts decorative actions.
+- Document every action's trigger and handoff in `docs/animation-behavior.md`.
+
+
 ## 0.1.15 · 2026-10-06
 
 ### Added

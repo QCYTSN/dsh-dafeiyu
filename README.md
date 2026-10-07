@@ -12,7 +12,7 @@
 
 大肥鱼由 DSH 插件启动，随 DSH 一起退出。透明、无边框、始终置顶的原生窗口，让你在编辑器、浏览器或其他应用中也能看到 Agent 的工作状态。
 
-> **0.1.15** 新增余额显示，适配 DSH 0.2 插件管理与官方桌面端。桌面端用户可直接在应用中安装，无需自己运行 npm、Python 或 Helper。详见 [更新日志](CHANGELOG.md)。
+> **0.1.16** 修复动作衔接、重影和待机动作过密，恢复上游素材的起势与收尾。支持余额显示、DSH 0.2 插件管理与官方桌面端；桌面用户可在应用中直接安装。详见 [更新日志](CHANGELOG.md)。
 
 <img src="docs/images/balance-preview.png" width="460" alt="大肥鱼在任务状态卡底部显示 API 余额">
 
@@ -72,7 +72,7 @@ pnpm dsh web
 推荐直接在应用内安装：
 
 1. 打开官方 DeepSeek Harness 桌面应用，点击左侧 **插件**。
-2. 点击 **添加插件**，输入 `dsh-dafeiyu@0.1.15`，点击 **安装**。
+2. 点击 **添加插件**，输入 `dsh-dafeiyu@0.1.16`，点击 **安装**。
 3. 安装成功后点击 **立即启用**，大肥鱼会出现在桌面上。
 4. 在插件列表打开 **dsh-dafeiyu**，调整角色、气泡和余额设置，修改实时生效。
 
@@ -100,10 +100,10 @@ pnpm dsh web
 
 ```powershell
 # WebUI；文件路径替换为实际下载路径
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.16.tgz"
 
 # 官方桌面端；必须使用应用自带的 dsh
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.16.tgz"
 ```
 
 桌面端也可在 **添加插件** 的输入框填写 `.tgz` 的完整路径。
@@ -134,8 +134,8 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
 | --- | --- |
 | 启用大肥鱼 | 开关当前 profile 的原生角色 |
 | 角色大小 / 气泡大小 | 独立调整；小气泡保留基本字号 |
-| 安静 / 标准 / 活泼 | 调整空闲微动作频率 |
-| 减少动态 | 减少走动与程序化晃动 |
+| 安静 / 标准 / 活泼 | 每次待机动作结束后，分别休息 45～90 / 25～45 / 12～22 秒 |
+| 减少动态 | 固定角色姿势，停止待机与点击动画；状态和提示仍实时更新 |
 | 提示音 | 完成／出错时播放声音 |
 | 气泡显示 | 常驻、隐藏，或仅在指定状态显示 |
 | 子 Agent | 允许子 Agent 状态参与显示 |
@@ -144,6 +144,8 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.15.tgz"
 | 显示余额 / 余额来源 | 开关与选择余额查询来源 |
 
 设置页修改实时生效。右键菜单可调整大小、减少动态、打开对应 DSH 客户端，或仅在本次运行隐藏／关闭角色。
+
+点击动作会完整播完，再回到当前任务状态；新任务可立即打断装饰动作。拖拽期间只播放悬空姿势，松手后完整落地。具体触发、频率和衔接规则见 [动作说明](docs/animation-behavior.md)。
 
 若 WebUI 使用自定义地址，可在启动 Host 时设置 `DSH_DAFEIYU_WEBUI_URL`；它优先于自动推断的默认地址。
 
@@ -200,7 +202,7 @@ CI 还会隔离安装 DSH 0.2.0-rc.2 并运行 `scripts/test-dsh-settings.mjs`�
 
 ## 素材与授权
 
-当前动态素材来自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，以来源的 **24 fps** 转成透明 WebP 帧。当前清单含 16 组动作、2,600 帧，帧画布为 412 × 344。
+当前动态素材来自 [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet)，以来源的 **24 fps** 转成透明 WebP 帧。当前清单含 16 组动作、3,444 帧，帧画布为 412 × 344；清单记录了上游版本、视频校验值和取帧范围。
 
 软件代码与角色素材适用不同授权，请完整阅读 [ASSET_LICENSE.md](ASSET_LICENSE.md)、[素材来源许可证](assets/dsh-pet-LICENSE.txt)和 [LICENSE](LICENSE)。旧版素材及社区拖拽图片保留于 `legacy/`，不随当前 npm 包分发。
 
