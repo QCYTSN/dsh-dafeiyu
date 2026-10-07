@@ -643,7 +643,8 @@ final class PetController: NSObject {
         let activity = Self.stringValue(message["activity"])
         displayState = state
         model.applyState(state, activity: activity)
-        clearOverlay()
+        displayState = model.pulseState ?? state
+        if model.pulseState == nil { clearOverlay() }
         showStatus(
             Self.stringValue(message["message"]) ?? Self.labels[state] ?? state,
             Self.stringValue(message["detail"]) ?? "",

@@ -476,7 +476,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 else:
                     activity = None if self.reduced_motion else message.get("activity")
                     self.model.apply_state(state, activity)
-                    self._clear_overlay()
+                    self.display_state = self.model.pulse_state or state
+                    if self.model.pulse_state is None:
+                        self._clear_overlay()
                     persistent = state in {"THINKING", "WORKING", "WAITING", "ERROR"}
                     self._show_status(
                         str(message.get("message", self.LABELS.get(state, state))),
