@@ -370,9 +370,12 @@ jobs:
             if [[ "$VERSION" == *-* ]]; then
               release_flags+=(--prerelease)
             fi
+            notes_file="$RUNNER_TEMP/dsh-dafeiyu-release-notes.md"
+            node scripts/release-notes.mjs > "$notes_file"
             gh release create "$release_tag" "$ARCHIVE" \
               --target "$GITHUB_SHA" \
               --title "DSH BigFish ${release_tag}" \
+              --notes-file "$notes_file" \
               --generate-notes \
               "${release_flags[@]}"
           fi

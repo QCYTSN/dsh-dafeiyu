@@ -1,5 +1,27 @@
 # Acceptance records
 
+> Historical validation, not an installation guide. Use the [latest stable
+> release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) and the current
+> [updating guide](UPDATING.md). This record is retained in GitHub and excluded
+> from the installable package.
+
+## 2026-10-07 · Animation handoffs / 0.1.16
+
+- Verified all 2,600 previously installed animation frames against the repository;
+  the old character's archived PNGs were not referenced by the runtime.
+- Verified the resulting 16 clips / 3,444 frames against the pinned upstream
+  source windows, including complete touch, idle, and landing sequences.
+- Passed 109 JavaScript, 49 Python, and 33 Swift tests in
+  [main CI](https://github.com/QCYTSN/dsh-dafeiyu/actions/runs/37580317168).
+- Passed all platform builds, final-archive checks, and trusted publishing in
+  [release CI](https://github.com/QCYTSN/dsh-dafeiyu/actions/runs/37580636627).
+- Installed the public npm package into the existing Windows Desktop
+  0.2.0-rc.2 profile; confirmed settings were retained, balance remained ready,
+  and the new activity intervals appeared in the plugin detail page.
+- Tested real Desktop clicks and dragging and restored the companion's position.
+  Controlled native-window playback also verified task interruption, full landing,
+  and completion messages across repeated idle snapshots.
+
 ## 2026-10-06 · Official Windows Desktop / 0.1.15
 
 Tested the existing DeepSeek Harness Desktop **0.2.0-rc.2** installation on

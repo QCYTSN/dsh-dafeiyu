@@ -36,7 +36,8 @@ Before publishing:
 
 1. Update the version in `package.json`. npm versions are immutable and cannot be reused.
 2. Add the release notes to `CHANGELOG.md`.
-3. Update the current version in `README.md` and `README_EN.md`.
+3. Update the current version and archive name in `README.md`, `README_EN.md`, and
+   `docs/UPDATING.md`. All user-facing download links must point to `releases/latest`.
 4. Commit the changes on `main` and leave the worktree clean.
 
 ## Recommended release command
@@ -75,17 +76,22 @@ workflow rejects a Git tag that does not exactly match the version in `package.j
 The **Run workflow** button remains useful for maintainers diagnosing CI, but it is not the normal
 release path and it does not replace the repository's Git tag/history checks.
 
-`dsh plugin --profile web add dsh-dafeiyu` (without `@alpha`) installs whatever npm's `latest`
-dist-tag points to. npm trusted publishing provides short-lived OIDC credentials only for package
-publishing; npm does not support using that OIDC exchange for `npm dist-tag`. If the package owner
-intentionally wants an alpha to become the default install, promote it separately from an
-authenticated owner session:
+The default npm install uses `latest`, which must remain a stable release. Do not promote a
+historical alpha as the default install. npm trusted publishing provides short-lived OIDC
+credentials for publishing and cannot run `npm dist-tag`; package-owner tag management is a
+separate authenticated action. Do not store a long-lived npm token for it.
 
-```bash
-npm dist-tag add dsh-dafeiyu@0.1.0-alpha.15 latest
-```
+## Keep the download page unambiguous
 
-Do not place a long-lived npm token in WSL merely to perform this promotion.
+- Release notes identify the installable `dsh-dafeiyu-<version>.tgz` and link to the latest stable
+  release. GitHub's automatic source ZIP / tar archives are not installable plugin packages.
+- After the new stable release and npm `latest` are verified, mark older release records as
+  historical and remove their old `.tgz` attachments. Keep published version tags and release
+  history intact. Do not remove the current stable attachment before its replacement is ready.
+- Remove completed repository-owned development branches only after confirming their work is
+  merged or superseded. Active contributor PRs are separate from the recommended downloads.
+- Keep historical acceptance notes out of the npm documentation whitelist. Preserve all current
+  and archived character assets and their licenses.
 
 ## Failure and retry behavior
 

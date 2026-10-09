@@ -4,15 +4,15 @@
 
 **A desktop companion for DeepSeek Harness.**
 
-[中文](README.md) · [npm](https://www.npmjs.com/package/dsh-dafeiyu) · [Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) · [Changelog](CHANGELOG.md)
+[中文](README.md) · [npm](https://www.npmjs.com/package/dsh-dafeiyu) · [Download latest](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest) · [Changelog](CHANGELOG.md)
 
-[![npm](https://img.shields.io/npm/v/dsh-dafeiyu?label=npm)](https://www.npmjs.com/package/dsh-dafeiyu) [![Release](https://img.shields.io/github/v/release/QCYTSN/dsh-dafeiyu)](https://github.com/QCYTSN/dsh-dafeiyu/releases)
+[![npm](https://img.shields.io/npm/v/dsh-dafeiyu?label=npm)](https://www.npmjs.com/package/dsh-dafeiyu) [![Release](https://img.shields.io/github/v/release/QCYTSN/dsh-dafeiyu)](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)
 
 </div>
 
 BigFish starts and stops with its DSH Host. A transparent, frameless native window keeps the Agent's task status visible while you work in other apps.
 
-> **0.1.16** fixes abrupt animation handoffs, frame ghosting and overly frequent idle actions, restoring upstream entrances and exits. Balance display, DSH 0.2 plugin management and official Desktop remain supported. Install directly in the app. See the [Changelog](CHANGELOG.md).
+> **Current stable version: 0.1.17.** This release organizes installation and download instructions and preserves the animations, assets, and balance features from 0.1.16. Install `dsh-dafeiyu@0.1.17`, or download **`dsh-dafeiyu-0.1.17.tgz`** from the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest). Windows, Linux, and macOS share this one package. GitHub's automatic **Source code (zip / tar.gz)** downloads are source archives, not installable packages.
 
 <img src="docs/images/balance-preview.png" width="460" alt="BigFish displays API balance below the current task">
 
@@ -49,21 +49,21 @@ For command-line installation, updates, or removal, fully quit the target DSH Ho
 With a global DSH CLI:
 
 ```powershell
-dsh plugin --profile web add dsh-dafeiyu
+dsh plugin --profile web add dsh-dafeiyu@0.1.17
 dsh web
 ```
 
 With `npx`, without a global install:
 
 ```powershell
-npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu
+npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu@0.1.17
 npx -y @deepseek-ai/dsh web
 ```
 
 From a DeepSeek Harness source checkout, run in that checkout:
 
 ```powershell
-pnpm dsh plugin --profile web add dsh-dafeiyu
+pnpm dsh plugin --profile web add dsh-dafeiyu@0.1.17
 pnpm dsh web
 ```
 
@@ -72,7 +72,7 @@ pnpm dsh web
 Install directly in the app:
 
 1. Open the official DeepSeek Harness Desktop app and select **Plugins** in the sidebar.
-2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.16`, and select **Install**.
+2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.17`, and select **Install**.
 3. After installation, select **Enable now**. BigFish appears on your desktop.
 4. Open **dsh-dafeiyu** in the plugin list to adjust the character, bubble, and balance settings. Changes apply live.
 
@@ -87,7 +87,7 @@ For command-line installation:
 3. Run:
 
    ```powershell
-   dsh plugin --profile desktop add dsh-dafeiyu
+   dsh plugin --profile desktop add dsh-dafeiyu@0.1.17
    ```
 
 4. Reopen Desktop and select dsh-dafeiyu under sidebar Plugins.
@@ -96,14 +96,14 @@ The `dsh` command above must belong to Desktop. A standalone npm or `npx @deepse
 
 ### Release archive
 
-Download a `.tgz` from [Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) and install it with the appropriate client's CLI. Do not unpack it first:
+Open the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), download **`dsh-dafeiyu-0.1.17.tgz`** under **Assets**, and install it with the appropriate client's CLI. Do not unpack it first. Historical versions and **Source code** archives are not the recommended installation:
 
 ```powershell
 # WebUI; replace the path with your downloaded file
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.16.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.17.tgz"
 
 # Official Desktop; use its bundled CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.16.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.17.tgz"
 ```
 
 Desktop also accepts the full `.tgz` path in its **Add plugin** field.
@@ -155,7 +155,7 @@ The native window appears on the machine running the Host. A remote server or a 
 
 ## Update and troubleshoot
 
-Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu` again, and enable it to install the newer release. Alternatively use Desktop's bundled CLI below.
+Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu@0.1.17`, and enable it. Alternatively use Desktop's bundled CLI below.
 
 Quit the target Host, update, and restart:
 
@@ -169,12 +169,12 @@ dsh plugin --profile desktop update dsh-dafeiyu
 
 Desktop's plugin manager is also supported. Rollback, removal, Windows `EPERM`, and restoring settings after a DSH migration are covered in [Updating and rollback](docs/UPDATING.md), currently in Chinese.
 
-- DSH 0.2 settings: upgrade to 0.1.15 and open sidebar Plugins → dsh-dafeiyu. Previous Hosts retain their older settings entry.
+- DSH 0.2 settings: install the current stable release and open sidebar Plugins → dsh-dafeiyu. Previous Hosts retain their older settings entry.
 - Installation reports only `[exit 1]`: include the detailed plugin-manager log, such as `hub.log`, DSH version, OS, and install method.
 - Balance unavailable: check DSH's credentials and gateway endpoint support.
 - Companion missing: check the profile, enable switch, and the Host's graphical desktop.
 
-The [issue / PR triage](docs/GITHUB_TRIAGE.md) separates implemented fixes from reports needing more evidence. [Acceptance records](docs/ACCEPTANCE.md) contain historical validation.
+The [issue / PR triage](https://github.com/QCYTSN/dsh-dafeiyu/blob/main/docs/GITHUB_TRIAGE.md) separates implemented fixes from reports needing more evidence. [Acceptance records](https://github.com/QCYTSN/dsh-dafeiyu/blob/main/docs/ACCEPTANCE.md) contain historical validation. Older version numbers in these records are for traceability, not installation recommendations.
 
 ## Develop from source
 
@@ -190,7 +190,7 @@ Python development uses `requirements.txt`; macOS needs Xcode Command Line Tools
 
 CI also installs DSH 0.2.0-rc.2 in isolation and runs `scripts/test-dsh-settings.mjs` against its settings API. This check uses a test storage adapter and never reads user profiles or credentials.
 
-GitHub Actions builds platform Helpers and publishes releases. See [Releasing](docs/RELEASING.md).
+GitHub Actions builds platform Helpers and publishes releases. See [Releasing](https://github.com/QCYTSN/dsh-dafeiyu/blob/main/docs/RELEASING.md).
 
 ## Assets and licensing
 

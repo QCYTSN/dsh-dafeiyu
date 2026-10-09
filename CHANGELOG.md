@@ -1,5 +1,23 @@
 # Changelog
 
+> This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
+
+## 0.1.17 · 2026-10-09
+
+### Changed
+
+- Point Chinese and English installation instructions to the current stable
+  release, distinguish the installable `.tgz` from GitHub source archives,
+  and remove obsolete version recommendations from the updating guide.
+- Limit packaged documentation to current user guides and images. Historical
+  acceptance records and maintainer notes remain available in the repository.
+- Include installation instructions and the matching changelog section in
+  future GitHub Releases. Keep the stable download entry at `releases/latest`.
+- Retire obsolete GitHub installation attachments and completed development
+  branches while preserving historical release records and published tags.
+- Retain all current and archived character assets without changing animation
+  behavior. Mark the archived asset directory as source material only.
+
 ## 0.1.16 · 2026-10-07
 
 ### Fixed

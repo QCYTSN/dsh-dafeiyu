@@ -1,6 +1,6 @@
 {
   "name": "dsh-dafeiyu",
-  "version": "0.1.16",
+  "version": "0.1.17",
   "description": "A desktop-native BigFish companion driven by DeepSeek Harness session events.",
   "author": "QCYTSN",
   "type": "module",
@@ -35,7 +35,9 @@
     "assets/cursor_grab.cur",
     "assets/cursor_grabbing.cur",
     "assets/cursors/",
-    "docs/",
+    "docs/UPDATING.md",
+    "docs/animation-behavior.md",
+    "docs/images/",
     "cordis.patch.yml",
     "requirements.txt",
     "README.md",

@@ -2,7 +2,7 @@
 
 先确认插件安装在 `web` 还是官方桌面端的 `desktop` profile。使用命令操作前完全退出对应 Host，包括托盘或后台仍在运行的进程；操作完成后重新启动。使用应用内插件管理时，按应用提示重启。
 
-余额与 DSH 0.2 插件设置修复从 **0.1.15** 起提供。
+**当前稳定版为 0.1.17。** 推荐安装 `dsh-dafeiyu@0.1.17`，下载入口固定为[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)。动画、余额与 DSH 0.2 插件设置修复均已包含在当前版本中。
 
 ## WebUI
 
@@ -22,9 +22,9 @@ npx -y @deepseek-ai/dsh plugin --profile web update dsh-dafeiyu
 
 ## 官方桌面端
 
-官方桌面端 0.2.0-rc.2 的安装页面明确说明暂不支持自动更新。打开左侧 **插件**，卸载 **dsh-dafeiyu**，再通过 **添加插件** 安装 `dsh-dafeiyu@0.1.15`，并点击 **立即启用**。若应用提示刷新或重启，按提示操作。
+官方桌面端 0.2.0-rc.2 的安装页面明确说明暂不支持自动更新。打开左侧 **插件**，卸载 **dsh-dafeiyu**，再通过 **添加插件** 安装 `dsh-dafeiyu@0.1.17`，并点击 **立即启用**。若应用提示刷新或重启，按提示操作。
 
-只填包名会选择安装源中的最新版。新版本刚发布时，默认安装源可能仍返回旧版；指定目标版本后核对详情页版本号。以后升级时，将 `0.1.15` 替换为目标版本。
+只填包名会选择安装源中的最新版。新版本刚发布时，默认安装源可能仍返回旧版；使用本页的明确版本号，并在安装后核对详情页。以后升级时以[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)为准。
 
 命令方式必须使用**桌面应用自带的 CLI**。先启动一次应用初始化 profile，完全退出，再执行：
 
@@ -36,19 +36,23 @@ dsh plugin --profile desktop update dsh-dafeiyu
 
 第三方桌面壳可能仍连接 `web` profile，需按实际 Host 判断。
 
-## 回退或安装离线包
+## 安装当前离线包
 
-从 [Releases](https://github.com/QCYTSN/dsh-dafeiyu/releases) 下载目标版本 `.tgz`，不解压，用同一 profile 的 `add` 命令替换安装：
+从[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)的 **Assets** 下载 **`dsh-dafeiyu-0.1.17.tgz`**。这是 Windows、Linux 和 macOS 共用的安装包；**Source code (zip / tar.gz)** 仅供源码开发。安装包不用解压，用同一 profile 的 `add` 命令替换安装：
 
 ```powershell
 # WebUI
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.17.tgz"
 
 # 官方桌面端，自带 CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.14.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.17.tgz"
 ```
 
-路径和版本替换为实际文件。升级 DSH 后回退到旧插件，可能重新遇到设置接口兼容问题，请同时核对两者版本。
+路径替换为实际下载位置。桌面应用的 **添加插件** 也接受安装包的完整路径。
+
+## 有意回退（仅排错）
+
+历史发布页保留版本记录，旧安装附件已撤下，避免被当作最新版下载。确需排错回退时，先选定与当前 DSH 兼容的已知版本，再用对应客户端的 `add` 命令安装 npm 上的明确版本。不要使用历史测试记录中的版本号作为一般安装建议；升级 DSH 后回退到旧插件，可能重新遇到设置接口兼容问题。
 
 ## 移除
 
