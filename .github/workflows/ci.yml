@@ -87,6 +87,9 @@ jobs:
       - name: Install Helper build dependencies
         run: python -m pip install --disable-pip-version-check -r requirements.txt pyinstaller
 
+      - name: Test native card layout
+        run: python -m unittest runtime.tests.test_helper_geometry -v
+
       - name: Build and visually smoke-test Linux Helper
         env:
           DSH_DAFEIYU_BUILD_PYTHON: ${{ env.pythonLocation }}/bin/python

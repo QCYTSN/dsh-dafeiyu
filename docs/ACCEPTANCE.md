@@ -5,6 +5,19 @@
 > [updating guide](UPDATING.md). This record is retained in GitHub and excluded
 > from the installable package.
 
+## 2026-10-10 · Desktop opening and fixed character position / 0.1.18
+
+- Reproduced opening failure with the existing Windows Desktop 0.2.0-rc.2:
+  Qt accepted `dsh://open` but the interface did not appear when the Helper
+  inherited `ELECTRON_RUN_AS_NODE=1`. The corrected Helper environment opened
+  that same app and restored its minimized main window.
+- Reproduced a character anchor changing from y=30 to y=190 after card growth,
+  and a notification restoring the rendered character to y=328 while its saved
+  anchor remained y=500. These cases now preserve a single anchor.
+- Passed 111 JavaScript and 54 Python tests locally, including the real Qt
+  window with card changes, balances, task lists, alerts, and drag/landing.
+- Kept all frame assets, source provenance, and animation durations unchanged.
+
 ## 2026-10-07 · Animation handoffs / 0.1.16
 
 - Verified all 2,600 previously installed animation frames against the repository;

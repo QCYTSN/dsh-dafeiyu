@@ -1,6 +1,6 @@
 {
   "name": "dsh-dafeiyu",
-  "version": "0.1.17",
+  "version": "0.1.18",
   "description": "A desktop-native BigFish companion driven by DeepSeek Harness session events.",
   "author": "QCYTSN",
   "type": "module",
@@ -19,6 +19,7 @@
     "runtime/animation_model.py",
     "runtime/layout_store.py",
     "runtime/asset_paths.py",
+    "runtime/pet_geometry.py",
     "runtime/__init__.py",
     "runtime/bin/",
     "native/macos/",

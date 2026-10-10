@@ -2,6 +2,12 @@
 
 > 此文件记录 issue / PR 的处理依据，不是安装指南。旧版本号用于追溯；安装请使用[当前稳定版](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)。本记录不随安装包分发。
 
+## 2026-10-10 修复
+
+- [#87](https://github.com/QCYTSN/dsh-dafeiyu/issues/87) 与 [#78 的重启后打不开反馈](https://github.com/QCYTSN/dsh-dafeiyu/issues/78#issuecomment-6094058849)：官方 Desktop 的 Host 设置 `ELECTRON_RUN_AS_NODE=1`，Helper 继承后又将该变量传给通过 `dsh://open` 启动的应用。0.1.18 在 Helper 启动边界清除它；本地已有的 Windows Desktop 0.2.0-rc.2 已复现清除前无界面、清除后正常唤起。
+- #87 位置偏移：已复现气泡高度变化改写角色纵坐标，以及提醒抖动结束后把窗口恢复到尺寸变化前的旧坐标。0.1.18 固定角色锚点、顶部气泡改放下方，并移除 Qt / macOS 的提醒窗口抖动。保留原素材及动作时长。
+- 双击打开客户端属于独立交互建议，本次保留双击摸头，先修复现有打开动作和位置问题。没有自动关闭贡献者 issue 或合并其 PR。
+
 ## 2026-10-09 整理
 
 - 当前稳定版安装说明已统一到 0.1.17，素材与动画行为沿用 0.1.16。

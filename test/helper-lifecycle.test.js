@@ -41,6 +41,24 @@ test('helper process exposes WSL detection helpers without throwing', () => {
   assert.equal(typeof defaultCommand(true), 'string')
 })
 
+test('a helper child cannot inherit the Desktop Host Electron Node mode', async () => {
+  const logger = { debug() {}, info() {}, warn() {}, error() {} }
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    args: ['-e', 'process.exit(process.env.ELECTRON_RUN_AS_NODE === undefined && process.env.DSH_DAFEIYU_WEBUI_URL === "dsh://open" ? 0 : 1)'],
+    env: { ELECTRON_RUN_AS_NODE: '1', DSH_DAFEIYU_WEBUI_URL: 'dsh://open' },
+    heartbeatMs: 0,
+  }, logger)
+  const child = bridge.start()
+  // This probe intentionally sends no READY; it only checks the child environment.
+  bridge.stop('environment-probe')
+  const code = await new Promise((resolve, reject) => {
+    child.once('exit', resolve)
+    child.once('error', reject)
+  })
+  assert.equal(code, 0)
+})
+
 test('helper consumes events and exits when the plugin stops', async () => {
   const directory = await mkdtemp(join(tmpdir(), 'dsh-dafeiyu-test-'))
   const eventLog = join(directory, 'events.jsonl')

@@ -30,10 +30,9 @@ PyObjC 在 macOS 26 上崩溃 → EPIPE 未捕获 → 整个 dsh 服务器退出
 
 - 状态展示：`IDLE / THINKING / WORKING / WAITING / SUCCESS / ERROR /
   DISCONNECTED`，状态卡 + 多任务卡（颜色、图标、截断文本）
-- 动画内核：`runtime/animation_model.py` 的忠实移植（clips、pulse、
-  overlay、idle 微动作、crossfade、程序化 motion：breathe/think/work/
-  wait/bounce/shake/dizzy/float + 行走摆动）
-- 交互：左键拖拽（带抓取、松手、眩晕和抗议动画并持久化位置）、单击摸头/戳/尾巴、
+- 动画内核：与 `runtime/animation_model.py` 共用上游帧清单及播放规则，
+  包括任务状态、完整完成提示、待机动作和动作间淡化；不叠加程序化摇摆或窗口抖动。
+- 交互：左键拖拽（悬空段循环、松手后完整落地并持久化位置）、单击摸头/戳/尾巴、
   双击、右键菜单（大小/气泡大小/减少动态/打开 WebUI/辅助功能权限/
   本次隐藏/本次关闭）
 - 全屏置顶：`NSWindow.CollectionBehavior` 的 `canJoinAllSpaces` +
@@ -42,7 +41,7 @@ PyObjC 在 macOS 26 上崩溃 → EPIPE 未捕获 → 整个 dsh 服务器退出
 - 布局持久化：`~/.dsh/dsh-dafeiyu/layout.json`（与旧版同路径；首次启动
   自动迁移旧 Qt 版 top-left 坐标到 AppKit bottom-left）
 - 权限（苹果官方接口）：UserNotifications 通知授权
-  （SUCCESS/ERROR 脉冲时提示，失败则回退到 beep + 窗口抖动）；
+  （SUCCESS/ERROR 脉冲时提示，同时按设置播放提示音）；
   Accessibility 检查/请求（`AXIsProcessTrustedWithOptions` + 系统设置
   深链），可在右键菜单触发
 - 协议兼容：与插件 `src/protocol.js` 完全一致（ready/pong/closed +

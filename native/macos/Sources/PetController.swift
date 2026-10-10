@@ -84,9 +84,6 @@ final class PetController: NSObject {
     private var animTimer: Timer?
     private var keepFrontTimer: Timer?
     private var microTimer: Timer?
-    private var shakeTimer: Timer?
-    private var shakeOrigin: NSPoint?
-    private var shakeCount = 0
     private var lastTickMs: Int
     private var dragPetOffsetX: CGFloat = 0
     private var dragPetOffsetY: CGFloat = 8
@@ -586,9 +583,12 @@ final class PetController: NSObject {
     }
 
     @objc private func openWebUI(_ sender: Any?) {
-        if let url = URL(string: webuiURL) {
-            NSWorkspace.shared.open(url)
+        if let url = URL(string: webuiURL), NSWorkspace.shared.open(url) {
+            return
         }
+        FileHandle.standardError.write(Data("Unable to open the configured DSH client\n".utf8))
+        showOverlay("无法打开 DSH", "请确认 DSH 已安装、打开地址设置正确", "ERROR", 4000)
+        contentView?.needsDisplay = true
     }
 
     @objc private func accessibilityPermission(_ sender: Any?) {
@@ -743,7 +743,6 @@ final class PetController: NSObject {
         animTimer?.invalidate()
         keepFrontTimer?.invalidate()
         microTimer?.invalidate()
-        shakeTimer?.invalidate()
         if reportClosed {
             ProtocolIO.shared.write([
                 "protocolVersion": 1,
@@ -811,7 +810,6 @@ final class PetController: NSObject {
                 sound.play()
             }
         }
-        shakeWindow()
         Permissions.requestNotificationAuthorizationIfNeeded()
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
@@ -823,34 +821,6 @@ final class PetController: NSObject {
             if let error = error {
                 FileHandle.standardError.write(Data("Notification error: \(error)\n".utf8))
             }
-        }
-    }
-
-    private func shakeWindow() {
-        guard let panel = panel else { return }
-        shakeTimer?.invalidate()
-        shakeOrigin = panel.frame.origin
-        shakeCount = 0
-        shakeTimer = Timer.scheduledTimer(withTimeInterval: 0.03, repeats: true) { [weak self] _ in
-            self?.shakeTick()
-        }
-    }
-
-    private func shakeTick() {
-        guard let panel = panel, let origin = shakeOrigin else {
-            shakeTimer?.invalidate()
-            shakeTimer = nil
-            return
-        }
-        let offsets: [(CGFloat, CGFloat)] = [(6, 0), (-6, 0), (4, 0), (-4, 0), (2, 0), (-2, 0), (0, 0)]
-        if shakeCount < offsets.count {
-            let offset = offsets[shakeCount]
-            panel.setFrameOrigin(NSPoint(x: origin.x + offset.0, y: origin.y + offset.1))
-            shakeCount += 1
-        } else {
-            shakeTimer?.invalidate()
-            shakeTimer = nil
-            panel.setFrameOrigin(origin)
         }
     }
 
@@ -879,12 +849,7 @@ final class PetController: NSObject {
         let drawWidth = pet.width
         let drawHeight = pet.height
         let x = pet.minX
-        var y = pet.minY
-        let card = bubbleRect()
-        let bubbleBottom = card.maxY + 12
-        if bubbleBottom > y {
-            y = bubbleBottom
-        }
+        let y = pet.minY
         let centerX = x + drawWidth / 2
         let centerY = y + drawHeight / 2
 

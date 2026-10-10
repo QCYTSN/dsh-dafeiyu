@@ -262,6 +262,16 @@ function defaultArgs(command, helperPath) {
   return [helperPath]
 }
 
+export function resolveHelperEnvironment(environment = process.env, overrides = {}) {
+  const env = { ...environment, ...overrides }
+  // Desktop's Host runs Electron as Node. Native helpers must not pass that
+  // mode to applications launched through QDesktopServices / NSWorkspace.
+  for (const key of Object.keys(env)) {
+    if (key.toUpperCase() === 'ELECTRON_RUN_AS_NODE') delete env[key]
+  }
+  return env
+}
+
 export class HelperProcess {
   constructor(options = {}, logger = console) {
     this.options = options
@@ -309,7 +319,7 @@ export class HelperProcess {
 
       child = spawn(command, [...args, ...extraArgs], {
         cwd: this.options.cwd || resolve(here, '..'),
-        env: { ...process.env, ...this.options.env },
+        env: resolveHelperEnvironment(process.env, this.options.env),
         stdio: ['pipe', 'pipe', 'pipe'],
         windowsHide: true,
       })

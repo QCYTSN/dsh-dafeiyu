@@ -22,10 +22,12 @@ try:
     from .animation_model import AnimationModel, crossfade_duration
     from .layout_store import default_layout_path, load_layout, save_layout
     from .asset_paths import bundle_root
+    from .pet_geometry import bubble_top, position_window
 except ImportError:
     from animation_model import AnimationModel, crossfade_duration
     from layout_store import default_layout_path, load_layout, save_layout
     from asset_paths import bundle_root
+    from pet_geometry import bubble_top, position_window
 
 
 PROTOCOL_VERSION = 1
@@ -386,9 +388,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.webui_url = os.environ.get("DSH_DAFEIYU_WEBUI_URL", "http://127.0.0.1:3080/")
             self.open_label = os.environ.get("DSH_DAFEIYU_OPEN_LABEL", "打开 DSH")
             self.balance_summary = ""
-            self.shake_timer: QTimer | None = None
-            self.shake_origin: QPoint | None = None
-            self.shake_count = 0
             self.drag_origin: QPoint | None = None
             self.pet_origin: QPoint | None = None
             self.pet_x = 0
@@ -505,11 +504,11 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._schedule_micro()
 
         def _apply_config(self, message: dict[str, Any]) -> None:
+            """Apply a live CONFIG message without restarting the window."""
             if isinstance(message.get("openUrl"), str):
                 self.webui_url = message["openUrl"]
             if isinstance(message.get("openLabel"), str):
                 self.open_label = message["openLabel"]
-            """Apply a live CONFIG message without restarting the window."""
             scale = message.get("scale")
             if isinstance(scale, (int, float)) and not isinstance(scale, bool):
                 self.scale = min(1.4, max(0.55, float(scale)))
@@ -725,41 +724,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             )
 
         def _move_to_pet(self, pet_x: int, pet_y: int) -> None:
-            """Move the window so the pet stands at (pet_x, pet_y).
-
-            The pet position is the source of truth; the window is just the
-            container that keeps the status bubble on screen.  While the window
-            fits on screen the pet stays centered under it.  When the window
-            would have to leave the screen, it is clamped and the pet shifts
-            inside the window instead, so the pet can stand at any screen
-            position while the bubble stays fully visible.
-            """
-            pet_width, pet_height = self._pet_size()
+            """Resize or move the container around the character's anchor."""
             geometry = self._screen_geometry_at(pet_x, pet_y)
-            if geometry is None:
-                self.pet_x = pet_x
-                self.pet_y = pet_y
-                self.move(
-                    pet_x - (self.width() - pet_width) // 2,
-                    pet_y - (self.height() - pet_height - 8),
-                )
-                self.update()
-                return
-
-            min_x = geometry.left()
-            max_x = max(min_x, geometry.right() - self.width() + 1)
-            min_y = geometry.top()
-            max_y = max(min_y, geometry.bottom() - self.height() + 1)
-
-            center_offset_x = (self.width() - pet_width) // 2
-            window_x = min(max(pet_x - center_offset_x, min_x), max_x)
-            offset_x = min(max(pet_x - window_x, 0), self.width() - pet_width)
-            self.pet_x = window_x + offset_x
-
-            top_offset_y = self.height() - pet_height - 8
-            window_y = min(max(pet_y - top_offset_y, min_y), max_y)
-            self.pet_y = window_y + top_offset_y
-
+            screen = (geometry.x(), geometry.y(), geometry.width(), geometry.height()) if geometry is not None else None
+            window_x, window_y, self.pet_x, self.pet_y = position_window(
+                (pet_x, pet_y), self._pet_size(), (self.width(), self.height()), screen,
+                self._card_height() if self._bubble_visible() else 0,
+            )
             self.move(window_x, window_y)
             self.update()
 
@@ -768,7 +739,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def _pet_rect(self) -> tuple[int, int, int, int]:
             pet_width, pet_height = self._pet_size()
-            return self._pet_offset_x(pet_width), self.height() - pet_height - 8, pet_width, pet_height
+            offset_y = min(max(self.pet_y - self.y(), 0), self.height() - pet_height)
+            return self._pet_offset_x(pet_width), offset_y, pet_width, pet_height
 
         def _bubble_rect(self) -> tuple[int, int, int, int]:
             card_width = round(420 * self.bubble_scale)
@@ -782,7 +754,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if max_x < min_x:
                 max_x = min_x
             card_x = min(max(card_x, min_x), max_x)
-            return card_x, 7, card_width, card_height
+            _, pet_y, _, pet_height = self._pet_rect()
+            card_y = bubble_top(pet_y, pet_height, card_height, self.height())
+            return card_x, card_y, card_width, card_height
 
         def _restore_visible_position(self) -> None:
             pet_width, pet_height = self._pet_size()
@@ -1025,28 +999,6 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                         QApplication.beep()
                     except Exception:
                         pass
-            self._shake_window()
-
-        def _shake_window(self) -> None:
-            if self.shake_timer is None:
-                self.shake_timer = QTimer(self)
-                self.shake_timer.timeout.connect(self._shake_tick)
-            self.shake_origin = self.pos()
-            self.shake_count = 0
-            self.shake_timer.start(30)
-
-        def _shake_tick(self) -> None:
-            offsets = [(6, 0), (-6, 0), (4, 0), (-4, 0), (2, 0), (-2, 0), (0, 0)]
-            if self.shake_origin is None:
-                self.shake_timer.stop()
-                return
-            if self.shake_count < len(offsets):
-                dx, dy = offsets[self.shake_count]
-                self.move(self.shake_origin.x() + dx, self.shake_origin.y() + dy)
-                self.shake_count += 1
-            else:
-                self.shake_timer.stop()
-                self.move(self.shake_origin)
 
         def paintEvent(self, _event: Any) -> None:
             painter = QPainter(self)
@@ -1054,18 +1006,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             # 平滑缩放：放大/缩小时插值，避免锯齿和模糊
             painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform, True)
             card = self._current_card() if self._bubble_visible() else None
-            bubble_height = 12
             card_x, card_y, card_width, card_height = self._bubble_rect()
             s = self.bubble_scale
             corner_radius = round(30 * s)
 
             if len(self.tasks) >= 2 and self._bubble_visible():
-                bubble_height = card_y + card_height + 19
                 self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
                 self._draw_multi_task_card(painter, card_x, card_y, card_width, card_height, s)
             elif card:
                 title, detail, card_state = card
-                bubble_height = card_y + card_height + 19
                 self._draw_card_background(painter, card_x, card_y, card_width, card_height, corner_radius, s)
                 icon_center_x = card_x + card_width - round(39 * s)
                 icon_center_y = card_y + round(42 * s)
@@ -1137,10 +1086,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             def draw_pet(pix: QPixmap, alpha: float) -> None:
                 pw = pix.width() * self.scale
                 ph = pix.height() * self.scale
-                x = self._pet_offset_x(pw)
-                y = self.height() - ph - 8
-                if bubble_height > y:
-                    y = bubble_height
+                x, y, _, _ = self._pet_rect()
                 painter.save()
                 painter.setOpacity(alpha)
                 painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
@@ -1250,13 +1196,20 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()
             elif selected == open_webui_action:
-                QDesktopServices.openUrl(QUrl(self.webui_url))
+                self._open_client()
             elif selected == hide_action:
                 self.hide()
             elif selected == exit_action:
                 self._save_layout()
                 emit_reply("closed", reason="user")
                 QApplication.quit()
+
+        def _open_client(self) -> None:
+            if not QDesktopServices.openUrl(QUrl(self.webui_url)):
+                print("Unable to open the configured DSH client", file=sys.stderr)
+                self._show_overlay("无法打开 DSH", "请确认 DSH 已安装、打开地址设置正确", "ERROR", 4000)
+                self._sync_bubble_size()
+                self.update()
 
     application = QApplication(sys.argv[:1])
     application.setQuitOnLastWindowClosed(False)

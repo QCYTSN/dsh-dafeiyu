@@ -7,6 +7,7 @@ import {
   cacheWslBundledHelper,
   defaultCmdExe,
   defaultWindowsLocalAppData,
+  resolveHelperEnvironment,
   resolveHelperLaunch,
 } from '../src/helper-process.js'
 
@@ -14,6 +15,16 @@ const bundledPath = '/package/runtime/bin/win32-x64/dsh-dafeiyu-helper.exe'
 const linuxBundledPath = '/package/runtime/bin/linux-x64/dsh-dafeiyu-helper'
 const darwinBundledPath = '/package/runtime/bin/darwin/dsh-dafeiyu-helper.app/Contents/MacOS/dsh-dafeiyu-helper'
 const helperPath = '/package/runtime/helper.py'
+
+test('native helpers open Desktop without inheriting Electron Node mode', () => {
+  const host = { ELECTRON_RUN_AS_NODE: '1', PATH: '/runtime/bin', DSH_HOME: '/profile' }
+  const overrides = { electron_run_as_node: '1', DSH_DAFEIYU_WEBUI_URL: 'dsh://open' }
+  assert.deepEqual(resolveHelperEnvironment(host, overrides), {
+    PATH: '/runtime/bin', DSH_HOME: '/profile', DSH_DAFEIYU_WEBUI_URL: 'dsh://open',
+  })
+  assert.equal(host.ELECTRON_RUN_AS_NODE, '1')
+  assert.equal(overrides.electron_run_as_node, '1')
+})
 
 function resolve(overrides = {}) {
   return resolveHelperLaunch({

@@ -12,7 +12,7 @@
 
 大肥鱼由 DSH 插件启动，随 DSH 一起退出。透明、无边框、始终置顶的原生窗口，让你在编辑器、浏览器或其他应用中也能看到 Agent 的工作状态。
 
-> **当前稳定版：0.1.17。** 本版整理安装与下载说明，保留 0.1.16 的动作、素材和余额功能。安装时填写 `dsh-dafeiyu@0.1.17`，离线安装请从[最新版下载页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)选择 **`dsh-dafeiyu-0.1.17.tgz`**；Windows、Linux 与 macOS 共用这一个包。GitHub 自动生成的 **Source code (zip / tar.gz)** 是源码，不是安装包。
+> **当前稳定版：0.1.18。** 修复右键打不开官方桌面端，以及气泡变化／提醒导致的角色位置偏移。安装时填写 `dsh-dafeiyu@0.1.18`，离线安装请从[最新版下载页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)选择 **`dsh-dafeiyu-0.1.18.tgz`**；Windows、Linux 与 macOS 共用这一个包。GitHub 自动生成的 **Source code (zip / tar.gz)** 是源码，不是安装包。
 
 <img src="docs/images/balance-preview.png" width="460" alt="大肥鱼在任务状态卡底部显示 API 余额">
 
@@ -49,21 +49,21 @@
 已全局安装 DSH：
 
 ```powershell
-dsh plugin --profile web add dsh-dafeiyu@0.1.17
+dsh plugin --profile web add dsh-dafeiyu@0.1.18
 dsh web
 ```
 
 使用 `npx`，无需全局安装 DSH：
 
 ```powershell
-npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu@0.1.17
+npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu@0.1.18
 npx -y @deepseek-ai/dsh web
 ```
 
 从 DeepSeek Harness 源码运行的用户，在 Harness 仓库中执行：
 
 ```powershell
-pnpm dsh plugin --profile web add dsh-dafeiyu@0.1.17
+pnpm dsh plugin --profile web add dsh-dafeiyu@0.1.18
 pnpm dsh web
 ```
 
@@ -72,7 +72,7 @@ pnpm dsh web
 推荐直接在应用内安装：
 
 1. 打开官方 DeepSeek Harness 桌面应用，点击左侧 **插件**。
-2. 点击 **添加插件**，输入 `dsh-dafeiyu@0.1.17`，点击 **安装**。
+2. 点击 **添加插件**，输入 `dsh-dafeiyu@0.1.18`，点击 **安装**。
 3. 安装成功后点击 **立即启用**，大肥鱼会出现在桌面上。
 4. 在插件列表打开 **dsh-dafeiyu**，调整角色、气泡和余额设置，修改实时生效。
 
@@ -87,7 +87,7 @@ pnpm dsh web
 3. 执行：
 
    ```powershell
-   dsh plugin --profile desktop add dsh-dafeiyu@0.1.17
+   dsh plugin --profile desktop add dsh-dafeiyu@0.1.18
    ```
 
 4. 重新打开桌面应用，在左侧插件 → dsh-dafeiyu 调整角色。
@@ -96,14 +96,14 @@ pnpm dsh web
 
 ### 使用 Release 安装包
 
-打开[最新版下载页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)，在 **Assets** 中下载 **`dsh-dafeiyu-0.1.17.tgz`**，用对应客户端的命令安装；**无需解压**。不要选择历史版本，也不要下载 **Source code** 作为安装包：
+打开[最新版下载页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)，在 **Assets** 中下载 **`dsh-dafeiyu-0.1.18.tgz`**，用对应客户端的命令安装；**无需解压**。不要选择历史版本，也不要下载 **Source code** 作为安装包：
 
 ```powershell
 # WebUI；文件路径替换为实际下载路径
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.17.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.18.tgz"
 
 # 官方桌面端；必须使用应用自带的 dsh
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.17.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.18.tgz"
 ```
 
 桌面端也可在 **添加插件** 的输入框填写 `.tgz` 的完整路径。
@@ -169,7 +169,7 @@ WebUI 用户完全退出 DSH 后执行：
 npx -y @deepseek-ai/dsh plugin --profile web update dsh-dafeiyu
 ```
 
-官方桌面端 **0.2.0-rc.2 暂不支持应用内自动更新**。在插件页面卸载大肥鱼，再添加 `dsh-dafeiyu@0.1.17` 并立即启用；也可以完全退出应用后使用自带的命令：
+官方桌面端 **0.2.0-rc.2 暂不支持应用内自动更新**。在插件页面卸载大肥鱼，再添加 `dsh-dafeiyu@0.1.18` 并立即启用；也可以完全退出应用后使用自带的命令：
 
 ```powershell
 dsh plugin --profile desktop update dsh-dafeiyu

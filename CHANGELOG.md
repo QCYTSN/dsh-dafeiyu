@@ -2,6 +2,21 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## 0.1.18 · 2026-10-10
+
+### Fixed
+
+- Remove the Desktop Host's `ELECTRON_RUN_AS_NODE` environment variable from
+  native Helpers so opening `dsh://open` launches the Desktop interface instead
+  of another Node process. Show a status message when the OS rejects opening it.
+- Preserve the character's screen position when a status bubble, balance footer,
+  or task list changes height. Qt places the card below characters near the top
+  of the screen, using the same character rectangle for painting and clicks.
+- Remove notification-driven window shaking on Qt and macOS. A notification
+  can no longer restore an old window position during a resize or drag.
+- Keep all character frames and the 0.1.16 animation timing unchanged. Add
+  regression coverage for Desktop launch environments and native card layout.
+
 ## 0.1.17 · 2026-10-09
 
 ### Changed
