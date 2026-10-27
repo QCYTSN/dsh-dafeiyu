@@ -46,6 +46,14 @@ class HelperGeometryTests(unittest.TestCase):
                         x, y, _, _ = window._pet_rect()
                         self.assertEqual((window.x() + x, window.y() + y), expected)
 
+                    self.assertEqual(window.sound_states, {'SUCCESS', 'ERROR'})
+                    alerts = []
+                    with patch.object(window, '_notify_alert', side_effect=alerts.append):
+                        message('alert', alert='APPROVAL', sessionId='s', toolName='bash')
+                        message('alert', alert='SOMETHING_NEW')
+                    self.assertEqual(alerts, ['APPROVAL'])
+                    message('config', soundStates=['ERROR', 42])
+                    self.assertEqual(window.sound_states, {'ERROR'})
                     message('config', soundEnabled=False, bubbleMode='hidden', scale=1.0, bubbleScale=1.0)
                     for expected in ((200, 30), (1508, 696)):
                         window._move_to_pet(*expected)

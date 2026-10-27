@@ -46,6 +46,27 @@ test('local config endpoint reads and persists an allowed patch', async () => {
   assert.equal(changed.body.soundEnabled, false)
 })
 
+test('config endpoint persists per-event sound choices and drops unknown states', async () => {
+  const handler = createConfigHandler(settingsFixture())
+  const changed = await request(handler, {
+    method: 'PATCH',
+    body: JSON.stringify({ soundStates: ['ERROR', 'WAITING'] }),
+    origin: 'http://127.0.0.1:2026',
+  })
+  assert.equal(changed.status, 200)
+  assert.deepEqual(changed.body.soundStates, ['ERROR'])
+  const invalid = await request(handler, { method: 'PATCH', body: '{"soundStates":"ERROR"}', origin: 'http://127.0.0.1:2026' })
+  assert.equal(invalid.status, 400)
+})
+
+test('sound states default to every event and drop unknown entries', async () => {
+  const { normalizeSoundStates } = await import('../src/plugin.js')
+  assert.deepEqual(normalizeSoundStates(undefined), ['SUCCESS', 'ERROR'])
+  assert.deepEqual(normalizeSoundStates(['APPROVAL']), ['APPROVAL'])
+  assert.deepEqual(normalizeSoundStates([]), [])
+  assert.deepEqual(normalizeSoundStates(['ERROR', 'ERROR', 'IDLE']), ['ERROR'])
+})
+
 test('local config endpoint rejects remote, cross-origin, and unknown writes', async () => {
   const handler = createConfigHandler(settingsFixture())
   assert.equal((await request(handler, { address: '192.168.1.8' })).status, 403)

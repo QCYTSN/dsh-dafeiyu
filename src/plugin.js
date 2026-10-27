@@ -45,6 +45,11 @@ export const Config = Schema.object({
   ]).default('normal').description('空闲微动作频率'),
   reducedMotion: Schema.boolean().default(false).description('减少走动、循环帧和程序化晃动'),
   soundEnabled: Schema.boolean().default(true).description('任务完成或出错时播放提示音'),
+  soundStates: Schema.array(Schema.union([
+    Schema.const('SUCCESS').description('对话完成'),
+    Schema.const('ERROR').description('工具出错'),
+    Schema.const('APPROVAL').description('等待审批'),
+  ])).role('checkbox').default(['SUCCESS', 'ERROR']).description('播放提示音与系统通知的场景'),
   bubbleMode: Schema.union([
     Schema.const('always').description('常驻显示'),
     Schema.const('hidden').description('完全隐藏'),
@@ -69,6 +74,7 @@ const defaults = Object.freeze({
   activityLevel: 'normal',
   reducedMotion: false,
   soundEnabled: true,
+  soundStates: ['SUCCESS', 'ERROR'],
   bubbleMode: 'always',
   bubbleStates: ['SUCCESS', 'ERROR', 'WAITING'],
   includeSubagents: false,
@@ -78,6 +84,13 @@ const defaults = Object.freeze({
   balanceSource: 'auto',
 })
 
+const SOUND_STATES = new Set(['SUCCESS', 'ERROR', 'APPROVAL'])
+
+export function normalizeSoundStates(value) {
+  if (!Array.isArray(value)) return [...defaults.soundStates]
+  return [...new Set(value.filter((state) => SOUND_STATES.has(state)))]
+}
+
 function publicConfig(config = {}) {
   return {
     enabled: config.enabled ?? defaults.enabled,
@@ -86,6 +99,7 @@ function publicConfig(config = {}) {
     activityLevel: config.activityLevel ?? defaults.activityLevel,
     reducedMotion: config.reducedMotion ?? defaults.reducedMotion,
     soundEnabled: config.soundEnabled ?? defaults.soundEnabled,
+    soundStates: normalizeSoundStates(config.soundStates),
     bubbleMode: config.bubbleMode ?? defaults.bubbleMode,
     bubbleStates: Array.isArray(config.bubbleStates) ? config.bubbleStates : defaults.bubbleStates,
     includeSubagents: config.includeSubagents ?? defaults.includeSubagents,
@@ -108,6 +122,10 @@ async function readPatch(req) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) throw new Error('patch must be an object')
   const allowed = new Set(Object.keys(defaults))
   if (Object.keys(value).some((key) => !allowed.has(key))) throw new Error('patch contains an unknown setting')
+  if ('soundStates' in value) {
+    if (!Array.isArray(value.soundStates)) throw new Error('soundStates must be an array')
+    value.soundStates = normalizeSoundStates(value.soundStates)
+  }
   return value
 }
 
@@ -354,6 +372,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
     DSH_DAFEIYU_ACTIVITY_LEVEL: String(resolved.activityLevel ?? defaults.activityLevel),
     DSH_DAFEIYU_REDUCED_MOTION: resolved.reducedMotion === true ? '1' : '0',
     DSH_DAFEIYU_SOUND_ENABLED: resolved.soundEnabled !== false ? '1' : '0',
+    DSH_DAFEIYU_SOUND_STATES: normalizeSoundStates(resolved.soundStates).join(','),
     DSH_DAFEIYU_BUBBLE_MODE: String(resolved.bubbleMode ?? defaults.bubbleMode),
     DSH_DAFEIYU_BUBBLE_STATES: (Array.isArray(resolved.bubbleStates) ? resolved.bubbleStates : defaults.bubbleStates).join(','),
     DSH_DAFEIYU_WEBUI_URL: resolveClientTarget({ ...config, ...resolved }).url,
@@ -373,6 +392,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       activityLevel: next.activityLevel ?? defaults.activityLevel,
       reducedMotion: next.reducedMotion === true,
       soundEnabled: next.soundEnabled !== false,
+      soundStates: normalizeSoundStates(next.soundStates),
       bubbleMode: next.bubbleMode ?? defaults.bubbleMode,
       bubbleStates: Array.isArray(next.bubbleStates) ? next.bubbleStates : defaults.bubbleStates,
       openUrl: resolveClientTarget({ ...config, ...next }).url,

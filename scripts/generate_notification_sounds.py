@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate the original BigFish success/error notification sounds."""
+"""Generate the original BigFish success/error/approval notification sounds."""
 
 from __future__ import annotations
 
@@ -55,6 +55,13 @@ def main() -> int:
         args.output / "error.wav",
         ((0.00, 0.22, 392.00), (0.17, 0.40, 329.63)),
         0.42,
+    )
+    # A repeated "ding-ding" that reads as "your attention, please" rather than
+    # as a result, so a pending approval is distinguishable by ear.
+    render(
+        args.output / "approval.wav",
+        ((0.00, 0.18, 880.00), (0.20, 0.44, 880.00), (0.20, 0.44, 1318.51)),
+        0.46,
     )
     return 0
 

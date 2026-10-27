@@ -113,7 +113,7 @@ test('idle actions have a full rest interval after playback, in increasing activ
 })
 
 test('original notification sounds are valid short mono WAV files', async () => {
-  for (const name of ['success.wav', 'error.wav']) {
+  for (const name of ['success.wav', 'error.wav', 'approval.wav']) {
     const bytes = await readFile(join(repositoryRoot, 'assets', 'sounds', name))
     assert.equal(bytes.subarray(0, 4).toString('ascii'), 'RIFF')
     assert.equal(bytes.subarray(8, 12).toString('ascii'), 'WAVE')

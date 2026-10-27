@@ -15,6 +15,7 @@ export const CompanionMessageKind = Object.freeze({
   HELLO: 'hello',
   STATE: 'state',
   PULSE: 'pulse',
+  ALERT: 'alert',
   TASK: 'task',
   TASKS: 'tasks',
   CONFIG: 'config',
@@ -24,6 +25,11 @@ export const CompanionMessageKind = Object.freeze({
   PONG: 'pong',
   CLOSED: 'closed',
   SHUTDOWN: 'shutdown',
+})
+
+// One-shot attention signals that do not change the companion state.
+export const CompanionAlert = Object.freeze({
+  APPROVAL: 'APPROVAL',
 })
 
 const states = new Set(Object.values(CompanionState))

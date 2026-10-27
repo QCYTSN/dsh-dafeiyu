@@ -81,6 +81,7 @@ final class PetController: NSObject {
     var reducedMotion: Bool
     var activityLevel: String
     var soundEnabled: Bool
+    var soundStates: Set<String>
     var bubbleMode: String
     var bubbleStates: [String]
 
@@ -153,6 +154,9 @@ final class PetController: NSObject {
         }
         self.activityLevel = env["DSH_DAFEIYU_ACTIVITY_LEVEL"] ?? "normal"
         self.soundEnabled = env["DSH_DAFEIYU_SOUND_ENABLED"] != "0"
+        self.soundStates = env["DSH_DAFEIYU_SOUND_STATES"]
+            .map { Set($0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty }) }
+            ?? ["SUCCESS", "ERROR"]
         let configuredBubbleMode = env["DSH_DAFEIYU_BUBBLE_MODE"]
         self.bubbleMode = ["always", "hidden", "custom"].contains(configuredBubbleMode ?? "")
             ? configuredBubbleMode!
@@ -710,6 +714,10 @@ final class PetController: NSObject {
             balanceSummary = String((message["summary"] as? String ?? "").prefix(200))
             resizeAndReposition()
             contentView?.needsDisplay = true
+        case "alert":
+            if message["alert"] as? String == "APPROVAL" {
+                notifyAlert("APPROVAL")
+            }
         default:
             break
         }
@@ -795,6 +803,9 @@ final class PetController: NSObject {
         }
         if let value = message["soundEnabled"] as? Bool {
             soundEnabled = value
+        }
+        if let value = message["soundStates"] as? [Any] {
+            soundStates = Set(value.compactMap { $0 as? String })
         }
         if let value = message["activityLevel"] as? String, ["quiet", "normal", "lively"].contains(value) {
             activityLevel = value
@@ -883,8 +894,13 @@ final class PetController: NSObject {
     }
 
     private func notifyAlert(_ state: String) {
-        if soundEnabled {
-            let filename = state == "SUCCESS" ? "success" : "error"
+        // The scene selection controls both the chime and the macOS banner, so
+        // unchecking a scene silences it and stops its notification too. The
+        // master switch only mutes the sound.
+        guard soundStates.contains(state) else { return }
+        let playSound = soundEnabled
+        if playSound {
+            let filename = state == "SUCCESS" ? "success" : state == "APPROVAL" ? "approval" : "error"
             if let url = Bundle.main.resourceURL?
                 .appendingPathComponent("assets/sounds/\(filename).wav"),
                let sound = NSSound(contentsOf: url, byReference: true) {
@@ -894,9 +910,18 @@ final class PetController: NSObject {
         Permissions.requestNotificationAuthorizationIfNeeded()
         guard Bundle.main.bundleIdentifier != nil else { return }
         let content = UNMutableNotificationContent()
-        content.title = state == "SUCCESS" ? "任务完成" : "任务出错"
-        content.body = state == "SUCCESS" ? "DSH 任务已完成" : "DSH 任务遇到问题"
-        content.sound = soundEnabled ? .default : nil
+        switch state {
+        case "SUCCESS":
+            content.title = "任务完成"
+            content.body = "DSH 任务已完成"
+        case "APPROVAL":
+            content.title = "等待审批"
+            content.body = "DSH 申请权限，需要你手动批准"
+        default:
+            content.title = "任务出错"
+            content.body = "DSH 任务遇到问题"
+        }
+        content.sound = playSound ? .default : nil
         let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {

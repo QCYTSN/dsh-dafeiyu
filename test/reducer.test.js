@@ -224,12 +224,21 @@ test('approval events show waiting and resume after the decision', () => {
   const reducer = new CompanionReducer()
   reducer.handle(session, event('turn/start', { turn: 1 }, 1))
 
-  const [asked] = reducer.handle(session, event('approval/asked', {
+  const askedMessages = reducer.handle(session, event('approval/asked', {
     id: 'approval-1',
     toolName: 'bash',
   }, 2))
+  const [asked] = askedMessages
   assert.equal(asked.state, CompanionState.WAITING)
   assert.equal(asked.stage, '等待审批')
+  const alert = askedMessages.find((message) => message.kind === 'alert')
+  assert.equal(alert.alert, 'APPROVAL')
+  assert.equal(alert.toolName, 'bash')
+  assert.equal(alert.sessionId, asked.sessionId)
+
+  // A duplicate ask for the same pending approval must not chime again.
+  const repeated = reducer.handle(session, event('approval/asked', { id: 'approval-1', toolName: 'bash' }, 2))
+  assert.equal(repeated.some((message) => message.kind === 'alert'), false)
 
   assert.deepEqual(reducer.handle(session, event('approval/decided', {
     id: 'unrelated',
@@ -241,6 +250,14 @@ test('approval events show waiting and resume after the decision', () => {
     outcome: 'granted',
   }, 4))
   assert.equal(resumed.state, CompanionState.THINKING)
+})
+
+test('user questions wait without the approval alert', () => {
+  const reducer = new CompanionReducer()
+  reducer.handle(session, event('turn/start', { turn: 1 }, 1))
+  const messages = reducer.handle(session, event('tool/call', { callId: 'q-1', name: 'ask_user_question' }, 2))
+  assert.equal(messages[0].state, CompanionState.WAITING)
+  assert.equal(messages.some((message) => message.kind === 'alert'), false)
 })
 
 test('tool categories keep renderer semantics independent from DSH tool names', () => {

@@ -2,6 +2,26 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## 0.1.22 · 2026-10-27
+
+### Added
+
+- Choose which events alert you: the new `soundStates` setting (“提示音与通知场景”)
+  enables the turn-completed, tool-error and approval alerts independently.
+  `soundEnabled` stays the master switch and only mutes the audio.
+- Play a new “ding-ding” approval chime (`assets/sounds/approval.wav`) when a DSH
+  session asks for a permission that needs manual approval. On macOS the same
+  scene selection also controls its “等待审批” notification banner, so unchecking
+  a scene stops both the sound and the banner; Windows and Linux play audio only,
+  because the Qt Helper has no system-notification channel.
+
+### Changed
+
+- The scenes default to completion and tool errors only, so upgrading keeps the
+  previous behaviour. Enable “等待审批” to get the approval chime and, on macOS,
+  its banner. macOS notification banners for completion and errors now follow the
+  scene selection instead of always being posted.
+
 ## 0.1.21 · 2026-10-27
 
 ### Fixed
