@@ -8,6 +8,9 @@
         activityLevel: normal
         reducedMotion: false
         soundEnabled: true
+        soundStates:
+          - SUCCESS
+          - ERROR
         bubbleMode: always
         bubbleStates:
           - SUCCESS

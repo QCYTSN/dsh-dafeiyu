@@ -161,7 +161,7 @@ test('live settings keep the active project state without restarting the helper'
     seq: 2,
     data: { todos: [{ content: '继续保留这个任务', status: 'in_progress' }] },
   })
-  settingsValue = { ...settingsValue, scale: 0.9, bubbleScale: 0.8, soundEnabled: false }
+  settingsValue = { ...settingsValue, scale: 0.9, bubbleScale: 0.8, soundEnabled: false, soundStates: ['SUCCESS', 'BOGUS'] }
   settingsListener(settingsValue)
   listeners.get('session/event')(activeSession, {
     type: 'tool/call',
@@ -178,6 +178,7 @@ test('live settings keep the active project state without restarting the helper'
   assert.equal(messages.filter((message) => message.kind === 'hello').length, 1)
   assert.equal(messages.filter((message) => message.kind === 'config').length, 1)
   assert.equal(messages.find((message) => message.kind === 'config').soundEnabled, false)
+  assert.deepEqual(messages.find((message) => message.kind === 'config').soundStates, ['SUCCESS'])
   const working = messages.findLast((message) => message.state === 'WORKING')
   assert.equal(working.project, 'active-project')
   assert.equal(working.task, '继续保留这个任务')

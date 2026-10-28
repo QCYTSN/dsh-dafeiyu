@@ -340,6 +340,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             )
             configured_sound_enabled = os.environ.get("DSH_DAFEIYU_SOUND_ENABLED")
             self.sound_enabled = configured_sound_enabled != "0"
+            configured_sound_states = os.environ.get("DSH_DAFEIYU_SOUND_STATES")
+            self.sound_states = (
+                {part.strip() for part in configured_sound_states.split(",") if part.strip()}
+                if configured_sound_states is not None
+                else {"SUCCESS", "ERROR"}
+            )
             self.activity_level = os.environ.get("DSH_DAFEIYU_ACTIVITY_LEVEL", "normal")
             configured_bubble_mode = os.environ.get("DSH_DAFEIYU_BUBBLE_MODE")
             self.bubble_mode = (
@@ -442,6 +448,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             elif kind == "balance":
                 self.balance_summary = str(message.get("summary", ""))[:200]
                 self._sync_bubble_size()
+            elif kind == "alert":
+                if message.get("alert") == "APPROVAL":
+                    self._notify_alert("APPROVAL")
             elif kind in {"state", "pulse"}:
                 previous_base_state = self.model.base_state
                 state = str(message.get("state", "IDLE"))
@@ -521,6 +530,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             sound_enabled = message.get("soundEnabled")
             if isinstance(sound_enabled, bool):
                 self.sound_enabled = sound_enabled
+            sound_states = message.get("soundStates")
+            if isinstance(sound_states, list):
+                self.sound_states = {state for state in sound_states if isinstance(state, str)}
             activity_level = message.get("activityLevel")
             if activity_level in {"quiet", "normal", "lively"}:
                 self.activity_level = activity_level
@@ -978,14 +990,16 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     more,
                 )
 
+        SOUND_FILES = {"SUCCESS": "success.wav", "ERROR": "error.wav", "APPROVAL": "approval.wav"}
+
         def _notify_alert(self, state: str) -> None:
-            if self.sound_enabled:
+            if self.sound_enabled and state in self.sound_states:
                 played = False
                 if sys.platform == "win32":
                     try:
                         import winsound
 
-                        sound_name = "success.wav" if state == "SUCCESS" else "error.wav"
+                        sound_name = self.SOUND_FILES.get(state, "error.wav")
                         sound_path = bundle_root() / "assets" / "sounds" / sound_name
                         winsound.PlaySound(
                             str(sound_path),

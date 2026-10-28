@@ -1,4 +1,5 @@
 import {
+  CompanionAlert,
   CompanionMessageKind,
   CompanionState,
   createMessage,
@@ -268,6 +269,8 @@ export class CompanionReducer {
       case 'approval/asked': {
         const id = String(event.data?.id ?? '')
         const toolName = String(event.data?.toolName ?? 'approval')
+        // A repeated ask for the same pending approval must not chime twice.
+        const fresh = !(id && record.waitingApprovalId === id && record.state === CompanionState.WAITING)
         record.waitingApprovalId = id
         this.#update(record, CompanionState.WAITING, {
           phase: 'approval',
@@ -275,7 +278,16 @@ export class CompanionReducer {
           toolName,
           message: statusCopy('approval', event.seq),
         })
-        return this.#render()
+        const messages = this.#render()
+        if (fresh) {
+          messages.push(createMessage(CompanionMessageKind.ALERT, {
+            alert: CompanionAlert.APPROVAL,
+            sessionId: record.id,
+            sourceSeq: event.seq,
+            toolName,
+          }))
+        }
+        return messages
       }
 
       case 'approval/decided':
