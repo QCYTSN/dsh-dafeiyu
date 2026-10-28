@@ -2,7 +2,7 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
-## 0.1.22 · 2026-10-27
+## 0.1.22 · 2026-10-28
 
 ### Added
 
@@ -21,6 +21,13 @@
   previous behaviour. Enable “等待审批” to get the approval chime and, on macOS,
   its banner. macOS notification banners for completion and errors now follow the
   scene selection instead of always being posted.
+
+### Fixed
+
+- Print the `settings.describe()` namespace list only on a real settings write
+  failure, labelled as settings-page namespaces rather than writable config
+  entries. The activation line no longer includes a list that omits the plugin
+  while writes still succeed, which made issue #95 logs easy to misread.
 
 ## 0.1.21 · 2026-10-27
 

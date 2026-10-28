@@ -5,6 +5,24 @@
 > [updating guide](UPDATING.md). This record is retained in GitHub and excluded
 > from the installable package.
 
+## 2026-10-28 · Approval alerts and settings diagnostics / 0.1.22
+
+- Merged PR #93 only after its second commit passed all four CI jobs. The
+  approval scene is opt-in by default, and on macOS the scene selection gates
+  both the chime and the notification banner.
+- The author verified the Windows Qt path; the macOS banner path was not run on
+  a Mac in this session.
+- Issue #95 reporter confirmed on macOS 13 / DSH 0.2.1-rc.3 that 0.1.21 keeps a
+  context-menu 0.8 choice across helper and full DSH restarts, and that
+  `settings.update` wrote `cordis.patch.yml` successfully. The original failure
+  could not be reproduced; the issue was closed after the fallback confirmation.
+- Adjusted the settings diagnostics so the `settings.describe()` list appears
+  only on a real failure and is labelled as settings-page namespaces; the
+  activation line no longer prints a list that omits the plugin during
+  activation.
+- Not verified: macOS approval banner appearance, and the macOS click-through /
+  cross-display fixes from 0.1.20 / 0.1.21 still await reporter confirmation.
+
 ## 2026-10-27 · Cross-display drag and settings fallback / 0.1.21
 
 - Passed 132 JavaScript and 54 Python tests locally on Windows. New coverage:

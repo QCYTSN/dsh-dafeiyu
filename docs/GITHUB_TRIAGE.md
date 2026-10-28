@@ -2,6 +2,12 @@
 
 > 此文件记录 issue / PR 的处理依据，不是安装指南。旧版本号用于追溯；安装请使用[当前稳定版](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)。本记录不随安装包分发。
 
+## 2026-10-28 发布（0.1.22）
+
+- [#93 提示音独立开关](https://github.com/QCYTSN/dsh-dafeiyu/pull/93)：合并（merge commit 65d5344）。新增 `soundStates`（完成 / 出错 / 等待审批）与 `approval.wav`；macOS 上场景选择同时门控系统横幅，`soundEnabled` 只静音音频；默认只含 `SUCCESS`/`ERROR`，审批提示音需主动开启。四组 CI 全绿；版本号与 CHANGELOG 日期由维护者在发布提交中收口，不跟随 PR 的 0.1.22 预置值。
+- [#95 菜单设置重启回退](https://github.com/QCYTSN/dsh-dafeiyu/issues/95)：报告者用 0.1.21 复测确认 helper 重启、DSH 重启均保持 0.8，`settings.update` 返回 200 且写入 `cordis.patch.yml`，无法再复现原始故障；已关闭。按反馈把 `settings.describe()` 列表改为只在失败时打印，并标注为“设置页 namespace，不是可写 config 条目”；activation 行不再打印该列表。
+- #92 / #88 / #91 / #81 / #83 / #80 / #76 等仍按原状态等待实机或日志；PR 队列已清空（除已合并/关闭项）。
+
 ## 2026-10-27 修复（0.1.21）
 
 - [#94 macOS 跨显示器拖动](https://github.com/QCYTSN/dsh-dafeiyu/issues/94)：合并 [#96](https://github.com/QCYTSN/dsh-dafeiyu/pull/96)。`PetPanel` 覆写 `constrainFrameRect`，拖动期间使用 `moveToActiveSpace + fullScreenAuxiliary`，松手恢复 `canJoinAllSpaces / stationary`；`keepFront` 拖动期间不再重设 collectionBehavior。PR 四组 CI 全绿后合并，作者已在本机双向跨屏验证；普通桌面与全屏 Space 的跨屏行为仍待更多实机反馈。

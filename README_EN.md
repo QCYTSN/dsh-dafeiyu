@@ -12,7 +12,7 @@
 
 BigFish starts and stops with its DSH Host. A transparent, frameless native window keeps the Agent's task status visible while you work in other apps.
 
-> **Current stable version: 0.1.21.** Adds the macOS cross-display drag fix, and keeps native context-menu size, bubble-size and reduced-motion choices even when the DSH settings write is rejected, with the failure reason written to the Helper log. The 0.1.20 click-through fix and the 0.1.19 Helper cold-start diagnostics remain. Install `dsh-dafeiyu@0.1.21`, or download **`dsh-dafeiyu-0.1.21.tgz`** from the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest). Windows, Linux, and macOS share this one package. GitHub's automatic **Source code (zip / tar.gz)** downloads are source archives, not installable packages.
+> **Current stable version: 0.1.22.** Adds the approval chime and per-scene alert switches (completed / tool error / waiting for approval); on macOS the scene choice also gates the system notification banner, while Windows and Linux play audio only. The 0.1.21 cross-display drag and settings fallback, the 0.1.20 click-through fix, and the 0.1.19 Helper cold-start diagnostics remain. Install `dsh-dafeiyu@0.1.22`, or download **`dsh-dafeiyu-0.1.22.tgz`** from the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest). Windows, Linux, and macOS share this one package. GitHub's automatic **Source code (zip / tar.gz)** downloads are source archives, not installable packages.
 
 <img src="docs/images/balance-preview.png" width="460" alt="BigFish displays API balance below the current task">
 
@@ -49,21 +49,21 @@ For command-line installation, updates, or removal, fully quit the target DSH Ho
 With a global DSH CLI:
 
 ```powershell
-dsh plugin --profile web add dsh-dafeiyu@0.1.21
+dsh plugin --profile web add dsh-dafeiyu@0.1.22
 dsh web
 ```
 
 With `npx`, without a global install:
 
 ```powershell
-npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu@0.1.21
+npx -y @deepseek-ai/dsh plugin --profile web add dsh-dafeiyu@0.1.22
 npx -y @deepseek-ai/dsh web
 ```
 
 From a DeepSeek Harness source checkout, run in that checkout:
 
 ```powershell
-pnpm dsh plugin --profile web add dsh-dafeiyu@0.1.21
+pnpm dsh plugin --profile web add dsh-dafeiyu@0.1.22
 pnpm dsh web
 ```
 
@@ -72,7 +72,7 @@ pnpm dsh web
 Install directly in the app:
 
 1. Open the official DeepSeek Harness Desktop app and select **Plugins** in the sidebar.
-2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.21`, and select **Install**.
+2. Select **Add plugin**, enter `dsh-dafeiyu@0.1.22`, and select **Install**.
 3. After installation, select **Enable now**. BigFish appears on your desktop.
 4. Open **dsh-dafeiyu** in the plugin list to adjust the character, bubble, and balance settings. Changes apply live.
 
@@ -87,7 +87,7 @@ For command-line installation:
 3. Run:
 
    ```powershell
-   dsh plugin --profile desktop add dsh-dafeiyu@0.1.21
+   dsh plugin --profile desktop add dsh-dafeiyu@0.1.22
    ```
 
 4. Reopen Desktop and select dsh-dafeiyu under sidebar Plugins.
@@ -96,14 +96,14 @@ The `dsh` command above must belong to Desktop. A standalone npm or `npx @deepse
 
 ### Release archive
 
-Open the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), download **`dsh-dafeiyu-0.1.21.tgz`** under **Assets**, and install it with the appropriate client's CLI. Do not unpack it first. Historical versions and **Source code** archives are not the recommended installation:
+Open the [latest release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), download **`dsh-dafeiyu-0.1.22.tgz`** under **Assets**, and install it with the appropriate client's CLI. Do not unpack it first. Historical versions and **Source code** archives are not the recommended installation:
 
 ```powershell
 # WebUI; replace the path with your downloaded file
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.21.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.22.tgz"
 
 # Official Desktop; use its bundled CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.21.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.22.tgz"
 ```
 
 Desktop also accepts the full `.tgz` path in its **Add plugin** field.
@@ -157,7 +157,7 @@ The native window appears on the machine running the Host. A remote server or a 
 
 ## Update and troubleshoot
 
-Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu@0.1.21`, and enable it. Alternatively use Desktop's bundled CLI below.
+Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu@0.1.22`, and enable it. Alternatively use Desktop's bundled CLI below.
 
 Quit the target Host, update, and restart:
 

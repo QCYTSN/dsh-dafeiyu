@@ -2,7 +2,7 @@
 
 先确认插件安装在 `web` 还是官方桌面端的 `desktop` profile。使用命令操作前完全退出对应 Host，包括托盘或后台仍在运行的进程；操作完成后重新启动。使用应用内插件管理时，按应用提示重启。
 
-**当前稳定版为 0.1.21。** 推荐安装 `dsh-dafeiyu@0.1.21`，下载入口固定为[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)。当前版本新增 macOS 跨显示器拖动修复；右键菜单里的大小、气泡大小和减少动态在 DSH 设置写入失败时也会保留，并把失败原因写进 Helper 日志。继续包含 0.1.20 的透明区域点击穿透，以及 0.1.19 的 Helper 冷启动诊断、临时目录清理与 Linux arm64 回退。
+**当前稳定版为 0.1.22。** 推荐安装 `dsh-dafeiyu@0.1.22`，下载入口固定为[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)。当前版本新增「等待审批」提示音与按场景独立开关（完成 / 出错 / 等待审批）；macOS 上场景选择同时控制系统通知横幅，Windows / Linux 只播放声音。继续包含 0.1.21 的跨显示器拖动与菜单设置兜底、0.1.20 的透明区域点击穿透，以及 0.1.19 的 Helper 冷启动诊断、临时目录清理与 Linux arm64 回退。
 
 ## WebUI
 
@@ -22,7 +22,7 @@ npx -y @deepseek-ai/dsh plugin --profile web update dsh-dafeiyu
 
 ## 官方桌面端
 
-官方桌面端 0.2.0-rc.2 的安装页面明确说明暂不支持自动更新。打开左侧 **插件**，卸载 **dsh-dafeiyu**，再通过 **添加插件** 安装 `dsh-dafeiyu@0.1.21`，并点击 **立即启用**。若应用提示刷新或重启，按提示操作。
+官方桌面端 0.2.0-rc.2 的安装页面明确说明暂不支持自动更新。打开左侧 **插件**，卸载 **dsh-dafeiyu**，再通过 **添加插件** 安装 `dsh-dafeiyu@0.1.22`，并点击 **立即启用**。若应用提示刷新或重启，按提示操作。
 
 只填包名会选择安装源中的最新版。新版本刚发布时，默认安装源可能仍返回旧版；使用本页的明确版本号，并在安装后核对详情页。以后升级时以[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)为准。
 
@@ -38,14 +38,14 @@ dsh plugin --profile desktop update dsh-dafeiyu
 
 ## 安装当前离线包
 
-从[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)的 **Assets** 下载 **`dsh-dafeiyu-0.1.21.tgz`**。这是 Windows、Linux 和 macOS 共用的安装包；**Source code (zip / tar.gz)** 仅供源码开发。安装包不用解压，用同一 profile 的 `add` 命令替换安装：
+从[最新版发布页](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)的 **Assets** 下载 **`dsh-dafeiyu-0.1.22.tgz`**。这是 Windows、Linux 和 macOS 共用的安装包；**Source code (zip / tar.gz)** 仅供源码开发。安装包不用解压，用同一 profile 的 `add` 命令替换安装：
 
 ```powershell
 # WebUI
-npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.21.tgz"
+npx -y @deepseek-ai/dsh plugin --profile web add "C:\Downloads\dsh-dafeiyu-0.1.22.tgz"
 
 # 官方桌面端，自带 CLI
-dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.21.tgz"
+dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.22.tgz"
 ```
 
 路径替换为实际下载位置。桌面应用的 **添加插件** 也接受安装包的完整路径。
@@ -91,7 +91,7 @@ dsh plugin --profile desktop remove dsh-dafeiyu
 
 ## 角色不出现 / Helper 启动失败（#88、#91）
 
-从 0.1.21 起，Helper 的启动过程会写入诊断日志，超时、`exited before ready`、`spawn error` 和最终放弃都会留下原因：
+从 0.1.22 起，Helper 的启动过程会写入诊断日志，超时、`exited before ready`、`spawn error` 和最终放弃都会留下原因：
 
 - Windows：`%LOCALAPPDATA%\dsh-dafeiyu\logs\helper.log`
 - macOS：`~/Library/Logs/dsh-dafeiyu/helper.log`
@@ -105,7 +105,7 @@ Linux arm64 的 npm 包内没有对应的随架构 Helper，会回退到 `python
 
 ## 右键菜单改大小后重启回退（#95）
 
-0.1.21 起，插件会把右键菜单选择的大小、气泡大小和「减少动态」记到 `$DSH_HOME/dsh-dafeiyu/user-settings.json`（默认 `~/.dsh/dsh-dafeiyu/user-settings.json`）。这是 DSH `settings.update()` 写不进去时的兜底：
+0.1.22 起，插件会把右键菜单选择的大小、气泡大小和「减少动态」记到 `$DSH_HOME/dsh-dafeiyu/user-settings.json`（默认 `~/.dsh/dsh-dafeiyu/user-settings.json`）。这是 DSH `settings.update()` 写不进去时的兜底：
 
 - 只要 DSH 里仍是选择时的旧值，helper 重启或 DSH 重启后仍沿用菜单选择；
 - 之后在 DSH 设置页改成新值时，兜底会自动清除，新值优先；

@@ -357,7 +357,11 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
     startRuntime(next)
   }
 
-  const hostNamespaceList = () => {
+  // `settings.describe()` lists the settings-page namespaces, not the
+  // configEditor entries that `settings.update()` writes. Its absence of
+  // "dsh-dafeiyu" is not evidence of a failed write (issue #95), so it is only
+  // printed on an actual failure and labelled explicitly.
+  const settingsPageNamespaceList = () => {
     try {
       return (hostSettings.describe?.() ?? []).map((row) => row.ns).join(',')
     } catch {
@@ -438,7 +442,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
           const detail = error instanceof Error ? error.message : String(error)
           diagnosticsLog.write(
             'ERROR',
-            `settings.update failed for namespace "${hostSettings.namespace ?? 'dsh-dafeiyu'}": ${detail}; host namespaces: ${hostNamespaceList() || '(none)'}; kept native menu values: ${JSON.stringify(overrides.snapshot())}`,
+            `settings.update failed for namespace "${hostSettings.namespace ?? 'dsh-dafeiyu'}": ${detail}; settings-page namespaces (describe, not write targets): ${settingsPageNamespaceList() || '(none)'}; kept native menu values: ${JSON.stringify(overrides.snapshot())}`,
           )
           logger.warn?.(`dsh-dafeiyu failed to persist helper settings: ${detail}`)
         }).finally(() => {
@@ -461,7 +465,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       diagnosticsLogged = true
       diagnosticsLog.write(
         'INFO',
-        `settings persistence (activation): namespace="${hostSettings.namespace ?? 'dsh-dafeiyu'}"; update=${typeof hostSettings.update === 'function'}; host namespaces: ${hostNamespaceList() || '(none)'}; native-menu fallback: ${JSON.stringify(overrides.snapshot())}`,
+        `settings persistence (activation): namespace="${hostSettings.namespace ?? 'dsh-dafeiyu'}"; update=${typeof hostSettings.update === 'function'}; native-menu fallback: ${JSON.stringify(overrides.snapshot())}`,
       )
     }
     bridge.start()
