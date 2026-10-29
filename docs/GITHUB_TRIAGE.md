@@ -2,6 +2,13 @@
 
 > 此文件记录 issue / PR 的处理依据，不是安装指南。旧版本号用于追溯；安装请使用[当前稳定版](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest)。本记录不随安装包分发。
 
+## 2026-10-29 修复（0.1.23）
+
+- [#91 Python 回退提示](https://github.com/QCYTSN/dsh-dafeiyu/issues/91)：`runtime/helper.py` 实际输出 `PySide6 is required for visual mode (...)`，Host 原 matcher 只认 `ImportError` / `ModuleNotFoundError`，因此 0.1.19–0.1.22 的安装指引没有触发。0.1.23 已改为同时匹配该文本，并新增真实 Helper + `-S` 的回归测试。原生 `linux-arm64` Helper 仍未随包；issue 保持打开等 arm64 复测。
+- [PR #97](https://github.com/QCYTSN/dsh-dafeiyu/pull/97)（draft）：只抽取了两个与任务跳转无关的独立修复到 0.1.23——#91 matcher 与冒烟脚本 layout 隔离。任务卡点击跳转（#85）仍留在 draft PR，等待真实 DSH 页面端到端、多屏/全屏/右键菜单与 CI 验证；本轮未合并、未发布该功能。
+- #92 / #83 / #81：bosprimigenious 在 macOS 27.0.1 上补了受控 AppKit/真实鼠标探针，单屏命中区、部分离屏锚点、字号解耦均通过；多屏/全屏/右键菜单和完整日常验收仍未覆盖，issue 保持打开。
+- #95 已关闭；#80 / #88 / #76 / #39 / #22 仍按原状态等待日志或大改。
+
 ## 2026-10-28 发布（0.1.22）
 
 - [#93 提示音独立开关](https://github.com/QCYTSN/dsh-dafeiyu/pull/93)：合并（merge commit 65d5344）。新增 `soundStates`（完成 / 出错 / 等待审批）与 `approval.wav`；macOS 上场景选择同时门控系统横幅，`soundEnabled` 只静音音频；默认只含 `SUCCESS`/`ERROR`，审批提示音需主动开启。四组 CI 全绿；版本号与 CHANGELOG 日期由维护者在发布提交中收口，不跟随 PR 的 0.1.22 预置值。

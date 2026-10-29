@@ -569,7 +569,11 @@ export class HelperProcess {
       // The Python fallback is a supported path on architectures without a
       // bundled Helper; name the missing package instead of leaving only a
       // traceback in a console the user may never see (issue #91).
-      if (!this.pythonHintLogged && /(ModuleNotFoundError|ImportError).*PySide6/.test(line)) {
+      // helper.py catches ImportError itself and prints
+      // "PySide6 is required for visual mode (...)", so the exception class
+      // name is not part of that supported fallback message.
+      if (!this.pythonHintLogged
+        && /(?:ModuleNotFoundError|ImportError).*PySide6|PySide6 is required for visual mode/.test(line)) {
         this.pythonHintLogged = true
         const hint = `dsh-dafeiyu fell back to the Python Helper but PySide6 is unavailable. Install "PySide6>=6.7,<7" for ${process.platform}/${process.arch}, or install a release that bundles a Helper for this architecture.`
         this.logger.error?.(hint)

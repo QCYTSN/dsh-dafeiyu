@@ -9,6 +9,7 @@ import {
 } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 import {
   cleanStaleExtractionDirectories,
@@ -209,6 +210,39 @@ test('a Python fallback without PySide6 logs an actionable hint', async () => {
   assert.match(log, /ModuleNotFoundError: No module named "PySide6"/)
   assert.match(log, /fell back to the Python Helper but PySide6 is unavailable/)
   assert.ok(errors.some((message) => message.includes('PySide6')))
+})
+
+test('the real Python visual fallback reports how to install missing PySide6', async () => {
+  const directory = makeDirectory('dsh-dafeiyu-real-python-hint-')
+  const logFile = join(directory, 'helper.log')
+  const errors = []
+  const logger = { debug() {}, info() {}, warn() {}, error(message) { errors.push(message) } }
+  const bridge = new HelperProcess({
+    command: process.execPath,
+    // -S excludes site-packages even on machines with PySide6 installed. Run
+    // the actual Helper so its caught ImportError wording cannot drift away
+    // from the Host's diagnostic matcher unnoticed.
+    args: [
+      fileURLToPath(new URL('../scripts/run-python.mjs', import.meta.url)),
+      '-S',
+      fileURLToPath(new URL('../runtime/helper.py', import.meta.url)),
+    ],
+    heartbeatMs: 0,
+    restartDelayMs: 10,
+    maxStartFailures: 1,
+    logFile,
+  }, logger)
+
+  try {
+    bridge.start()
+    await waitFor(() => bridge.restartSuppressed === true)
+    const log = readLog(logFile)
+    assert.match(log, /PySide6 is required for visual mode/)
+    assert.match(log, /fell back to the Python Helper but PySide6 is unavailable/)
+    assert.ok(errors.some((message) => message.includes('Install "PySide6>=6.7,<7"')))
+  } finally {
+    bridge.stop('real-python-hint-test-complete')
+  }
 })
 
 test('creating a log directory is best effort and never throws', () => {

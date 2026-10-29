@@ -5,6 +5,23 @@
 > [updating guide](UPDATING.md). This record is retained in GitHub and excluded
 > from the installable package.
 
+## 2026-10-29 · Python fallback hint and smoke isolation / 0.1.23
+
+- Passed 137 JavaScript and 54 Python tests locally on Windows. The new
+  diagnostics test runs the real Helper with `-S` (no site-packages), observes
+  the actual `PySide6 is required for visual mode ...` stderr, and asserts both
+  the Helper log and the host error callback carry the install hint.
+- Reproduced the smoke runner's layout side effect with a sentinel
+  `DSH_DAFEIYU_LAYOUT_PATH`; after the isolation change, the visual smoke and
+  stdin-EOF children leave the sentinel unchanged and clean up their temporary
+  probe directory.
+- Only the two independent fixes from draft PR #97 were taken. The macOS task
+  row navigation remains unmerged; its real DSH page end-to-end, multi-display,
+  full-screen, and context-menu paths are still unverified.
+- Contributor-controlled macOS probes (not run in this session) passed for
+  single-screen click-through, partial-offscreen anchors, and font decoupling;
+  those issues remain open for multi-display / visual acceptance.
+
 ## 2026-10-28 · Approval alerts and settings diagnostics / 0.1.22
 
 - Merged PR #93 only after its second commit passed all four CI jobs. The

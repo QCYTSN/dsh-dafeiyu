@@ -1,5 +1,7 @@
 import { spawn } from 'node:child_process'
-import { mkdir, rm, stat } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, stat } from 'node:fs/promises'
+import { rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
@@ -34,9 +36,16 @@ await stat(executable)
 await mkdir(dirname(snapshot), { recursive: true })
 await rm(snapshot, { force: true })
 
+// A visual Helper saves layout on startup, even without a user interaction.
+// Always isolate it from the caller's real DSH profile and any layout override.
+const probeDirectory = await mkdtemp(resolve(tmpdir(), 'dsh-dafeiyu-packaged-smoke-'))
+const environment = { ...process.env, DSH_DAFEIYU_LAYOUT_PATH: resolve(probeDirectory, 'layout.json') }
+process.once('exit', () => rmSync(probeDirectory, { recursive: true, force: true }))
+
 const child = spawn(executable, ['--snapshot', snapshot], {
   stdio: ['pipe', 'pipe', 'pipe'],
   windowsHide: true,
+  env: environment,
 })
 let standardError = ''
 let standardOutput = ''
@@ -119,6 +128,7 @@ try {
 const eofChild = spawn(executable, ['--headless'], {
   stdio: ['pipe', 'pipe', 'pipe'],
   windowsHide: true,
+  env: environment,
 })
 let eofOutput = ''
 let eofError = ''

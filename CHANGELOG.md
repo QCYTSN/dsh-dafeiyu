@@ -2,6 +2,21 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## 0.1.23 · 2026-10-29
+
+### Fixed
+
+- Recognize the Python Helper's actual missing-PySide6 message
+  (`PySide6 is required for visual mode ...`) instead of only matching
+  `ImportError` / `ModuleNotFoundError` lines. Linux arm64 and other hosts that
+  fall back to the Python Helper now get the promised installation hint in the
+  console and Helper log
+  ([#91](https://github.com/QCYTSN/dsh-dafeiyu/issues/91)). From bosprimigenious'
+  [#97](https://github.com/QCYTSN/dsh-dafeiyu/pull/97).
+- Keep packaged visual smoke tests from rewriting the caller's
+  `layout.json`: both smoke children now use a per-run temporary layout
+  directory. Test tooling only; the normal plugin launch path is unchanged.
+
 ## 0.1.22 · 2026-10-28
 
 ### Added
