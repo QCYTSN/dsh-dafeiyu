@@ -5,6 +5,32 @@
 > [updating guide](UPDATING.md). This record is retained in GitHub and excluded
 > from the installable package.
 
+## 2026-10-31 · macOS task navigation / rebased on 0.1.23
+
+Baseline: `0843238` / official 0.1.23. This unreleased PR only adds task-row
+navigation. The published Python dependency diagnostics and packaged-smoke
+layout isolation are unchanged from the baseline.
+
+- macOS 27.0.1 (26A434), Apple M5 / arm64; one built-in display.
+- `pnpm install --frozen-lockfile` succeeded; `pnpm test`: 144 passed, 0 failed.
+- `pnpm test:python`: 54 tests, 4 Qt-dependent skips (PySide6 unavailable).
+- `swift test` failed: the installed Command Line Tools cannot resolve XCTest.
+- `pnpm build:helper:darwin` compiled arm64, then failed linking x86_64 because
+  the installed CLT compatibility libraries lack that architecture.
+- Recompiled all seven production Swift sources with the script's arm64
+  target (`arm64-apple-macosx12.0`) and framework flags. Ad-hoc signature
+  verification, packaged visual smoke and stdin-EOF lifecycle checks passed.
+  This is an arm64-only local build, not a universal-package success.
+- NOT READY for full acceptance: actual Desktop navigation with the page
+  companion disabled, stale/closed session and no-client feedback, dragging,
+  full-screen/context-menu/click-through regressions remain unverified.
+  The installed Desktop plugin was still 0.1.14 at inspection; its running
+  user task was not interrupted to replace the package. Official 0.1.23 was
+  downloaded and its release SHA-256 verified for the separate #81/#83 run.
+- Multi-display was not tested (no external display). Windows and Linux
+  manual acceptance were not performed. Earlier CI belongs to the old PR
+  head and does not validate this rebased source.
+
 ## 2026-10-29 · Python fallback hint and smoke isolation / 0.1.23
 
 - Passed 137 JavaScript and 54 Python tests locally on Windows. The new

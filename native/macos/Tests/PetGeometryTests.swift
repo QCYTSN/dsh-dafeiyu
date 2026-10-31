@@ -39,4 +39,34 @@ final class PetGeometryTests: XCTestCase {
         XCTAssertTrue(PetGeometry.isInteractive(CGPoint(x: 9.5, y: 10), pet: pet, bubble: nil))
         XCTAssertFalse(PetGeometry.isInteractive(CGPoint(x: 8, y: 10), pet: pet, bubble: nil))
     }
+
+    func testTaskRowsUseTheDrawnGeometryAtEveryBubbleScale() {
+        for scale: CGFloat in [0.8, 1, 1.2] {
+            let card = CGRect(x: 14, y: 7, width: 420 * scale, height: 136 * scale)
+            for index in 0..<3 {
+                let row = PetGeometry.taskRowRect(in: card, index: index, scale: scale)
+                XCTAssertEqual(row.minY, card.minY + (36 + CGFloat(index) * 24) * scale)
+                XCTAssertEqual(PetGeometry.taskRowIndex(at: CGPoint(x: row.midX, y: row.midY),
+                                                      card: card, scale: scale, taskCount: 4), index)
+            }
+            // Header, row gaps and the collapsed "more tasks" footer do not open a session.
+            XCTAssertNil(PetGeometry.taskRowIndex(at: CGPoint(x: card.midX, y: card.minY + 15 * scale),
+                                                  card: card, scale: scale, taskCount: 4))
+            XCTAssertNil(PetGeometry.taskRowIndex(at: CGPoint(x: card.midX, y: card.minY + 58 * scale),
+                                                  card: card, scale: scale, taskCount: 4))
+            let hiddenRow = PetGeometry.taskRowRect(in: card, index: 3, scale: scale)
+            XCTAssertNil(PetGeometry.taskRowIndex(at: CGPoint(x: hiddenRow.midX, y: hiddenRow.midY),
+                                                  card: card, scale: scale, taskCount: 4))
+        }
+    }
+
+    func testRemovedTasksCannotLeaveClickableRows() {
+        let card = CGRect(x: 14, y: 7, width: 420, height: 136)
+        let lastRow = PetGeometry.taskRowRect(in: card, index: 2, scale: 1)
+        let point = CGPoint(x: lastRow.midX, y: lastRow.midY)
+        XCTAssertEqual(PetGeometry.taskRowIndex(at: point, card: card, scale: 1, taskCount: 3), 2)
+        XCTAssertNil(PetGeometry.taskRowIndex(at: point, card: card, scale: 1, taskCount: 2))
+        XCTAssertNil(PetGeometry.taskRowIndex(at: point, card: card, scale: 1, taskCount: 1))
+        XCTAssertNil(PetGeometry.taskRowIndex(at: point, card: card, scale: 1, taskCount: 0))
+    }
 }

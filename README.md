@@ -128,6 +128,10 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.23.tgz"
 
 账户余额和 API 余额的查询方式参考了 [keshing/balance-display](https://github.com/keshing/balance-display) 与 DSH 的公开账户服务。插件不会发起模型调用。
 
+## 开发分支：任务卡会话跳转（尚未发布）
+
+macOS 同时显示多个任务时，单击可见任务行可请求已打开的 DSH 页面切到对应会话；无需启用“页面内角色”。拖动仍移动桌宠。“已请求打开会话”表示请求已发给客户端，不表示客户端已切到前台。没有打开客户端或目标会话已关闭时，卡片会提示原因。Windows / Linux 任务卡目前仍只展示状态。
+
 ## 常用设置
 
 | 设置 | 作用 |

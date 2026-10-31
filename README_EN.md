@@ -18,6 +18,14 @@ BigFish starts and stops with its DSH Host. A transparent, frameless native wind
 
 *Captured from the Windows native window with sample balance data. Current character assets come from [PC2005-cloud/dsh-pet](https://github.com/PC2005-cloud/dsh-pet). The companion's interface is currently in Chinese.*
 
+## Development branch: task navigation (unreleased)
+
+On macOS, click a visible row in the multi-task card to request navigation in
+an already-open DSH client. This works with the in-page companion disabled.
+Dragging still moves the companion. Feedback confirms a request was sent, not
+that DSH was brought to the foreground. A missing client or closed session is
+reported in the card. Windows and Linux task cards remain display-only.
+
 ## Features
 
 - Real session states: thinking, searching, editing, running, verifying, waiting, success, and errors.
