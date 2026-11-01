@@ -2,6 +2,16 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## Unreleased
+
+### Added
+
+- Click a visible task row in the macOS multi-task card to request that an
+  already-open DSH client show that session (#85). The page companion can stay
+  disabled. Hidden, removed and collapsed rows do not navigate; a missing
+  client or disposed session produces feedback. Requests use the existing
+  Helper stdio and SSE channel and are never replayed to new subscribers.
+
 ## 0.1.23 · 2026-10-29
 
 ### Fixed

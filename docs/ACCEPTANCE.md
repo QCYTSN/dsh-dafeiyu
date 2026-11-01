@@ -5,6 +5,93 @@
 > [updating guide](UPDATING.md). This record is retained in GitHub and excluded
 > from the installable package.
 
+## 2026-11-02 · macOS acceptance / task navigation rebased on 0.1.23
+
+Baseline: `0843238` / official 0.1.23. This unreleased PR only adds task-row
+navigation. The published Python dependency diagnostics and packaged-smoke
+layout isolation are unchanged from the baseline.
+
+**NOT READY for full acceptance; PR #97 remains a draft.** The maintainer closed
+#81 after the visual checks. Official-package #83 boundary checks passed and
+await maintainer confirmation. PR navigation and the regressions below passed,
+but no-client feedback, the closed-session race and PR multi-display acceptance
+remain incomplete. Official 0.1.23 does not contain task-row navigation.
+
+- Environment: DSH Desktop `0.2.0-rc.2`, macOS 27.0.1 (26A434), Apple M5 /
+  arm64; `bubbleScale=0.8`, character scale `0.85`, persistent bubbles and
+  `webOverlay=false`. Only the built-in display is connected for the November 2
+  PR tests. SSN-24 was connected for the November 1 official-package tests.
+- Issue #81, official `dsh-dafeiyu@0.1.23`: actual A/B/C sessions entered
+  `ask_user_question` waiting state. The three-task card title/rows and the
+  remaining A status card title/body after answering B/C were legible without
+  clipping or overlap. Balance display was temporarily disabled for public
+  screenshots, then restored. The maintainer has closed the issue.
+  [Status card](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/0d86da54bfa8e1486d5550b706e8c20bf24cd0be/docs/acceptance/2026-11-01/official-0.1.23-status-bubble-0.8.png),
+  [three-task card](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/0d86da54bfa8e1486d5550b706e8c20bf24cd0be/docs/acceptance/2026-11-01/official-0.1.23-three-tasks-bubble-0.8.png),
+  [issue report](https://github.com/QCYTSN/dsh-dafeiyu/issues/81#issuecomment-6554050106).
+- Issue #83, official 0.1.23: real partial-offscreen dragging retained the pet
+  position through window/content changes. On November 2, the right-offscreen
+  anchor stayed at `(1510,506)` before quit (00:41:13), after restart (00:41:42),
+  during real C-session waiting (00:42:21), in full-screen (00:42:31), and after
+  exit (00:42:52); times are UTC+8, anchors are AppKit points. The Helper PID
+  changed from 95043 to 46712. The November 1 two-way built-in → SSN-24 →
+  built-in drag retained anchors `(1514,430)` → `(724,1480)` → `(1514,430)`.
+  Earlier ambiguous fullscreen/restart attempts remain in the raw log and are
+  not counted as passes. The issue remains open for maintainer confirmation.
+  [Raw position/window log](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/native-boundary-log.jsonl),
+  [restart waiting](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/official-20261102-after-restart-waiting.png),
+  [full-screen DSH](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/official-20261102-fullscreen-dsh.png),
+  [full-screen native card](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/official-20261102-fullscreen-pet.png).
+- PR build: the tested local arm64 package uses source head
+  `b927ec34a09b53a91a43e66152cccc684ecaf647` and navigation implementation
+  `1dae5c7`. Its package version is also 0.1.23; it is not the official release.
+  Tarball SHA-256:
+  `175ffc9e3760fdc1b436ce84f9c14519d898bc775a4eb89af26b74d95ede6f7a`.
+- PR real DSH checks passed with the page companion disabled: all three visible
+  task rows entered their respective A/B/C sessions; dragging from row 2 by
+  40 pt kept session A open; clicking afterward still navigated; the native
+  context menu opened/closed; full-screen navigation and exit worked; a click
+  through the transparent card/character gap collapsed the underlying question
+  card. Ending/archiving C removed its row; clicking the unused third-row region
+  relative to the resized card did not reopen C. These used real sessions,
+  without synthetic Host events.
+  [Three rows](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-three-tasks.png),
+  [row 1 → A](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-row1-A-dsh.png),
+  [row 2 → B](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-row2-B-dsh.png),
+  [row 3 → C](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-row3-C-dsh.png),
+  [drag remains on A](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-drag-row2-stays-A.png),
+  [context menu](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-right-menu.png),
+  [full-screen navigation](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-fullscreen-row1-A.png),
+  [click-through](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-transparent-click-through.png),
+  [C removed](https://raw.githubusercontent.com/bosprimigenious/dsh-dafeiyu/7488dfb9ac73bb21b8e7f4f7a41e9b1cb66f5ab3/docs/acceptance/2026-11-02/pr-20261102-C-archived-two-rows.png).
+- Incomplete: the real reveal SSE was blocked in DevTools, but none of the seven
+  native captures contains the specific no-client error message, so that check
+  is not a pass. Blocking was removed and a reload restored SSE HTTP 200;
+  clicking A navigated again (01:09:47). The `session-unavailable` race has not
+  been reproduced in real UI; normal C removal is not evidence for that error
+  path. PR cross-display behavior remains untested with only the built-in display
+  connected. Windows/Linux manual acceptance was not performed.
+- Earlier AX input and screenshot-tool failures are tool limitations, not
+  conclusions about the plugin.
+- Local checks on navigation head `1dae5c7`: `pnpm install --frozen-lockfile`
+  succeeded; `pnpm test`: 144 passed, 0 failed. `pnpm test:python`: 54 tests,
+  4 Qt-dependent skips (PySide6 unavailable).
+  Re-running both suites on November 2 with the updated acceptance document
+  produced the same results (144 passed; 54 tests with 4 skips).
+- `swift test` failed: the installed Command Line Tools cannot resolve XCTest.
+  `pnpm build:helper:darwin` compiled arm64, then failed linking x86_64 because
+  the installed CLT compatibility libraries lack that architecture.
+- Recompiled all seven production Swift sources with the script's arm64
+  target (`arm64-apple-macosx12.0`) and framework flags. Ad-hoc signature
+  verification, packaged visual smoke and stdin-EOF lifecycle checks passed.
+  This is an arm64-only local build, not a universal-package success.
+  `pnpm pack` failed with bundled dependencies / the isolated linker; packaging
+  with `npm pack`, as used by CI, succeeded.
+- [CI run 41284227851, attempt 2](https://github.com/QCYTSN/dsh-dafeiyu/actions/runs/41284227851)
+  passed all four jobs for `b927ec34a09b53a91a43e66152cccc684ecaf647` after the
+  earlier approval attempt returned 403. This result belongs to that existing
+  head only. The new documentation commit's CI has not yet been checked.
+
 ## 2026-10-29 · Python fallback hint and smoke isolation / 0.1.23
 
 - Passed 137 JavaScript and 54 Python tests locally on Windows. The new

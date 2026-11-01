@@ -21,6 +21,8 @@ export const CompanionMessageKind = Object.freeze({
   CONFIG: 'config',
   BALANCE: 'balance',
   SETTINGS: 'settings',
+  REVEAL: 'reveal',
+  REVEAL_RESULT: 'reveal-result',
   PING: 'ping',
   PONG: 'pong',
   CLOSED: 'closed',
@@ -56,6 +58,10 @@ export function assertCompanionMessage(value) {
   if ((value.kind === CompanionMessageKind.STATE || value.kind === CompanionMessageKind.PULSE)
     && !states.has(value.state)) {
     throw new TypeError(`Unknown companion state: ${String(value.state)}`)
+  }
+  if (value.kind === CompanionMessageKind.REVEAL
+    && (typeof value.sessionId !== 'string' || !value.sessionId.trim() || value.sessionId.length > 200)) {
+    throw new TypeError('Reveal requires a non-empty sessionId of at most 200 characters')
   }
   return value
 }

@@ -75,6 +75,7 @@ async function animatedOverlay() {
   const manifest = { clips, stateMap: { IDLE: 'idle', THINKING: 'thinking', WORKING: 'command', SUCCESS: 'success', ERROR: 'error' }, workingActivityMap: { commanding: 'command' } }
   const urls = []
   let overlay, nextFrame, events, now = 0, cleanup
+  const nativeCleanups = []
   const { client } = loadClient(async (url) => ({ ok: true, json: async () => url.endsWith('/config') ? { webOverlay: true } : manifest }), source, {
     React: {
       ...React,
@@ -87,7 +88,10 @@ async function animatedOverlay() {
     Date: { now: () => now },
     EventSource: class { constructor() { events = this } close() {} },
   })
-  client.apply({ slots: { inject(name, register) { register() }, register(options, render) { if (options.name === 'shell.overlay') render() } } })
+  client.apply({
+    effect(setup) { nativeCleanups.push(setup()) },
+    slots: { inject(name, register) { register() }, register(options, render) { if (options.name === 'shell.overlay') render() } },
+  })
   await new Promise((resolve) => setImmediate(resolve))
   overlay()
   await new Promise((resolve) => setImmediate(resolve))
@@ -95,7 +99,7 @@ async function animatedOverlay() {
     frame: () => decodeURIComponent(urls.at(-1).split('?frame=')[1]),
     step(time) { now = time; const callback = nextFrame; callback(time) },
     message(message) { events.onmessage({ data: JSON.stringify(message) }) },
-    close() { cleanup() },
+    close() { cleanup(); for (const dispose of nativeCleanups) dispose?.() },
   }
 }
 

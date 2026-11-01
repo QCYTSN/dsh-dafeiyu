@@ -97,6 +97,13 @@ final class PetController: NSObject {
     var overlayDeadlineMs: Int?
     var task = ""
     var tasks: [[String: Any]] = []
+    /// Briefly replace the task card with navigation feedback. While it is
+    /// visible, the hidden task rows must not keep accepting clicks.
+    private var revealFeedbackDeadlineMs = 0
+
+    private var showsTaskCard: Bool {
+        tasks.count >= 2 && Self.nowMs() >= revealFeedbackDeadlineMs
+    }
 
     // Geometry (pet anchor in AppKit bottom-left coordinates)
     private var petX: CGFloat = 0
@@ -551,6 +558,20 @@ final class PetController: NSObject {
             playInteraction("head_pat", message: "好啦好啦，知道你喜欢我~")
             return
         }
+        if showsTaskCard, bubbleVisible(),
+           let index = PetGeometry.taskRowIndex(at: point, card: bubbleRect(),
+                                                scale: bubbleScale, taskCount: tasks.count) {
+            if let sessionId = Self.stringValue(tasks[index]["sessionId"]),
+               !sessionId.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                ProtocolIO.shared.write([
+                    "protocolVersion": 1,
+                    "kind": "reveal",
+                    "sessionId": sessionId,
+                    "timestamp": Self.nowMs(),
+                ])
+            }
+            return
+        }
         let rect = petRect()
         let relativeX = max(0, point.x - rect.minX)
         let relativeY = max(0, point.y - rect.minY)
@@ -718,6 +739,17 @@ final class PetController: NSObject {
             if message["alert"] as? String == "APPROVAL" {
                 notifyAlert("APPROVAL")
             }
+        case "reveal-result":
+            let ok = message["ok"] as? Bool == true
+            let reason = message["reason"] as? String
+            let title = ok ? "已请求打开会话" : "无法打开会话"
+            let detail = ok ? "请在 DSH 中查看这个任务"
+                : reason == "no-client" ? "请先打开 DSH 会话页面，再点击任务行"
+                : "这个任务已结束或会话已关闭"
+            let ttl = ok ? 1600 : 4000
+            revealFeedbackDeadlineMs = Self.nowMs() + ttl
+            showOverlay(title, detail, ok ? statusState : "ERROR", ttl)
+            contentView?.needsDisplay = true
         default:
             break
         }
@@ -991,7 +1023,7 @@ final class PetController: NSObject {
     func drawCard(in view: NSView) {
         guard bubbleVisible() else { return }
         let rect = bubbleRect()
-        if tasks.count >= 2 {
+        if showsTaskCard {
             drawTaskCard(rect: rect)
         } else if let card = currentCard() {
             drawStatusCard(rect: rect, card: card)
@@ -1121,7 +1153,8 @@ final class PetController: NSObject {
         )
 
         for (index, task) in tasks.prefix(3).enumerated() {
-            let rowY = rect.minY + (36 + CGFloat(index) * 24) * s
+            let rowRect = PetGeometry.taskRowRect(in: rect, index: index, scale: s)
+            let rowY = rowRect.minY
             let state = Self.stringValue(task["state"]) ?? "IDLE"
             let stateLabel = Self.labels[state] ?? state
             let label = Self.stringValue(task["project"])
@@ -1134,7 +1167,7 @@ final class PetController: NSObject {
             NSBezierPath(ovalIn: NSRect(x: textX, y: rowY + 4 * s, width: 8 * s, height: 8 * s)).fill()
             drawText(
                 line,
-                in: NSRect(x: textX + 14 * s, y: rowY, width: textWidth - 14 * s, height: max(12, 20 * s)),
+                in: NSRect(x: textX + 14 * s, y: rowY, width: textWidth - 14 * s, height: rowRect.height),
                 font: detailFont,
                 color: Self.hex("#747981")
             )

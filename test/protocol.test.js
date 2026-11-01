@@ -54,3 +54,11 @@ test('protocol accepts settings reported by the desktop helper', () => {
   assert.equal(assertCompanionMessage(message), message)
   assert.deepEqual(JSON.parse(encodeMessage(message)), message)
 })
+
+test('reveal messages reject empty, oversized and non-string session identifiers', () => {
+  for (const sessionId of [undefined, '', '   ', 42, 's'.repeat(201)]) {
+    assert.throws(() => assertCompanionMessage(createMessage(CompanionMessageKind.REVEAL, { sessionId })), /sessionId/)
+  }
+  const valid = createMessage(CompanionMessageKind.REVEAL, { sessionId: 'task-B' })
+  assert.deepEqual(JSON.parse(encodeMessage(valid)), valid)
+})

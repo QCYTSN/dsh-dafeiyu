@@ -160,11 +160,14 @@ export function createConfigHandler(settings) {
 // consumers (the future web overlay). Snapshot kinds are remembered so a client
 // that connects late still renders the current state immediately.
 export function createEventStream() {
-  const clients = new Set()
+  const clients = new Map()
   const snapshot = new Map()
   return {
     get clientCount() {
       return clients.size
+    },
+    get revealClientCount() {
+      return [...clients.values()].filter((options) => options.reveal).length
     },
     broadcast(message) {
       if (message?.kind === 'hello' || message?.kind === 'state' || message?.kind === 'task'
@@ -172,16 +175,24 @@ export function createEventStream() {
         snapshot.set(message.kind, message)
       }
       const payload = `data: ${JSON.stringify(message)}\n\n`
-      for (const res of clients) {
+      let delivered = 0
+      for (const [res, options] of clients) {
+        if (message?.kind === CompanionMessageKind.REVEAL && !options.reveal) continue
+        if (res.destroyed || res.writableEnded) {
+          clients.delete(res)
+          continue
+        }
         try {
           res.write(payload)
+          delivered += 1
         } catch {
           clients.delete(res)
         }
       }
+      return delivered
     },
-    add(res) {
-      clients.add(res)
+    add(res, options = {}) {
+      clients.set(res, options)
       for (const message of snapshot.values()) {
         res.write(`data: ${JSON.stringify(message)}\n\n`)
       }
@@ -202,7 +213,8 @@ export function createEventsHandler(stream) {
       connection: 'keep-alive',
     })
     res.write('retry: 2000\n\n')
-    const remove = stream.add(res)
+    const reveal = new URL(req.url ?? '/', 'http://localhost').searchParams.get('reveal') === '1'
+    const remove = stream.add(res, { reveal })
     req.on('close', remove)
   }
 }
@@ -421,6 +433,17 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
     bridge = new HelperProcess({
       ...helperConfig,
       env: helperEnvironment(resolved),
+      onReveal: (request) => {
+        const sessionId = request.sessionId
+        // A disposed/evicted task must not navigate to an unrelated new session.
+        const available = reducer?.sessions.has(sessionId) === true
+        const delivered = available
+          ? eventStream.broadcast(createMessage(CompanionMessageKind.REVEAL, { sessionId })) : 0
+        const reason = !available ? 'session-unavailable' : delivered === 0 ? 'no-client' : undefined
+        bridge?.send(createMessage(CompanionMessageKind.REVEAL_RESULT, {
+          sessionId, ok: !reason, ...(reason ? { reason } : {}),
+        }))
+      },
       onSettingsChange: (report) => {
         if (typeof settings.update !== 'function') return
         const patch = {}

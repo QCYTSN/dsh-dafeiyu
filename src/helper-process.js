@@ -19,6 +19,7 @@ import { createInterface } from 'node:readline'
 import { createHelperLog, defaultHelperLogPath } from './helper-log.js'
 import {
   CompanionMessageKind,
+  assertCompanionMessage,
   createMessage,
   encodeMessage,
 } from './protocol.js'
@@ -701,6 +702,11 @@ export class HelperProcess {
       }
       if (reply?.protocolVersion === 1 && reply.kind === CompanionMessageKind.CLOSED) {
         this.restartSuppressed = true
+        return
+      }
+      if (reply?.protocolVersion === 1 && reply.kind === CompanionMessageKind.REVEAL) {
+        assertCompanionMessage(reply)
+        this.options.onReveal?.(reply)
         return
       }
       if (reply?.protocolVersion === 1 && reply.kind === CompanionMessageKind.SETTINGS) {
