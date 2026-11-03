@@ -38,6 +38,27 @@ STATES = {"IDLE", "THINKING", "WORKING", "WAITING", "SUCCESS", "ERROR", "DISCONN
 DECODED_FRAME_CACHE = 24
 
 
+WS_EX_TRANSPARENT = 0x00000020
+WS_EX_LAYERED = 0x00080000
+OPACITY_CHOICES = (("不透明", 1.0), ("80%", 0.8), ("60%", 0.6), ("40%", 0.4))
+
+
+def click_through_active(enabled: bool, modifier_held: bool) -> bool:
+    """Click-through applies unless the user holds Ctrl to reach the pet."""
+    return enabled and not modifier_held
+
+
+def click_through_ex_style(style: int, transparent: bool) -> int:
+    """Return the Win32 extended style with WS_EX_TRANSPARENT set or cleared.
+
+    WS_EX_TRANSPARENT only lets clicks fall through on a layered window, so it is
+    always paired with WS_EX_LAYERED (already present for translucent Qt windows).
+    """
+    if transparent:
+        return style | WS_EX_TRANSPARENT | WS_EX_LAYERED
+    return style & ~WS_EX_TRANSPARENT
+
+
 def configure_qt_platform() -> None:
     """Prefer XWayland when available so desktop-window controls keep working."""
     if sys.platform != "linux" or os.environ.get("QT_QPA_PLATFORM"):
@@ -420,6 +441,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 | Qt.WindowType.Tool
             )
             self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+            self.pet_opacity = float(self.layout["opacity"])
+            self.click_through = bool(self.layout["clickThrough"])
+            self.tray: Any = None
+            if sys.platform == "win32":
+                # Poll Ctrl so the pet stays reachable while click-through is on.
+                self.click_through_timer = QTimer(self)
+                self.click_through_timer.timeout.connect(self._apply_click_through)
+                self.click_through_timer.start(80)
+            QTimer.singleShot(0, self._setup_tray)
             self._apply_window_size()
             QTimer.singleShot(0, self._restore_visible_position)
 
@@ -806,6 +836,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 "reducedMotion": self.reduced_motion,
                 "bubbleMode": self.bubble_mode,
                 "bubbleStates": self.bubble_states,
+                "opacity": self.pet_opacity,
+                "clickThrough": self.click_through,
             }
             try:
                 save_layout(self.layout_path, self.layout)
@@ -1102,7 +1134,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 ph = pix.height() * self.scale
                 x, y, _, _ = self._pet_rect()
                 painter.save()
-                painter.setOpacity(alpha)
+                painter.setOpacity(alpha * self.pet_opacity)
                 painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
                 painter.restore()
 
@@ -1187,6 +1219,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
+            opacity_menu = menu.addMenu("透明度")
+            opacity_actions = {}
+            for label, value in OPACITY_CHOICES:
+                action = opacity_menu.addAction(label)
+                action.setCheckable(True)
+                action.setChecked(abs(self.pet_opacity - value) < 0.05)
+                opacity_actions[action] = value
+            click_through_action = None
+            if sys.platform == "win32":
+                click_through_action = menu.addAction("鼠标穿透（按住 Ctrl 可点）")
+                click_through_action.setCheckable(True)
+                click_through_action.setChecked(self.click_through)
             open_webui_action = menu.addAction(self.open_label)
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
@@ -1209,6 +1253,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("settings", reducedMotion=self.reduced_motion)
                 self.update()
+            elif selected in opacity_actions:
+                self._set_opacity(opacity_actions[selected])
+            elif click_through_action is not None and selected == click_through_action:
+                self._set_click_through(click_through_action.isChecked())
             elif selected == open_webui_action:
                 self._open_client()
             elif selected == hide_action:
@@ -1217,6 +1265,92 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._save_layout()
                 emit_reply("closed", reason="user")
                 QApplication.quit()
+
+        def _set_opacity(self, value: float) -> None:
+            self.pet_opacity = min(1.0, max(0.2, float(value)))
+            self._save_layout()
+            self.update()
+
+        def _set_click_through(self, enabled: bool) -> None:
+            self.click_through = enabled
+            self._save_layout()
+            if enabled:
+                self._show_overlay("鼠标穿透已开启", "按住 Ctrl 可以拖动、右键", self.status_state, 3000)
+                self.update()
+
+        def _apply_click_through(self) -> None:
+            if not self.isVisible():
+                return
+            try:
+                import ctypes
+
+                user32 = ctypes.windll.user32
+                held = bool(user32.GetAsyncKeyState(0x11) & 0x8000)  # VK_CONTROL
+                want = click_through_active(self.click_through, held)
+                hwnd = int(self.winId())
+                style = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
+                if bool(style & WS_EX_TRANSPARENT) != want:
+                    user32.SetWindowLongW(hwnd, -20, click_through_ex_style(style, want))
+            except (AttributeError, OSError):
+                self.click_through_timer.stop()
+
+        def _setup_tray(self) -> None:
+            """Tray entry to bring the pet back after hiding or while click-through is on."""
+            from PySide6.QtGui import QIcon
+            from PySide6.QtWidgets import QSystemTrayIcon
+
+            if not QSystemTrayIcon.isSystemTrayAvailable():
+                return
+            try:
+                icon = QIcon(self._pixmap(self.model.frame))
+            except Exception:
+                icon = QIcon()
+            tray = QSystemTrayIcon(icon, self)
+            tray.setToolTip("DSH 大肥鱼（单击显示）")
+            menu = QMenu()
+            show_action = menu.addAction("显示")
+            hide_action = menu.addAction("隐藏")
+            menu.addSeparator()
+            click_through_action = None
+            if sys.platform == "win32":
+                click_through_action = menu.addAction("鼠标穿透")
+                click_through_action.setCheckable(True)
+            opacity_menu = menu.addMenu("透明度")
+            opacity_actions = {}
+            for label, value in OPACITY_CHOICES:
+                action = opacity_menu.addAction(label)
+                action.setCheckable(True)
+                opacity_actions[action] = value
+
+            def sync() -> None:
+                if click_through_action is not None:
+                    click_through_action.setChecked(self.click_through)
+                for action, value in opacity_actions.items():
+                    action.setChecked(abs(self.pet_opacity - value) < 0.05)
+
+            def bring_back() -> None:
+                self.show()
+                self.raise_()
+
+            def chosen(action: Any) -> None:
+                if action == show_action:
+                    bring_back()
+                elif action == hide_action:
+                    self.hide()
+                elif click_through_action is not None and action == click_through_action:
+                    self._set_click_through(click_through_action.isChecked())
+                elif action in opacity_actions:
+                    self._set_opacity(opacity_actions[action])
+
+            menu.aboutToShow.connect(sync)
+            menu.triggered.connect(chosen)
+            tray.activated.connect(
+                lambda reason: bring_back() if reason == QSystemTrayIcon.ActivationReason.Trigger else None
+            )
+            tray.setContextMenu(menu)
+            self.tray_menu = menu
+            self.tray = tray
+            tray.show()
 
         def _open_client(self) -> None:
             if not QDesktopServices.openUrl(QUrl(self.webui_url)):

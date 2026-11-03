@@ -140,7 +140,7 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | Client target | Auto, WebUI, or official Desktop |
 | Balance / source | Enable queries and choose the source |
 
-Settings apply live. The native context menu offers size, motion, client navigation, and hide/close for the current run. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
+Settings apply live. The native context menu offers size, opacity, motion, client navigation, and hide/close for the current run. On Windows it also offers click-through: clicks fall through to the window behind the pet, and holding Ctrl makes the pet reachable again for dragging or the context menu. On Windows / Linux a tray icon brings the pet back with a click and offers show/hide, click-through, and opacity, which helps after hiding the pet or turning on click-through. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
 
 ## Platforms
 
