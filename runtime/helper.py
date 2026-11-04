@@ -131,6 +131,86 @@ def _cursor_api() -> tuple[Any, Any, Any]:
     return load_from_file, set_cursor, load_cursor
 
 
+def paint_pet(
+    painter: Any,
+    pixmap: Any,
+    fade_from: Any,
+    fade_alpha: float,
+    opacity: float,
+    x: float,
+    y: float,
+    scale: float,
+    canvas_size: Any,
+    device_pixel_ratio: float,
+) -> None:
+    """Draw the pet at one overall opacity, including during a crossfade.
+
+    A crossfade keeps the old frame solid under the new one so the pet never
+    flashes transparent. Below full opacity those two layers must be composed
+    first and faded once: fading each layer separately stacks them and makes
+    the pet visibly more solid until the crossfade ends.
+    """
+    from PySide6.QtCore import QRectF, Qt
+    from PySide6.QtGui import QPainter, QPixmap
+
+    def draw(target: Any, pix: Any, alpha: float) -> None:
+        target.save()
+        target.setOpacity(alpha)
+        target.drawPixmap(
+            QRectF(x, y, pix.width() * scale, pix.height() * scale),
+            pix,
+            QRectF(0, 0, pix.width(), pix.height()),
+        )
+        target.restore()
+
+    if fade_from is None or fade_alpha >= 1.0:
+        draw(painter, pixmap, opacity)
+        return
+    if opacity >= 1.0:
+        draw(painter, fade_from, 1.0)
+        draw(painter, pixmap, fade_alpha)
+        return
+    layer = QPixmap(
+        round(canvas_size.width() * device_pixel_ratio),
+        round(canvas_size.height() * device_pixel_ratio),
+    )
+    layer.setDevicePixelRatio(device_pixel_ratio)
+    layer.fill(Qt.GlobalColor.transparent)
+    layer_painter = QPainter(layer)
+    layer_painter.setRenderHints(painter.renderHints())
+    draw(layer_painter, fade_from, 1.0)
+    draw(layer_painter, pixmap, fade_alpha)
+    layer_painter.end()
+    painter.save()
+    painter.setOpacity(opacity)
+    painter.drawPixmap(0, 0, layer)
+    painter.restore()
+
+
+def window_ex_style_api() -> tuple[Any, Any]:
+    """Return configured (GetWindowLongW, SetWindowLongW) callables.
+
+    The HWND argument is declared explicitly so it is passed pointer-sized:
+    without argtypes, ctypes passes a Python int as a C int and can truncate it
+    on 64-bit Windows. GWL_EXSTYLE itself is a 32-bit value, so the Long
+    variants (rather than LongPtr) are sufficient.
+    """
+    import ctypes
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+
+    get_style = user32.GetWindowLongW
+    get_style.argtypes = [wintypes.HWND, ctypes.c_int]
+    get_style.restype = ctypes.c_long
+
+    set_style = user32.SetWindowLongW
+    set_style.argtypes = [wintypes.HWND, ctypes.c_int, ctypes.c_long]
+    set_style.restype = ctypes.c_long
+
+    return get_style, set_style
+
+
 def load_native_cursor(path: Path) -> Any:
     """Load a .cur cursor with LoadCursorFromFileW (pointer-sized handles).
 
@@ -1129,19 +1209,19 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 else:
                     self.fade_from_pixmap = None
 
-            def draw_pet(pix: QPixmap, alpha: float) -> None:
-                pw = pix.width() * self.scale
-                ph = pix.height() * self.scale
-                x, y, _, _ = self._pet_rect()
-                painter.save()
-                painter.setOpacity(alpha * self.pet_opacity)
-                painter.drawPixmap(QRectF(x, y, pw, ph), pix, QRectF(0, 0, pix.width(), pix.height()))
-                painter.restore()
-
-            if fade_alpha < 1.0 and self.fade_from_pixmap is not None:
-                # Keep the old frame opaque underneath so the pet never flashes transparent.
-                draw_pet(self.fade_from_pixmap, 1.0)
-            draw_pet(pixmap, fade_alpha)
+            x, y, _, _ = self._pet_rect()
+            paint_pet(
+                painter,
+                pixmap,
+                self.fade_from_pixmap if fade_alpha < 1.0 else None,
+                fade_alpha,
+                self.pet_opacity,
+                x,
+                y,
+                self.scale,
+                self.size(),
+                self.devicePixelRatioF(),
+            )
 
         def mousePressEvent(self, event: QMouseEvent) -> None:
             if event.button() == Qt.MouseButton.LeftButton:
@@ -1202,6 +1282,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
         def contextMenuEvent(self, event: Any) -> None:
             menu = QMenu(self)
+            dispatch = self._fill_menu(menu)
+            selected = menu.exec(event.globalPos())
+            if selected is not None:
+                dispatch(selected)
+
+        def _fill_menu(self, menu: Any) -> Any:
+            """Add the shared pet menu; return the handler for the chosen action."""
             size_menu = menu.addMenu("大小")
             size_actions = {}
             for label, scale in (("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)):
@@ -1235,36 +1322,39 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             menu.addSeparator()
             hide_action = menu.addAction("本次隐藏")
             exit_action = menu.addAction("本次关闭")
-            selected = menu.exec(event.globalPos())
-            if selected in size_actions:
-                self.scale = size_actions[selected]
-                self._apply_window_size()
-                self._move_to_pet(self.pet_x, self.pet_y)
-                self._save_layout()
-                emit_reply("settings", scale=self.scale)
-            elif selected in bubble_size_actions:
-                self.bubble_scale = bubble_size_actions[selected]
-                self._apply_window_size()
-                self._move_to_pet(self.pet_x, self.pet_y)
-                self._save_layout()
-                emit_reply("settings", bubbleScale=self.bubble_scale)
-            elif selected == reduced_action:
-                self._set_reduced_motion(reduced_action.isChecked())
-                self._save_layout()
-                emit_reply("settings", reducedMotion=self.reduced_motion)
-                self.update()
-            elif selected in opacity_actions:
-                self._set_opacity(opacity_actions[selected])
-            elif click_through_action is not None and selected == click_through_action:
-                self._set_click_through(click_through_action.isChecked())
-            elif selected == open_webui_action:
-                self._open_client()
-            elif selected == hide_action:
-                self.hide()
-            elif selected == exit_action:
-                self._save_layout()
-                emit_reply("closed", reason="user")
-                QApplication.quit()
+
+            def dispatch(selected: Any) -> None:
+                if selected in size_actions:
+                    self.scale = size_actions[selected]
+                    self._apply_window_size()
+                    self._move_to_pet(self.pet_x, self.pet_y)
+                    self._save_layout()
+                    emit_reply("settings", scale=self.scale)
+                elif selected in bubble_size_actions:
+                    self.bubble_scale = bubble_size_actions[selected]
+                    self._apply_window_size()
+                    self._move_to_pet(self.pet_x, self.pet_y)
+                    self._save_layout()
+                    emit_reply("settings", bubbleScale=self.bubble_scale)
+                elif selected == reduced_action:
+                    self._set_reduced_motion(reduced_action.isChecked())
+                    self._save_layout()
+                    emit_reply("settings", reducedMotion=self.reduced_motion)
+                    self.update()
+                elif selected in opacity_actions:
+                    self._set_opacity(opacity_actions[selected])
+                elif click_through_action is not None and selected == click_through_action:
+                    self._set_click_through(click_through_action.isChecked())
+                elif selected == open_webui_action:
+                    self._open_client()
+                elif selected == hide_action:
+                    self.hide()
+                elif selected == exit_action:
+                    self._save_layout()
+                    emit_reply("closed", reason="user")
+                    QApplication.quit()
+
+            return dispatch
 
         def _set_opacity(self, value: float) -> None:
             self.pet_opacity = min(1.0, max(0.2, float(value)))
@@ -1288,9 +1378,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 held = bool(user32.GetAsyncKeyState(0x11) & 0x8000)  # VK_CONTROL
                 want = click_through_active(self.click_through, held)
                 hwnd = int(self.winId())
-                style = user32.GetWindowLongW(hwnd, -20)  # GWL_EXSTYLE
+                get_style, set_style = window_ex_style_api()
+                style = get_style(hwnd, -20)  # GWL_EXSTYLE
                 if bool(style & WS_EX_TRANSPARENT) != want:
-                    user32.SetWindowLongW(hwnd, -20, click_through_ex_style(style, want))
+                    set_style(hwnd, -20, click_through_ex_style(style, want))
             except (AttributeError, OSError):
                 self.click_through_timer.stop()
 
@@ -1308,41 +1399,29 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             tray = QSystemTrayIcon(icon, self)
             tray.setToolTip("DSH 大肥鱼（单击显示）")
             menu = QMenu()
-            show_action = menu.addAction("显示")
-            hide_action = menu.addAction("隐藏")
-            menu.addSeparator()
-            click_through_action = None
-            if sys.platform == "win32":
-                click_through_action = menu.addAction("鼠标穿透")
-                click_through_action.setCheckable(True)
-            opacity_menu = menu.addMenu("透明度")
-            opacity_actions = {}
-            for label, value in OPACITY_CHOICES:
-                action = opacity_menu.addAction(label)
-                action.setCheckable(True)
-                opacity_actions[action] = value
+            current: dict[str, Any] = {}
 
-            def sync() -> None:
-                if click_through_action is not None:
-                    click_through_action.setChecked(self.click_through)
-                for action, value in opacity_actions.items():
-                    action.setChecked(abs(self.pet_opacity - value) < 0.05)
+            def rebuild() -> None:
+                # Same items as the pet's context menu, plus "显示" to bring it back.
+                for submenu in menu.findChildren(QMenu):
+                    submenu.deleteLater()
+                menu.clear()
+                current["show"] = menu.addAction("显示")
+                menu.addSeparator()
+                current["dispatch"] = self._fill_menu(menu)
 
             def bring_back() -> None:
                 self.show()
                 self.raise_()
 
             def chosen(action: Any) -> None:
-                if action == show_action:
+                if action == current["show"]:
                     bring_back()
-                elif action == hide_action:
-                    self.hide()
-                elif click_through_action is not None and action == click_through_action:
-                    self._set_click_through(click_through_action.isChecked())
-                elif action in opacity_actions:
-                    self._set_opacity(opacity_actions[action])
+                else:
+                    current["dispatch"](action)
 
-            menu.aboutToShow.connect(sync)
+            rebuild()
+            menu.aboutToShow.connect(rebuild)
             menu.triggered.connect(chosen)
             tray.activated.connect(
                 lambda reason: bring_back() if reason == QSystemTrayIcon.ActivationReason.Trigger else None

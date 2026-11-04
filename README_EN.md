@@ -140,7 +140,7 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | Client target | Auto, WebUI, or official Desktop |
 | Balance / source | Enable queries and choose the source |
 
-Settings apply live. The native context menu offers size, opacity, motion, client navigation, and hide/close for the current run. On Windows it also offers click-through: clicks fall through to the window behind the pet, and holding Ctrl makes the pet reachable again for dragging or the context menu. On Windows / Linux a tray icon brings the pet back with a click and offers show/hide, click-through, and opacity, which helps after hiding the pet or turning on click-through. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
+Settings apply live. The native context menu offers size, opacity, motion, client navigation, and hide/close for the current run. On Windows it also offers click-through: clicks fall through to the window behind the pet, and holding Ctrl makes the pet reachable again for dragging or the context menu. With the Python Helper, where the system provides a tray, a tray icon brings the pet back with a click and offers the same menu as the pet plus a Show item, which helps after hiding the pet or turning on click-through (verified on Windows 11; not yet verified on a Linux desktop). Opacity and click-through can currently be changed only from the context menu and the tray, not from the settings page. Both are stored in `layout.json`; the macOS Helper does not use these fields, so they are lost if it rewrites the same file. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
 
 ## Platforms
 
