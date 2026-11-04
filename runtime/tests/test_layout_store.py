@@ -30,6 +30,8 @@ class LayoutStoreTests(unittest.TestCase):
                 "reducedMotion": True,
                 "bubbleMode": "always",
                 "bubbleStates": ["SUCCESS", "ERROR", "WAITING"],
+                "opacity": 1.0,
+                "clickThrough": False,
             })
             self.assertEqual(json.loads(path.read_text(encoding="utf-8"))["scale"], 1.4)
             self.assertEqual(list(path.parent.glob("*.tmp")), [])
@@ -55,6 +57,18 @@ class LayoutStoreTests(unittest.TestCase):
                     default_layout_path(),
                     Path(directory) / "dsh" / "dsh-dafeiyu" / "layout.json",
                 )
+
+    def test_opacity_is_clamped(self) -> None:
+        self.assertEqual(normalise_layout({"opacity": 0.6})["opacity"], 0.6)
+        self.assertEqual(normalise_layout({"opacity": 0.0})["opacity"], 0.2)
+        self.assertEqual(normalise_layout({"opacity": 3})["opacity"], 1.0)
+        self.assertEqual(normalise_layout({"opacity": True})["opacity"], 1.0)
+        self.assertEqual(normalise_layout({})["opacity"], 1.0)
+
+    def test_click_through_requires_a_boolean(self) -> None:
+        self.assertTrue(normalise_layout({"clickThrough": True})["clickThrough"])
+        self.assertFalse(normalise_layout({"clickThrough": "yes"})["clickThrough"])
+        self.assertFalse(normalise_layout({})["clickThrough"])
 
     def test_character_scale_supports_the_mini_range(self) -> None:
         self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.55)

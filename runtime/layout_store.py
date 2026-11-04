@@ -20,6 +20,8 @@ DEFAULT_LAYOUT: dict[str, Any] = {
     "reducedMotion": False,
     "bubbleMode": "always",
     "bubbleStates": ["SUCCESS", "ERROR", "WAITING"],
+    "opacity": 1.0,
+    "clickThrough": False,
 }
 
 
@@ -59,6 +61,11 @@ def normalise_layout(value: Any) -> dict[str, Any]:
         layout["bubbleMode"] = value["bubbleMode"]
     if isinstance(value.get("bubbleStates"), list):
         layout["bubbleStates"] = [str(state) for state in value["bubbleStates"] if isinstance(state, str)]
+    opacity = value.get("opacity")
+    if isinstance(opacity, (int, float)) and not isinstance(opacity, bool):
+        layout["opacity"] = min(1.0, max(0.2, float(opacity)))
+    if isinstance(value.get("clickThrough"), bool):
+        layout["clickThrough"] = value["clickThrough"]
     return layout
 
 
