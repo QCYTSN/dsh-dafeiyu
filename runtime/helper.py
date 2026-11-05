@@ -1319,6 +1319,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 bubble_size_actions[action] = bubble_scale
             bubble_size_menu.addSeparator()
             custom_bubble_action = bubble_size_menu.addAction("自定义…")
+            bubble_size_menu.addSeparator()
             bubble_toggle_action = bubble_size_menu.addAction(
                 "显示气泡" if self.bubble_mode == "hidden" else "隐藏气泡"
             )

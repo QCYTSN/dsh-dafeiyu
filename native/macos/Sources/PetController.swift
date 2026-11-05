@@ -619,6 +619,10 @@ final class PetController: NSObject {
             bubbleMenu.addItem(item)
         }
         bubbleMenu.addItem(.separator())
+        let customBubble = NSMenuItem(title: "自定义…", action: #selector(customizeBubbleScale(_:)), keyEquivalent: "")
+        customBubble.target = self
+        bubbleMenu.addItem(customBubble)
+        bubbleMenu.addItem(.separator())
         let bubbleToggle = NSMenuItem(
             title: bubbleMode == "hidden" ? "显示气泡" : "隐藏气泡",
             action: #selector(toggleBubbleVisibility(_:)),
@@ -626,11 +630,6 @@ final class PetController: NSObject {
         )
         bubbleToggle.target = self
         bubbleMenu.addItem(bubbleToggle)
-
-        bubbleMenu.addItem(.separator())
-        let customBubble = NSMenuItem(title: "自定义…", action: #selector(customizeBubbleScale(_:)), keyEquivalent: "")
-        customBubble.target = self
-        bubbleMenu.addItem(customBubble)
         let bubbleItem = NSMenuItem(title: "气泡大小", action: nil, keyEquivalent: "")
         bubbleItem.submenu = bubbleMenu
         menu.addItem(bubbleItem)
