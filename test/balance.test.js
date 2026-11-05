@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
-import { createBalanceQuery, createBalanceMonitor, createBalanceHandler, parseApiBalance } from '../src/balance.js'
+import { createBalanceQuery, createBalanceMonitor, createBalanceHandler, parseApiBalance, balanceSummary } from '../src/balance.js'
 
 const wire = { is_available: true, balance_infos: [{ currency: 'CNY', total_balance: '12.3456', granted_balance: '2.0000', topped_up_balance: '10.3456' }] }
 const result = { ...parseApiBalance(wire), source: 'api-key' }
@@ -35,6 +35,11 @@ test('logged-in account balance keeps recharge and bonus currencies separate and
     { currency: 'CNY', toppedUp: '0.1', granted: '0.2', total: '0.3' },
     { currency: 'USD', toppedUp: '1.0000', granted: '0', total: '1.0000' },
   ])
+})
+
+test('not-configured balance produces no footer text', () => {
+  assert.equal(balanceSummary({ status: 'not-configured', balances: [], source: null }), '')
+  assert.equal(balanceSummary({ status: 'error', balances: [], source: null }), '余额暂不可用')
 })
 
 test('balance decimals preserve account precision and reject unbounded exponent expansion', () => {

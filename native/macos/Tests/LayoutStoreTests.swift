@@ -107,16 +107,16 @@ final class LayoutStoreTests: XCTestCase {
 
     func testBubbleScaleIsClamped() {
         write(["bubbleScale": 9])
-        XCTAssertEqual(PetLayout.load(from: layoutURL()).bubbleScale, 1.2)
+        XCTAssertEqual(PetLayout.load(from: layoutURL()).bubbleScale, 1.4)
         write(["bubbleScale": 0.1])
-        XCTAssertEqual(PetLayout.load(from: layoutURL()).bubbleScale, 0.8)
+        XCTAssertEqual(PetLayout.load(from: layoutURL()).bubbleScale, 0.5)
         write([:])
         XCTAssertEqual(PetLayout.load(from: layoutURL()).bubbleScale, 1.0)
     }
 
     func testCharacterScaleSupportsMiniRange() {
         write(["scale": 0.1])
-        XCTAssertEqual(PetLayout.load(from: layoutURL()).scale, 0.55)
+        XCTAssertEqual(PetLayout.load(from: layoutURL()).scale, 0.3)
         write(["scale": 0.6])
         XCTAssertEqual(PetLayout.load(from: layoutURL()).scale, 0.6)
     }
@@ -159,7 +159,7 @@ final class LayoutStoreTests: XCTestCase {
         layout.save(to: layoutURL())
         let onDisk = try! JSONSerialization.jsonObject(with: Data(contentsOf: layoutURL())) as! [String: Any]
         XCTAssertEqual(onDisk["scale"] as? Double, 1.4)
-        XCTAssertEqual(onDisk["bubbleScale"] as? Double, 1.2)
+        XCTAssertEqual(onDisk["bubbleScale"] as? Double, 1.4)
     }
 
     func testSaveNormalizesBubbleMode() {

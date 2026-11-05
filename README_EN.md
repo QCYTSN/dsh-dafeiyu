@@ -129,18 +129,18 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | Setting | Behavior |
 | --- | --- |
 | Enable BigFish | Toggle the native companion for this profile |
-| Character / bubble size | Independent sizing; small bubbles retain base font sizes |
+| Character / bubble size | Independent sizing; character size supports 30%–140% and bubble size 50%–140%, both with a custom slider in the context menu; small bubbles retain base font sizes |
 | Quiet / normal / lively | Rest for 45–90 / 25–45 / 12–22 seconds after each idle action |
 | Reduced motion | Hold the character pose, stop idle / touch animation, keep live status updates |
 | Sound | Master switch for all alerts (mutes audio only) |
 | Sound and notification scenes | Enable completion, tool-error and approval alerts independently. Unchecking a scene stops its chime and, on macOS, its notification banner; Windows and Linux play audio only |
-| Bubble mode | Always, hidden, or selected states |
+| Bubble mode | Always, hidden, or selected states; also toggle it from the context menu |
 | Subagents | Include subagent activity in displayed states |
 | In-page companion | Show a lightweight character inside DSH |
 | Client target | Auto, WebUI, or official Desktop |
 | Balance / source | Enable queries and choose the source |
 
-Settings apply live. The native context menu offers size, motion, client navigation, and hide/close for the current run. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
+Settings apply live. The native context menu offers size, bubble visibility, motion, client navigation, and hide/close for the current run. Set `DSH_DAFEIYU_WEBUI_URL` when launching the Host to override the default navigation URL.
 
 ## Platforms
 

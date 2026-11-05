@@ -44,8 +44,8 @@ class LayoutStoreTests(unittest.TestCase):
         self.assertEqual(normalise_layout({"bubbleStates": "bad"})["bubbleStates"], ["SUCCESS", "ERROR", "WAITING"])
 
     def test_bubble_scale_is_clamped(self) -> None:
-        self.assertEqual(normalise_layout({"bubbleScale": 9})["bubbleScale"], 1.2)
-        self.assertEqual(normalise_layout({"bubbleScale": 0.1})["bubbleScale"], 0.8)
+        self.assertEqual(normalise_layout({"bubbleScale": 9})["bubbleScale"], 1.4)
+        self.assertEqual(normalise_layout({"bubbleScale": 0.1})["bubbleScale"], 0.5)
         self.assertEqual(normalise_layout({})["bubbleScale"], 1.0)
 
     def test_xdg_config_home_is_used_on_linux(self) -> None:
@@ -57,7 +57,7 @@ class LayoutStoreTests(unittest.TestCase):
                 )
 
     def test_character_scale_supports_the_mini_range(self) -> None:
-        self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.55)
+        self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.3)
         self.assertEqual(normalise_layout({"scale": 0.6})["scale"], 0.6)
 
 

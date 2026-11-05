@@ -83,6 +83,13 @@ final class PetController: NSObject {
     var soundEnabled: Bool
     var soundStates: Set<String>
     var bubbleMode: String
+    /// The mode to restore when the card's close button or the context-menu
+    /// toggle brings a hidden bubble back.
+    private var bubbleModeBeforeHide: String = "always"
+    /// Percentage readout inside the custom-size alert.
+    private weak var sizeValueLabel: NSTextField?
+    /// Percentage readout inside the custom bubble-size alert.
+    private weak var bubbleValueLabel: NSTextField?
     var bubbleStates: [String]
 
     // Durable status
@@ -161,6 +168,9 @@ final class PetController: NSObject {
         self.bubbleMode = ["always", "hidden", "custom"].contains(configuredBubbleMode ?? "")
             ? configuredBubbleMode!
             : layout.bubbleMode
+        if self.bubbleMode != "hidden" {
+            self.bubbleModeBeforeHide = self.bubbleMode
+        }
         self.bubbleStates = env["DSH_DAFEIYU_BUBBLE_STATES"]
             .map { $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } }
             ?? layout.bubbleStates
@@ -579,13 +589,17 @@ final class PetController: NSObject {
         let menu = NSMenu(title: "DSH 大肥鱼")
 
         let sizeMenu = NSMenu(title: "大小")
-        for (label, value) in [("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)] {
+        for (label, value) in [("迷你", 0.4), ("小", 0.7), ("标准", 1.0), ("大", 1.25)] {
             let item = NSMenuItem(title: label, action: #selector(changeSize(_:)), keyEquivalent: "")
             item.target = self
             item.tag = Int(value * 100)
             item.state = abs(scale - value) < 0.05 ? .on : .off
             sizeMenu.addItem(item)
         }
+        sizeMenu.addItem(.separator())
+        let customSize = NSMenuItem(title: "自定义…", action: #selector(customizeSize(_:)), keyEquivalent: "")
+        customSize.target = self
+        sizeMenu.addItem(customSize)
         let sizeItem = NSMenuItem(title: "大小", action: nil, keyEquivalent: "")
         sizeItem.submenu = sizeMenu
         menu.addItem(sizeItem)
@@ -598,6 +612,18 @@ final class PetController: NSObject {
             item.state = abs(bubbleScale - value) < 0.05 ? .on : .off
             bubbleMenu.addItem(item)
         }
+        bubbleMenu.addItem(.separator())
+        let customBubble = NSMenuItem(title: "自定义…", action: #selector(customizeBubbleScale(_:)), keyEquivalent: "")
+        customBubble.target = self
+        bubbleMenu.addItem(customBubble)
+        bubbleMenu.addItem(.separator())
+        let bubbleToggle = NSMenuItem(
+            title: bubbleMode == "hidden" ? "显示气泡" : "隐藏气泡",
+            action: #selector(toggleBubbleVisibility(_:)),
+            keyEquivalent: ""
+        )
+        bubbleToggle.target = self
+        bubbleMenu.addItem(bubbleToggle)
         let bubbleItem = NSMenuItem(title: "气泡大小", action: nil, keyEquivalent: "")
         bubbleItem.submenu = bubbleMenu
         menu.addItem(bubbleItem)
@@ -640,11 +666,98 @@ final class PetController: NSObject {
         reportSettings(["scale": scale])
     }
 
+    @objc private func customizeSize(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "角色大小"
+        alert.informativeText = "拖动滑块调整角色大小，点击「确定」保存。"
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 52))
+        let label = NSTextField(labelWithString: "\(Int((scale * 100).rounded()))%")
+        label.frame = NSRect(x: 0, y: 30, width: 260, height: 18)
+        label.alignment = .center
+        let slider = NSSlider(value: scale, minValue: 0.3, maxValue: 1.4, target: self, action: #selector(sizeSliderChanged(_:)))
+        slider.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        slider.isContinuous = true
+        container.addSubview(label)
+        container.addSubview(slider)
+        alert.accessoryView = container
+        sizeValueLabel = label
+        let original = scale
+        let response = alert.runModal()
+        sizeValueLabel = nil
+        if response == .alertFirstButtonReturn {
+            saveLayout()
+            reportSettings(["scale": scale])
+        } else {
+            scale = original
+            resizeAndReposition()
+        }
+    }
+
+    @objc private func sizeSliderChanged(_ sender: NSSlider) {
+        scale = Self.clampedScale(sender.doubleValue)
+        sizeValueLabel?.stringValue = "\(Int((scale * 100).rounded()))%"
+        resizeAndReposition()
+    }
+
+    @objc private func customizeBubbleScale(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "气泡大小"
+        alert.informativeText = "拖动滑块调整气泡大小，点击「确定」保存。"
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 52))
+        let label = NSTextField(labelWithString: "\(Int((bubbleScale * 100).rounded()))%")
+        label.frame = NSRect(x: 0, y: 30, width: 260, height: 18)
+        label.alignment = .center
+        let slider = NSSlider(value: bubbleScale, minValue: 0.5, maxValue: 1.4, target: self, action: #selector(bubbleSliderChanged(_:)))
+        slider.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        slider.isContinuous = true
+        container.addSubview(label)
+        container.addSubview(slider)
+        alert.accessoryView = container
+        bubbleValueLabel = label
+        let original = bubbleScale
+        let response = alert.runModal()
+        bubbleValueLabel = nil
+        if response == .alertFirstButtonReturn {
+            saveLayout()
+            reportSettings(["bubbleScale": bubbleScale])
+        } else {
+            bubbleScale = original
+            resizeAndReposition()
+        }
+    }
+
+    @objc private func bubbleSliderChanged(_ sender: NSSlider) {
+        bubbleScale = Self.clampedBubbleScale(sender.doubleValue)
+        bubbleValueLabel?.stringValue = "\(Int((bubbleScale * 100).rounded()))%"
+        resizeAndReposition()
+    }
+
     @objc private func changeBubbleScale(_ sender: NSMenuItem) {
         bubbleScale = Self.clampedBubbleScale(Double(sender.tag) / 100.0)
         resizeAndReposition()
         saveLayout()
         reportSettings(["bubbleScale": bubbleScale])
+    }
+
+    @objc private func toggleBubbleVisibility(_ sender: Any?) {
+        if bubbleMode == "hidden" {
+            setBubbleMode(bubbleModeBeforeHide == "hidden" ? "always" : bubbleModeBeforeHide)
+        } else {
+            bubbleModeBeforeHide = bubbleMode
+            setBubbleMode("hidden")
+        }
+    }
+
+    private func setBubbleMode(_ mode: String) {
+        guard ["always", "hidden", "custom"].contains(mode) else { return }
+        bubbleMode = mode
+        saveLayout()
+        reportSettings(["bubbleMode": mode])
+        resizeAndReposition()
     }
 
     private func setReducedMotion(_ enabled: Bool) {
@@ -711,7 +824,9 @@ final class PetController: NSObject {
         case "config":
             applyConfig(message)
         case "balance":
-            balanceSummary = String((message["summary"] as? String ?? "").prefix(200))
+            let summary = String((message["summary"] as? String ?? "").prefix(200))
+            // "余额未配置" is noise on the compact card: no footer, more room.
+            balanceSummary = summary == "余额未配置" ? "" : summary
             resizeAndReposition()
             contentView?.needsDisplay = true
         case "alert":
@@ -815,6 +930,9 @@ final class PetController: NSObject {
         }
         if let value = message["bubbleMode"] as? String, ["always", "hidden", "custom"].contains(value) {
             bubbleMode = value
+            if value != "hidden" {
+                bubbleModeBeforeHide = value
+            }
             changed = true
         }
         if let value = message["bubbleStates"] as? [String] {
@@ -878,7 +996,9 @@ final class PetController: NSObject {
         if !statusMessage.isEmpty, statusDeadlineMs == nil || now < statusDeadlineMs! {
             return (statusMessage, statusDetail, statusState)
         }
-        return nil
+        // Always keep an idle card: the card must not depend on the balance
+        // footer (the footer is hidden when no balance is configured).
+        return ("大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE")
     }
 
     private func bubbleVisible() -> Bool {
@@ -1002,9 +1122,14 @@ final class PetController: NSObject {
             drawText(balanceSummary,
                      in: NSRect(x: rect.minX + 16 * bubbleScale, y: rect.maxY - 31 * bubbleScale,
                                 width: rect.width - 32 * bubbleScale, height: 23 * bubbleScale),
-                     font: NSFont.systemFont(ofSize: 9 * max(1, bubbleScale)),
+                     font: NSFont.systemFont(ofSize: max(6.5, 9 * Self.cardFontScale(bubbleScale))),
                      color: Self.hex("#53616F"))
         }
+    }
+
+    /// Card text scales down moderately below 0.8 and grows up to 1.2 above it.
+    private static func cardFontScale(_ s: CGFloat) -> CGFloat {
+        s < 0.8 ? 0.6 + 0.5 * s : min(1.2, s)
     }
 
     private func drawStatusCard(rect: NSRect, card: (title: String, detail: String, state: String)) {
@@ -1029,12 +1154,11 @@ final class PetController: NSObject {
 
         let textX = rect.minX + 16 * s
         let textWidth = max(40, rect.width - 102 * s)
-        // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
-        // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
-        // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。
-        let fontScale = min(1.2, max(1.0, s))
-        let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * fontScale), weight: .semibold)
-        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * fontScale))
+        // 0.8 以上保持基准字号（避免缩小时难以辨认），0.8 以下随气泡尺寸
+        // 适度缩小；主标题比副标题保留更明显的字号差。
+        let fontScale = Self.cardFontScale(s)
+        let titleFont = NSFont.systemFont(ofSize: max(8.0, 12.0 * fontScale), weight: .semibold)
+        let detailFont = NSFont.systemFont(ofSize: max(6.5, 9.0 * fontScale))
         drawText(
             card.title,
             in: NSRect(x: textX, y: rect.minY + 15 * s, width: textWidth, height: max(12, 27 * s)),
@@ -1106,13 +1230,13 @@ final class PetController: NSObject {
         cardPath.stroke()
 
         let textX = rect.minX + 16 * s
-        let textWidth = max(40, rect.width - 32 * s)
+        let textWidth = max(40, rect.width - 58 * s)
         // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
         // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
         // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。
-        let fontScale = min(1.2, max(1.0, s))
+        let fontScale = Self.cardFontScale(s)
         let titleFont = NSFont.systemFont(ofSize: max(8.0, 11.0 * fontScale), weight: .semibold)
-        let detailFont = NSFont.systemFont(ofSize: max(7.0, 9.0 * fontScale))
+        let detailFont = NSFont.systemFont(ofSize: max(6.5, 9.0 * fontScale))
         drawText(
             "\(tasks.count) 个任务进行中",
             in: NSRect(x: textX, y: rect.minY + 10 * s, width: textWidth, height: max(12, 22 * s)),
@@ -1202,11 +1326,11 @@ final class PetController: NSObject {
     }
 
     static func clampedScale(_ value: Double) -> Double {
-        min(1.4, max(0.55, value))
+        min(1.4, max(0.3, value))
     }
 
     static func clampedBubbleScale(_ value: Double) -> Double {
-        min(1.2, max(0.8, value))
+        min(1.4, max(0.5, value))
     }
 
     private static func stringValue(_ value: Any?) -> String? {

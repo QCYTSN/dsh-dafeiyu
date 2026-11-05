@@ -320,13 +320,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.layout = load_layout(self.layout_path)
             configured_scale = os.environ.get("DSH_DAFEIYU_SCALE")
             try:
-                self.scale = min(1.4, max(0.55, float(configured_scale))) if configured_scale else self.layout["scale"]
+                self.scale = min(1.4, max(0.3, float(configured_scale))) if configured_scale else self.layout["scale"]
             except ValueError:
                 self.scale = self.layout["scale"]
             configured_bubble_scale = os.environ.get("DSH_DAFEIYU_BUBBLE_SCALE")
             try:
                 self.bubble_scale = (
-                    min(1.2, max(0.8, float(configured_bubble_scale)))
+                    min(1.4, max(0.5, float(configured_bubble_scale)))
                     if configured_bubble_scale
                     else self.layout["bubbleScale"]
                 )
@@ -347,12 +347,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 else {"SUCCESS", "ERROR"}
             )
             self.activity_level = os.environ.get("DSH_DAFEIYU_ACTIVITY_LEVEL", "normal")
+            self.bubble_mode_before_hide = "always"
             configured_bubble_mode = os.environ.get("DSH_DAFEIYU_BUBBLE_MODE")
             self.bubble_mode = (
                 configured_bubble_mode
                 if configured_bubble_mode in {"always", "hidden", "custom"}
                 else self.layout.get("bubbleMode", "always")
             )
+            if self.bubble_mode != "hidden":
+                self.bubble_mode_before_hide = self.bubble_mode
             configured_bubble_states = os.environ.get("DSH_DAFEIYU_BUBBLE_STATES")
             if configured_bubble_states is not None:
                 self.bubble_states = [part.strip() for part in configured_bubble_states.split(",") if part.strip()]
@@ -446,7 +449,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             elif kind == "config":
                 self._apply_config(message)
             elif kind == "balance":
-                self.balance_summary = str(message.get("summary", ""))[:200]
+                summary = str(message.get("summary", ""))[:200]
+                # "余额未配置" is noise on the compact card: no footer, more room.
+                self.balance_summary = "" if summary == "余额未配置" else summary
                 self._sync_bubble_size()
             elif kind == "alert":
                 if message.get("alert") == "APPROVAL":
@@ -520,10 +525,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.open_label = message["openLabel"]
             scale = message.get("scale")
             if isinstance(scale, (int, float)) and not isinstance(scale, bool):
-                self.scale = min(1.4, max(0.55, float(scale)))
+                self.scale = min(1.4, max(0.3, float(scale)))
             bubble_scale = message.get("bubbleScale")
             if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
-                self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
+                self.bubble_scale = min(1.4, max(0.5, float(bubble_scale)))
             reduced_motion = message.get("reducedMotion")
             if isinstance(reduced_motion, bool) and reduced_motion != self.reduced_motion:
                 self._set_reduced_motion(reduced_motion)
@@ -540,6 +545,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self._schedule_micro()
             bubble_mode = message.get("bubbleMode")
             if bubble_mode in {"always", "hidden", "custom"}:
+                if bubble_mode != "hidden":
+                    self.bubble_mode_before_hide = bubble_mode
                 self.bubble_mode = bubble_mode
             bubble_states = message.get("bubbleStates")
             if isinstance(bubble_states, list):
@@ -707,6 +714,26 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             state = self.overlay_state or self.status_state or self.model.base_state or "IDLE"
             return state in self.bubble_states
 
+        def _set_bubble_mode(self, mode: str) -> None:
+            if mode not in {"always", "hidden", "custom"}:
+                return
+            if mode != "hidden":
+                self.bubble_mode_before_hide = mode
+            self.bubble_mode = mode
+            self._sync_bubble_size()
+            self._move_to_pet(self.pet_x, self.pet_y)
+            self._save_layout()
+            emit_reply("settings", bubbleMode=mode)
+            self.update()
+
+        def _toggle_bubble(self) -> None:
+            if self.bubble_mode == "hidden":
+                restore = self.bubble_mode_before_hide
+                self._set_bubble_mode(restore if restore != "hidden" else "always")
+            else:
+                self.bubble_mode_before_hide = self.bubble_mode
+                self._set_bubble_mode("hidden")
+
         def _sync_bubble_size(self) -> None:
             old_size = (self.width(), self.height())
             self._apply_window_size()
@@ -850,9 +877,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.status_deadline_ms is None or now_ms < self.status_deadline_ms
             ):
                 return self.status_message, self.status_detail, self.status_state
-            if self.balance_summary:
-                return "大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"
-            return None
+            # Always keep an idle card: the card must not depend on the balance
+            # footer (the footer is hidden when no balance is configured).
+            return "大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"
 
         @staticmethod
         def _status_colors(state: str) -> tuple[QColor, QColor]:
@@ -895,6 +922,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.setPen(Qt.PenStyle.NoPen)
                 painter.setBrush(foreground)
                 painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
+
+        def _card_font_scale(self, s: float) -> float:
+            return 0.6 + 0.5 * s if s < 0.8 else min(1.2, s)
 
         def _card_height(self) -> int:
             footer = 28 if self.balance_summary else 0
@@ -941,12 +971,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             s: float,
         ) -> None:
             title_font = QFont("Microsoft YaHei UI")
-            title_font.setPointSizeF(11.0 * max(1.0, s))
+            title_font.setPointSizeF(11.0 * self._card_font_scale(s))
             title_font.setWeight(QFont.Weight.DemiBold)
             detail_font = QFont("Microsoft YaHei UI")
-            detail_font.setPointSizeF(9.0 * max(1.0, s))
+            detail_font.setPointSizeF(9.0 * self._card_font_scale(s))
             text_x = card_x + round(16 * s)
-            text_width = max(40, card_width - round(32 * s))
+            text_width = max(40, card_width - round(58 * s))
             painter.setFont(title_font)
             painter.setPen(QColor("#25282D"))
             title = f"{len(self.tasks)} 个任务进行中"
@@ -1042,10 +1072,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 text_x = card_x + round(24 * s)
                 text_width = max(40, card_width - round(102 * s))
                 title_font = QFont("Microsoft YaHei UI")
-                title_font.setPointSizeF(11.0 * max(1.0, s))
+                title_font.setPointSizeF(12.0 * self._card_font_scale(s))
                 title_font.setWeight(QFont.Weight.DemiBold)
                 detail_font = QFont("Microsoft YaHei UI")
-                detail_font.setPointSizeF(9.0 * max(1.0, s))
+                detail_font.setPointSizeF(9.0 * self._card_font_scale(s))
                 painter.setFont(title_font)
                 painter.setPen(QColor("#25282D"))
                 title_text = QFontMetrics(title_font).elidedText(
@@ -1079,7 +1109,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
             if self.balance_summary and self._bubble_visible():
                 balance_font = QFont("Microsoft YaHei UI")
-                balance_font.setPointSizeF(9.0 * max(1.0, s))
+                balance_font.setPointSizeF(max(6.5, 9.0 * self._card_font_scale(s)))
                 painter.setFont(balance_font)
                 painter.setPen(QColor("#53616F"))
                 text_width = card_width - round(32 * s)
@@ -1168,15 +1198,95 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if event.button() == Qt.MouseButton.LeftButton:
                 self._play_interaction("head_pat", "好啦好啦，知道你喜欢我~")
 
+        def _customize_size(self) -> None:
+            from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QSlider, QVBoxLayout
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("角色大小")
+            dialog.setFixedWidth(300)
+            layout = QVBoxLayout(dialog)
+            label = QLabel(f"{round(self.scale * 100)}%", dialog)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            slider = QSlider(Qt.Orientation.Horizontal, dialog)
+            slider.setRange(30, 140)
+            slider.setSingleStep(5)
+            slider.setPageStep(10)
+            slider.setValue(round(self.scale * 100))
+            original = self.scale
+
+            def apply(value: int) -> None:
+                self.scale = max(0.3, min(1.4, value / 100))
+                label.setText(f"{value}%")
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
+            slider.valueChanged.connect(apply)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, dialog)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(label)
+            layout.addWidget(slider)
+            layout.addWidget(buttons)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self._save_layout()
+                emit_reply("settings", scale=self.scale)
+            else:
+                self.scale = original
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
+        def _customize_bubble_scale(self) -> None:
+            from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QSlider, QVBoxLayout
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("气泡大小")
+            dialog.setFixedWidth(300)
+            layout = QVBoxLayout(dialog)
+            label = QLabel(f"{round(self.bubble_scale * 100)}%", dialog)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            slider = QSlider(Qt.Orientation.Horizontal, dialog)
+            slider.setRange(50, 140)
+            slider.setSingleStep(5)
+            slider.setPageStep(10)
+            slider.setValue(round(self.bubble_scale * 100))
+            original = self.bubble_scale
+
+            def apply(value: int) -> None:
+                self.bubble_scale = max(0.5, min(1.4, value / 100))
+                label.setText(f"{value}%")
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
+            slider.valueChanged.connect(apply)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, dialog)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(label)
+            layout.addWidget(slider)
+            layout.addWidget(buttons)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self._save_layout()
+                emit_reply("settings", bubbleScale=self.bubble_scale)
+            else:
+                self.bubble_scale = original
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
         def contextMenuEvent(self, event: Any) -> None:
             menu = QMenu(self)
             size_menu = menu.addMenu("大小")
             size_actions = {}
-            for label, scale in (("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)):
+            for label, scale in (("迷你", 0.4), ("小", 0.7), ("标准", 1.0), ("大", 1.25)):
                 action = size_menu.addAction(label)
                 action.setCheckable(True)
                 action.setChecked(abs(self.scale - scale) < 0.05)
                 size_actions[action] = scale
+            size_menu.addSeparator()
+            custom_size_action = size_menu.addAction("自定义…")
             bubble_size_menu = menu.addMenu("气泡大小")
             bubble_size_actions = {}
             for label, bubble_scale in (("小", 0.8), ("标准", 1.0), ("大", 1.2)):
@@ -1184,6 +1294,12 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 action.setCheckable(True)
                 action.setChecked(abs(self.bubble_scale - bubble_scale) < 0.05)
                 bubble_size_actions[action] = bubble_scale
+            bubble_size_menu.addSeparator()
+            custom_bubble_action = bubble_size_menu.addAction("自定义…")
+            bubble_size_menu.addSeparator()
+            bubble_toggle_action = bubble_size_menu.addAction(
+                "显示气泡" if self.bubble_mode == "hidden" else "隐藏气泡"
+            )
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
@@ -1198,12 +1314,18 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
                 emit_reply("settings", scale=self.scale)
+            elif selected == custom_size_action:
+                self._customize_size()
             elif selected in bubble_size_actions:
                 self.bubble_scale = bubble_size_actions[selected]
                 self._apply_window_size()
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
                 emit_reply("settings", bubbleScale=self.bubble_scale)
+            elif selected == custom_bubble_action:
+                self._customize_bubble_scale()
+            elif selected == bubble_toggle_action:
+                self._toggle_bubble()
             elif selected == reduced_action:
                 self._set_reduced_motion(reduced_action.isChecked())
                 self._save_layout()
