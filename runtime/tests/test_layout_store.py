@@ -44,8 +44,8 @@ class LayoutStoreTests(unittest.TestCase):
         self.assertEqual(normalise_layout({"bubbleStates": "bad"})["bubbleStates"], ["SUCCESS", "ERROR", "WAITING"])
 
     def test_bubble_scale_is_clamped(self) -> None:
-        self.assertEqual(normalise_layout({"bubbleScale": 9})["bubbleScale"], 1.2)
-        self.assertEqual(normalise_layout({"bubbleScale": 0.1})["bubbleScale"], 0.8)
+        self.assertEqual(normalise_layout({"bubbleScale": 9})["bubbleScale"], 1.4)
+        self.assertEqual(normalise_layout({"bubbleScale": 0.1})["bubbleScale"], 0.5)
         self.assertEqual(normalise_layout({})["bubbleScale"], 1.0)
 
     def test_xdg_config_home_is_used_on_linux(self) -> None:

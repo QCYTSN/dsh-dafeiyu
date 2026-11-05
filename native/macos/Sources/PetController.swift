@@ -717,7 +717,7 @@ final class PetController: NSObject {
         let label = NSTextField(labelWithString: "\(Int((bubbleScale * 100).rounded()))%")
         label.frame = NSRect(x: 0, y: 30, width: 260, height: 18)
         label.alignment = .center
-        let slider = NSSlider(value: bubbleScale, minValue: 0.8, maxValue: 1.2, target: self, action: #selector(bubbleSliderChanged(_:)))
+        let slider = NSSlider(value: bubbleScale, minValue: 0.5, maxValue: 1.4, target: self, action: #selector(bubbleSliderChanged(_:)))
         slider.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
         slider.isContinuous = true
         container.addSubview(label)
@@ -1345,7 +1345,7 @@ final class PetController: NSObject {
     }
 
     static func clampedBubbleScale(_ value: Double) -> Double {
-        min(1.2, max(0.8, value))
+        min(1.4, max(0.5, value))
     }
 
     private static func stringValue(_ value: Any?) -> String? {

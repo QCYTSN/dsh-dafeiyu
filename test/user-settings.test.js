@@ -104,14 +104,14 @@ test('invalid fallback files and malformed entries are ignored', () => {
   writeFileSync(malformed, JSON.stringify({
     overrides: {
       scale: { value: 'huge', host: 1 },
-      bubbleScale: { value: 0.5, host: 1 },
+      bubbleScale: { value: 0.3, host: 1 },
       reducedMotion: { value: true, host: false },
     },
   }))
   const store = createUserSettingsStore(malformed)
   assert.deepEqual(store.apply({ scale: 1, bubbleScale: 1, reducedMotion: false }), {
     scale: 1,
-    bubbleScale: 0.8,
+    bubbleScale: 0.5,
     reducedMotion: true,
   })
 })

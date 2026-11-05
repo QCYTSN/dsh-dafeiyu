@@ -52,7 +52,7 @@ def normalise_layout(value: Any) -> dict[str, Any]:
         layout["scale"] = min(1.4, max(0.3, float(scale)))
     bubble_scale = value.get("bubbleScale")
     if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
-        layout["bubbleScale"] = min(1.2, max(0.8, float(bubble_scale)))
+        layout["bubbleScale"] = min(1.4, max(0.5, float(bubble_scale)))
     if isinstance(value.get("reducedMotion"), bool):
         layout["reducedMotion"] = value["reducedMotion"]
     if value.get("bubbleMode") in {"always", "hidden", "custom"}:
