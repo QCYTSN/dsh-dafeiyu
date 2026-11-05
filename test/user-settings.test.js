@@ -41,6 +41,14 @@ test('a menu choice survives while the host keeps its old baseline', () => {
   assert.equal(reloaded.snapshot().scale.host, 1)
 })
 
+test('the menu can go down to the 30% minimum', () => {
+  const file = join(makeDirectory('dsh-dafeiyu-user-settings-'), 'user-settings.json')
+  const store = createUserSettingsStore(file)
+  assert.equal(store.record({ scale: 0.3 }, { scale: 1 }), true)
+  assert.deepEqual(store.apply({ scale: 1 }), { scale: 0.3 })
+  assert.equal(store.snapshot().scale.value, 0.3)
+})
+
 test('a host echo of the menu value keeps the fallback alive', () => {
   const file = join(makeDirectory('dsh-dafeiyu-user-settings-'), 'user-settings.json')
   const store = createUserSettingsStore(file)
