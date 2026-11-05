@@ -86,6 +86,8 @@ final class PetController: NSObject {
     /// The mode to restore when the card's close button or the context-menu
     /// toggle brings a hidden bubble back.
     private var bubbleModeBeforeHide: String = "always"
+    /// Percentage readout inside the custom-size alert.
+    private weak var sizeValueLabel: NSTextField?
     var bubbleStates: [String]
 
     // Durable status
@@ -591,13 +593,17 @@ final class PetController: NSObject {
         let menu = NSMenu(title: "DSH 大肥鱼")
 
         let sizeMenu = NSMenu(title: "大小")
-        for (label, value) in [("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)] {
+        for (label, value) in [("迷你", 0.4), ("小", 0.7), ("标准", 1.0), ("大", 1.25)] {
             let item = NSMenuItem(title: label, action: #selector(changeSize(_:)), keyEquivalent: "")
             item.target = self
             item.tag = Int(value * 100)
             item.state = abs(scale - value) < 0.05 ? .on : .off
             sizeMenu.addItem(item)
         }
+        sizeMenu.addItem(.separator())
+        let customSize = NSMenuItem(title: "自定义…", action: #selector(customizeSize(_:)), keyEquivalent: "")
+        customSize.target = self
+        sizeMenu.addItem(customSize)
         let sizeItem = NSMenuItem(title: "大小", action: nil, keyEquivalent: "")
         sizeItem.submenu = sizeMenu
         menu.addItem(sizeItem)
@@ -659,6 +665,41 @@ final class PetController: NSObject {
         resizeAndReposition()
         saveLayout()
         reportSettings(["scale": scale])
+    }
+
+    @objc private func customizeSize(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "角色大小"
+        alert.informativeText = "拖动滑块调整角色大小，点击「确定」保存。"
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 52))
+        let label = NSTextField(labelWithString: "\(Int((scale * 100).rounded()))%")
+        label.frame = NSRect(x: 0, y: 30, width: 260, height: 18)
+        label.alignment = .center
+        let slider = NSSlider(value: scale, minValue: 0.3, maxValue: 1.4, target: self, action: #selector(sizeSliderChanged(_:)))
+        slider.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        slider.isContinuous = true
+        container.addSubview(label)
+        container.addSubview(slider)
+        alert.accessoryView = container
+        sizeValueLabel = label
+        let original = scale
+        let response = alert.runModal()
+        sizeValueLabel = nil
+        if response == .alertFirstButtonReturn {
+            saveLayout()
+            reportSettings(["scale": scale])
+        } else {
+            scale = original
+            resizeAndReposition()
+        }
+    }
+
+    @objc private func sizeSliderChanged(_ sender: NSSlider) {
+        scale = Self.clampedScale(sender.doubleValue)
+        sizeValueLabel?.stringValue = "\(Int((scale * 100).rounded()))%"
+        resizeAndReposition()
     }
 
     @objc private func changeBubbleScale(_ sender: NSMenuItem) {
@@ -1260,7 +1301,7 @@ final class PetController: NSObject {
     }
 
     static func clampedScale(_ value: Double) -> Double {
-        min(1.4, max(0.55, value))
+        min(1.4, max(0.3, value))
     }
 
     static func clampedBubbleScale(_ value: Double) -> Double {

@@ -320,7 +320,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             self.layout = load_layout(self.layout_path)
             configured_scale = os.environ.get("DSH_DAFEIYU_SCALE")
             try:
-                self.scale = min(1.4, max(0.55, float(configured_scale))) if configured_scale else self.layout["scale"]
+                self.scale = min(1.4, max(0.3, float(configured_scale))) if configured_scale else self.layout["scale"]
             except ValueError:
                 self.scale = self.layout["scale"]
             configured_bubble_scale = os.environ.get("DSH_DAFEIYU_BUBBLE_SCALE")
@@ -523,7 +523,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.open_label = message["openLabel"]
             scale = message.get("scale")
             if isinstance(scale, (int, float)) and not isinstance(scale, bool):
-                self.scale = min(1.4, max(0.55, float(scale)))
+                self.scale = min(1.4, max(0.3, float(scale)))
             bubble_scale = message.get("bubbleScale")
             if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
                 self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
@@ -1221,15 +1221,56 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             if event.button() == Qt.MouseButton.LeftButton:
                 self._play_interaction("head_pat", "好啦好啦，知道你喜欢我~")
 
+        def _customize_size(self) -> None:
+            from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QSlider, QVBoxLayout
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("角色大小")
+            dialog.setFixedWidth(300)
+            layout = QVBoxLayout(dialog)
+            label = QLabel(f"{round(self.scale * 100)}%", dialog)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            slider = QSlider(Qt.Orientation.Horizontal, dialog)
+            slider.setRange(30, 140)
+            slider.setSingleStep(5)
+            slider.setPageStep(10)
+            slider.setValue(round(self.scale * 100))
+            original = self.scale
+
+            def apply(value: int) -> None:
+                self.scale = max(0.3, min(1.4, value / 100))
+                label.setText(f"{value}%")
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
+            slider.valueChanged.connect(apply)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, dialog)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(label)
+            layout.addWidget(slider)
+            layout.addWidget(buttons)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self._save_layout()
+                emit_reply("settings", scale=self.scale)
+            else:
+                self.scale = original
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
         def contextMenuEvent(self, event: Any) -> None:
             menu = QMenu(self)
             size_menu = menu.addMenu("大小")
             size_actions = {}
-            for label, scale in (("迷你", 0.6), ("小", 0.8), ("标准", 1.0), ("大", 1.25)):
+            for label, scale in (("迷你", 0.4), ("小", 0.7), ("标准", 1.0), ("大", 1.25)):
                 action = size_menu.addAction(label)
                 action.setCheckable(True)
                 action.setChecked(abs(self.scale - scale) < 0.05)
                 size_actions[action] = scale
+            size_menu.addSeparator()
+            custom_size_action = size_menu.addAction("自定义…")
             bubble_size_menu = menu.addMenu("气泡大小")
             bubble_size_actions = {}
             for label, bubble_scale in (("小", 0.8), ("标准", 1.0), ("大", 1.2)):
@@ -1255,6 +1296,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
                 emit_reply("settings", scale=self.scale)
+            elif selected == custom_size_action:
+                self._customize_size()
             elif selected in bubble_size_actions:
                 self.bubble_scale = bubble_size_actions[selected]
                 self._apply_window_size()

@@ -116,7 +116,7 @@ final class LayoutStoreTests: XCTestCase {
 
     func testCharacterScaleSupportsMiniRange() {
         write(["scale": 0.1])
-        XCTAssertEqual(PetLayout.load(from: layoutURL()).scale, 0.55)
+        XCTAssertEqual(PetLayout.load(from: layoutURL()).scale, 0.3)
         write(["scale": 0.6])
         XCTAssertEqual(PetLayout.load(from: layoutURL()).scale, 0.6)
     }

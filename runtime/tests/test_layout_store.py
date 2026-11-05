@@ -57,7 +57,7 @@ class LayoutStoreTests(unittest.TestCase):
                 )
 
     def test_character_scale_supports_the_mini_range(self) -> None:
-        self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.55)
+        self.assertEqual(normalise_layout({"scale": 0.1})["scale"], 0.3)
         self.assertEqual(normalise_layout({"scale": 0.6})["scale"], 0.6)
 
 

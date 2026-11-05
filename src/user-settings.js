@@ -20,7 +20,7 @@ export function defaultUserSettingsPath({ env = process.env, home = homedir() } 
 
 function clampField(field, value) {
   if (field === 'scale' && typeof value === 'number' && Number.isFinite(value)) {
-    return Math.min(1.4, Math.max(0.55, value))
+    return Math.min(1.4, Math.max(0.3, value))
   }
   if (field === 'bubbleScale' && typeof value === 'number' && Number.isFinite(value)) {
     return Math.min(1.2, Math.max(0.8, value))

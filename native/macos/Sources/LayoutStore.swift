@@ -43,7 +43,7 @@ struct PetLayout {
     /// drift (e.g. a raw `scale: 5` must never be written to disk).
     func normalized() -> PetLayout {
         var layout = self
-        layout.scale = min(1.4, max(0.55, scale))
+        layout.scale = min(1.4, max(0.3, scale))
         layout.bubbleScale = min(1.2, max(0.8, bubbleScale))
         if !["always", "hidden", "custom"].contains(bubbleMode) {
             layout.bubbleMode = "always"
@@ -65,8 +65,8 @@ struct PetLayout {
         if let raw = json["petX"], !(raw is Bool), let v = raw as? Int { layout.petX = v }
         if let raw = json["petY"], !(raw is Bool), let v = raw as? Int { layout.petY = v }
         if let raw = json["scale"], !(raw is Bool) {
-            if let d = raw as? Double { layout.scale = min(1.4, max(0.55, d)) }
-            else if let i = raw as? Int { layout.scale = min(1.4, max(0.55, Double(i))) }
+            if let d = raw as? Double { layout.scale = min(1.4, max(0.3, d)) }
+            else if let i = raw as? Int { layout.scale = min(1.4, max(0.3, Double(i))) }
         }
         if let raw = json["bubbleScale"], !(raw is Bool) {
             if let d = raw as? Double { layout.bubbleScale = min(1.2, max(0.8, d)) }
