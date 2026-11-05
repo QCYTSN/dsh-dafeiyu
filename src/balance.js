@@ -156,7 +156,7 @@ export function createBalanceQuery(ctx, { fetchImpl = fetch, environment = proce
 export function balanceSummary(snapshot) {
   if (snapshot.status === 'disabled') return ''
   if (snapshot.status === 'loading') return '正在查询余额…'
-  if (!snapshot.balances.length) return snapshot.status === 'not-configured' ? '余额未配置' : '余额暂不可用'
+  if (!snapshot.balances.length) return snapshot.status === 'not-configured' ? '' : '余额暂不可用'
   const amounts = snapshot.balances.map((row) => new Intl.NumberFormat('zh-CN', {
     style: 'currency', currency: row.currency, minimumFractionDigits: 2, maximumFractionDigits: 4,
   }).format(row.total)).join(' · ')

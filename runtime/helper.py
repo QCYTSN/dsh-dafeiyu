@@ -449,7 +449,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             elif kind == "config":
                 self._apply_config(message)
             elif kind == "balance":
-                self.balance_summary = str(message.get("summary", ""))[:200]
+                summary = str(message.get("summary", ""))[:200]
+                # "余额未配置" is noise on the compact card: no footer, more room.
+                self.balance_summary = "" if summary == "余额未配置" else summary
                 self._sync_bubble_size()
             elif kind == "alert":
                 if message.get("alert") == "APPROVAL":
@@ -929,6 +931,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 painter.setBrush(foreground)
                 painter.drawEllipse(center_x - 5, center_y - 5, 10, 10)
 
+        def _card_font_scale(self, s: float) -> float:
+            return 0.6 + 0.5 * s if s < 0.8 else min(1.2, s)
+
         def _card_height(self) -> int:
             footer = 28 if self.balance_summary else 0
             if len(self.tasks) >= 2:
@@ -989,10 +994,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             s: float,
         ) -> None:
             title_font = QFont("Microsoft YaHei UI")
-            title_font.setPointSizeF(11.0 * max(1.0, s))
+            title_font.setPointSizeF(11.0 * self._card_font_scale(s))
             title_font.setWeight(QFont.Weight.DemiBold)
             detail_font = QFont("Microsoft YaHei UI")
-            detail_font.setPointSizeF(9.0 * max(1.0, s))
+            detail_font.setPointSizeF(9.0 * self._card_font_scale(s))
             text_x = card_x + round(16 * s)
             text_width = max(40, card_width - round(58 * s))
             painter.setFont(title_font)
@@ -1090,10 +1095,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 text_x = card_x + round(24 * s)
                 text_width = max(40, card_width - round(102 * s))
                 title_font = QFont("Microsoft YaHei UI")
-                title_font.setPointSizeF(11.0 * max(1.0, s))
+                title_font.setPointSizeF(12.0 * self._card_font_scale(s))
                 title_font.setWeight(QFont.Weight.DemiBold)
                 detail_font = QFont("Microsoft YaHei UI")
-                detail_font.setPointSizeF(9.0 * max(1.0, s))
+                detail_font.setPointSizeF(9.0 * self._card_font_scale(s))
                 painter.setFont(title_font)
                 painter.setPen(QColor("#25282D"))
                 title_text = QFontMetrics(title_font).elidedText(
@@ -1130,7 +1135,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
 
             if self.balance_summary and self._bubble_visible():
                 balance_font = QFont("Microsoft YaHei UI")
-                balance_font.setPointSizeF(9.0 * max(1.0, s))
+                balance_font.setPointSizeF(max(6.5, 9.0 * self._card_font_scale(s)))
                 painter.setFont(balance_font)
                 painter.setPen(QColor("#53616F"))
                 text_width = card_width - round(32 * s)
