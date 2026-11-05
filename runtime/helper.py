@@ -885,9 +885,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.status_deadline_ms is None or now_ms < self.status_deadline_ms
             ):
                 return self.status_message, self.status_detail, self.status_state
-            if self.balance_summary:
-                return "大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"
-            return None
+            # Always keep an idle card: the card must not depend on the balance
+            # footer (the footer is hidden when no balance is configured).
+            return "大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"
 
         @staticmethod
         def _status_colors(state: str) -> tuple[QColor, QColor]:

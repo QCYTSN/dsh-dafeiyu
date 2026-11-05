@@ -1002,7 +1002,9 @@ final class PetController: NSObject {
         if !statusMessage.isEmpty, statusDeadlineMs == nil || now < statusDeadlineMs! {
             return (statusMessage, statusDetail, statusState)
         }
-        return nil
+        // Always keep an idle card: the card must not depend on the balance
+        // footer (the footer is hidden when no balance is configured).
+        return ("大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE")
     }
 
     private func bubbleVisible() -> Bool {
