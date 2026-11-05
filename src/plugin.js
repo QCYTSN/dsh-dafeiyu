@@ -37,7 +37,7 @@ const assetsRoot = resolve(here, '..', 'assets')
 export const Config = Schema.object({
   enabled: Schema.boolean().default(true).description('启用桌面大肥鱼'),
   scale: Schema.number().min(0.3).max(1.4).step(0.05).default(1).role('slider').description('角色大小'),
-  bubbleScale: Schema.number().min(0.8).max(1.2).step(0.05).default(1).role('slider').description('气泡大小'),
+  bubbleScale: Schema.number().min(0.6).max(1.4).step(0.05).default(1).role('slider').description('气泡大小'),
   activityLevel: Schema.union([
     Schema.const('quiet').description('安静'),
     Schema.const('normal').description('标准'),
@@ -425,7 +425,7 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         if (typeof settings.update !== 'function') return
         const patch = {}
         if (Number.isFinite(report.scale)) patch.scale = Math.min(1.4, Math.max(0.3, report.scale))
-        if (Number.isFinite(report.bubbleScale)) patch.bubbleScale = Math.min(1.2, Math.max(0.8, report.bubbleScale))
+        if (Number.isFinite(report.bubbleScale)) patch.bubbleScale = Math.min(1.4, Math.max(0.6, report.bubbleScale))
         if (typeof report.reducedMotion === 'boolean') patch.reducedMotion = report.reducedMotion
         if (report.bubbleMode === 'always' || report.bubbleMode === 'hidden' || report.bubbleMode === 'custom') {
           patch.bubbleMode = report.bubbleMode

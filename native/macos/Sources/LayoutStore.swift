@@ -44,7 +44,7 @@ struct PetLayout {
     func normalized() -> PetLayout {
         var layout = self
         layout.scale = min(1.4, max(0.3, scale))
-        layout.bubbleScale = min(1.2, max(0.8, bubbleScale))
+        layout.bubbleScale = min(1.4, max(0.6, bubbleScale))
         if !["always", "hidden", "custom"].contains(bubbleMode) {
             layout.bubbleMode = "always"
         }
@@ -69,8 +69,8 @@ struct PetLayout {
             else if let i = raw as? Int { layout.scale = min(1.4, max(0.3, Double(i))) }
         }
         if let raw = json["bubbleScale"], !(raw is Bool) {
-            if let d = raw as? Double { layout.bubbleScale = min(1.2, max(0.8, d)) }
-            else if let i = raw as? Int { layout.bubbleScale = min(1.2, max(0.8, Double(i))) }
+            if let d = raw as? Double { layout.bubbleScale = min(1.4, max(0.6, d)) }
+            else if let i = raw as? Int { layout.bubbleScale = min(1.4, max(0.6, Double(i))) }
         }
         if let b = json["reducedMotion"] as? Bool { layout.reducedMotion = b }
         if let mode = json["bubbleMode"] as? String, ["always", "hidden", "custom"].contains(mode) {

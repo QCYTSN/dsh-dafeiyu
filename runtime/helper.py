@@ -326,7 +326,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             configured_bubble_scale = os.environ.get("DSH_DAFEIYU_BUBBLE_SCALE")
             try:
                 self.bubble_scale = (
-                    min(1.2, max(0.8, float(configured_bubble_scale)))
+                    min(1.4, max(0.6, float(configured_bubble_scale)))
                     if configured_bubble_scale
                     else self.layout["bubbleScale"]
                 )
@@ -526,7 +526,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.scale = min(1.4, max(0.3, float(scale)))
             bubble_scale = message.get("bubbleScale")
             if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
-                self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
+                self.bubble_scale = min(1.4, max(0.6, float(bubble_scale)))
             reduced_motion = message.get("reducedMotion")
             if isinstance(reduced_motion, bool) and reduced_motion != self.reduced_motion:
                 self._set_reduced_motion(reduced_motion)
@@ -1260,6 +1260,45 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self.update()
 
+        def _customize_bubble_scale(self) -> None:
+            from PySide6.QtWidgets import QDialog, QDialogButtonBox, QLabel, QSlider, QVBoxLayout
+
+            dialog = QDialog(self)
+            dialog.setWindowTitle("气泡大小")
+            dialog.setFixedWidth(300)
+            layout = QVBoxLayout(dialog)
+            label = QLabel(f"{round(self.bubble_scale * 100)}%", dialog)
+            label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            slider = QSlider(Qt.Orientation.Horizontal, dialog)
+            slider.setRange(60, 140)
+            slider.setSingleStep(5)
+            slider.setPageStep(10)
+            slider.setValue(round(self.bubble_scale * 100))
+            original = self.bubble_scale
+
+            def apply(value: int) -> None:
+                self.bubble_scale = max(0.6, min(1.4, value / 100))
+                label.setText(f"{value}%")
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
+            slider.valueChanged.connect(apply)
+            buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel, dialog)
+            buttons.accepted.connect(dialog.accept)
+            buttons.rejected.connect(dialog.reject)
+            layout.addWidget(label)
+            layout.addWidget(slider)
+            layout.addWidget(buttons)
+            if dialog.exec() == QDialog.DialogCode.Accepted:
+                self._save_layout()
+                emit_reply("settings", bubbleScale=self.bubble_scale)
+            else:
+                self.bubble_scale = original
+                self._sync_bubble_size()
+                self._move_to_pet(self.pet_x, self.pet_y)
+                self.update()
+
         def contextMenuEvent(self, event: Any) -> None:
             menu = QMenu(self)
             size_menu = menu.addMenu("大小")
@@ -1279,6 +1318,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 action.setChecked(abs(self.bubble_scale - bubble_scale) < 0.05)
                 bubble_size_actions[action] = bubble_scale
             bubble_size_menu.addSeparator()
+            custom_bubble_action = bubble_size_menu.addAction("自定义…")
             bubble_toggle_action = bubble_size_menu.addAction(
                 "显示气泡" if self.bubble_mode == "hidden" else "隐藏气泡"
             )
@@ -1304,6 +1344,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
                 emit_reply("settings", bubbleScale=self.bubble_scale)
+            elif selected == custom_bubble_action:
+                self._customize_bubble_scale()
             elif selected == bubble_toggle_action:
                 self._toggle_bubble()
             elif selected == reduced_action:

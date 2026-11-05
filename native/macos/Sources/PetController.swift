@@ -88,6 +88,8 @@ final class PetController: NSObject {
     private var bubbleModeBeforeHide: String = "always"
     /// Percentage readout inside the custom-size alert.
     private weak var sizeValueLabel: NSTextField?
+    /// Percentage readout inside the custom bubble-size alert.
+    private weak var bubbleValueLabel: NSTextField?
     var bubbleStates: [String]
 
     // Durable status
@@ -625,6 +627,10 @@ final class PetController: NSObject {
         bubbleToggle.target = self
         bubbleMenu.addItem(bubbleToggle)
 
+        bubbleMenu.addItem(.separator())
+        let customBubble = NSMenuItem(title: "自定义…", action: #selector(customizeBubbleScale(_:)), keyEquivalent: "")
+        customBubble.target = self
+        bubbleMenu.addItem(customBubble)
         let bubbleItem = NSMenuItem(title: "气泡大小", action: nil, keyEquivalent: "")
         bubbleItem.submenu = bubbleMenu
         menu.addItem(bubbleItem)
@@ -699,6 +705,41 @@ final class PetController: NSObject {
     @objc private func sizeSliderChanged(_ sender: NSSlider) {
         scale = Self.clampedScale(sender.doubleValue)
         sizeValueLabel?.stringValue = "\(Int((scale * 100).rounded()))%"
+        resizeAndReposition()
+    }
+
+    @objc private func customizeBubbleScale(_ sender: Any?) {
+        let alert = NSAlert()
+        alert.messageText = "气泡大小"
+        alert.informativeText = "拖动滑块调整气泡大小，点击「确定」保存。"
+        alert.addButton(withTitle: "确定")
+        alert.addButton(withTitle: "取消")
+        let container = NSView(frame: NSRect(x: 0, y: 0, width: 260, height: 52))
+        let label = NSTextField(labelWithString: "\(Int((bubbleScale * 100).rounded()))%")
+        label.frame = NSRect(x: 0, y: 30, width: 260, height: 18)
+        label.alignment = .center
+        let slider = NSSlider(value: bubbleScale, minValue: 0.6, maxValue: 1.4, target: self, action: #selector(bubbleSliderChanged(_:)))
+        slider.frame = NSRect(x: 0, y: 0, width: 260, height: 24)
+        slider.isContinuous = true
+        container.addSubview(label)
+        container.addSubview(slider)
+        alert.accessoryView = container
+        bubbleValueLabel = label
+        let original = bubbleScale
+        let response = alert.runModal()
+        bubbleValueLabel = nil
+        if response == .alertFirstButtonReturn {
+            saveLayout()
+            reportSettings(["bubbleScale": bubbleScale])
+        } else {
+            bubbleScale = original
+            resizeAndReposition()
+        }
+    }
+
+    @objc private func bubbleSliderChanged(_ sender: NSSlider) {
+        bubbleScale = Self.clampedBubbleScale(sender.doubleValue)
+        bubbleValueLabel?.stringValue = "\(Int((bubbleScale * 100).rounded()))%"
         resizeAndReposition()
     }
 
@@ -1305,7 +1346,7 @@ final class PetController: NSObject {
     }
 
     static func clampedBubbleScale(_ value: Double) -> Double {
-        min(1.2, max(0.8, value))
+        min(1.4, max(0.6, value))
     }
 
     private static func stringValue(_ value: Any?) -> String? {
