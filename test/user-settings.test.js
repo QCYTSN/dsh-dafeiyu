@@ -111,7 +111,7 @@ test('invalid fallback files and malformed entries are ignored', () => {
   const store = createUserSettingsStore(malformed)
   assert.deepEqual(store.apply({ scale: 1, bubbleScale: 1, reducedMotion: false }), {
     scale: 1,
-    bubbleScale: 0.6,
+    bubbleScale: 0.8,
     reducedMotion: true,
   })
 })

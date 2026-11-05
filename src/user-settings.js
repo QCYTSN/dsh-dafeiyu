@@ -23,7 +23,7 @@ function clampField(field, value) {
     return Math.min(1.4, Math.max(0.3, value))
   }
   if (field === 'bubbleScale' && typeof value === 'number' && Number.isFinite(value)) {
-    return Math.min(1.4, Math.max(0.6, value))
+    return Math.min(1.2, Math.max(0.8, value))
   }
   if (field === 'reducedMotion' && typeof value === 'boolean') return value
   return undefined

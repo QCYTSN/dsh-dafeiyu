@@ -326,7 +326,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             configured_bubble_scale = os.environ.get("DSH_DAFEIYU_BUBBLE_SCALE")
             try:
                 self.bubble_scale = (
-                    min(1.4, max(0.6, float(configured_bubble_scale)))
+                    min(1.2, max(0.8, float(configured_bubble_scale)))
                     if configured_bubble_scale
                     else self.layout["bubbleScale"]
                 )
@@ -526,7 +526,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self.scale = min(1.4, max(0.3, float(scale)))
             bubble_scale = message.get("bubbleScale")
             if isinstance(bubble_scale, (int, float)) and not isinstance(bubble_scale, bool):
-                self.bubble_scale = min(1.4, max(0.6, float(bubble_scale)))
+                self.bubble_scale = min(1.2, max(0.8, float(bubble_scale)))
             reduced_motion = message.get("reducedMotion")
             if isinstance(reduced_motion, bool) and reduced_motion != self.reduced_motion:
                 self._set_reduced_motion(reduced_motion)
@@ -1270,14 +1270,14 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             label = QLabel(f"{round(self.bubble_scale * 100)}%", dialog)
             label.setAlignment(Qt.AlignmentFlag.AlignCenter)
             slider = QSlider(Qt.Orientation.Horizontal, dialog)
-            slider.setRange(60, 140)
+            slider.setRange(80, 120)
             slider.setSingleStep(5)
             slider.setPageStep(10)
             slider.setValue(round(self.bubble_scale * 100))
             original = self.bubble_scale
 
             def apply(value: int) -> None:
-                self.bubble_scale = max(0.6, min(1.4, value / 100))
+                self.bubble_scale = max(0.8, min(1.2, value / 100))
                 label.setText(f"{value}%")
                 self._sync_bubble_size()
                 self._move_to_pet(self.pet_x, self.pet_y)

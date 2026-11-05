@@ -129,7 +129,7 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | Setting | Behavior |
 | --- | --- |
 | Enable BigFish | Toggle the native companion for this profile |
-| Character / bubble size | Independent sizing; character size supports 30%–140% and bubble size 60%–140%, both with a custom slider in the context menu; small bubbles retain base font sizes |
+| Character / bubble size | Independent sizing; character size supports 30%–140%, both with a custom slider in the context menu; small bubbles retain base font sizes |
 | Quiet / normal / lively | Rest for 45–90 / 25–45 / 12–22 seconds after each idle action |
 | Reduced motion | Hold the character pose, stop idle / touch animation, keep live status updates |
 | Sound | Master switch for all alerts (mutes audio only) |
