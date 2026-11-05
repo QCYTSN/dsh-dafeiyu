@@ -557,12 +557,6 @@ final class PetController: NSObject {
     }
 
     func handleClick(at point: NSPoint, clickCount: Int) {
-        if bubbleVisible(),
-           PetGeometry.closeButtonRect(bubble: bubbleRect(), scale: bubbleScale)
-               .insetBy(dx: -3, dy: -3).contains(point) {
-            toggleBubbleVisibility(nil)
-            return
-        }
         if clickCount >= 2 {
             playInteraction("head_pat", message: "好啦好啦，知道你喜欢我~")
             return
@@ -1124,7 +1118,6 @@ final class PetController: NSObject {
         } else if !balanceSummary.isEmpty {
             drawStatusCard(rect: rect, card: ("大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"))
         }
-        drawCloseButton(in: rect)
         if !balanceSummary.isEmpty {
             drawText(balanceSummary,
                      in: NSRect(x: rect.minX + 16 * bubbleScale, y: rect.maxY - 31 * bubbleScale,
@@ -1137,22 +1130,6 @@ final class PetController: NSObject {
     /// Card text scales down moderately below 0.8 and grows up to 1.2 above it.
     private static func cardFontScale(_ s: CGFloat) -> CGFloat {
         s < 0.8 ? 0.6 + 0.5 * s : min(1.2, s)
-    }
-
-    private func drawCloseButton(in rect: NSRect) {
-        let s = bubbleScale
-        let button = PetGeometry.closeButtonRect(bubble: rect, scale: s)
-        NSColor(calibratedWhite: 0.94, alpha: 0.92).setFill()
-        NSBezierPath(ovalIn: button).fill()
-        NSColor(calibratedWhite: 0.52, alpha: 0.85).setStroke()
-        let cross = NSBezierPath()
-        let inset = button.width * 0.3
-        cross.move(to: NSPoint(x: button.minX + inset, y: button.minY + inset))
-        cross.line(to: NSPoint(x: button.maxX - inset, y: button.maxY - inset))
-        cross.move(to: NSPoint(x: button.maxX - inset, y: button.minY + inset))
-        cross.line(to: NSPoint(x: button.minX + inset, y: button.maxY - inset))
-        cross.lineWidth = max(1.1, 1.5 * s)
-        cross.stroke()
     }
 
     private func drawStatusCard(rect: NSRect, card: (title: String, detail: String, state: String)) {

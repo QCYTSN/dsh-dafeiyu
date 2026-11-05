@@ -1,6 +1,6 @@
 import unittest
 
-from runtime.pet_geometry import bubble_close_rect, bubble_top, position_window
+from runtime.pet_geometry import bubble_top, position_window
 
 
 class PetGeometryTests(unittest.TestCase):
@@ -23,13 +23,6 @@ class PetGeometryTests(unittest.TestCase):
                     if card_height:
                         cy = bubble_top(py - wy, 344, card_height, window_size[1])
                         self.assertTrue(cy + card_height <= py - wy or cy >= py - wy + 344)
-
-    def test_close_button_sits_inside_the_card_top_right(self) -> None:
-        card = (14, 7, 364, 120)
-        x, y, width, height = bubble_close_rect(card, 1.0)
-        self.assertEqual((width, height), (18, 18))
-        self.assertEqual(x + width, 14 + 364 - 8)
-        self.assertEqual(y, 7 + 8)
 
     def test_card_goes_below_a_pet_near_the_top(self) -> None:
         wx, wy, px, py = position_window((200, 30), (412, 344), (462, 490), (0, 0, 1920, 1040), 112)

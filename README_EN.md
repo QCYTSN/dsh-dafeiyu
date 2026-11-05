@@ -134,7 +134,7 @@ Implementation references include [keshing/balance-display](https://github.com/k
 | Reduced motion | Hold the character pose, stop idle / touch animation, keep live status updates |
 | Sound | Master switch for all alerts (mutes audio only) |
 | Sound and notification scenes | Enable completion, tool-error and approval alerts independently. Unchecking a scene stops its chime and, on macOS, its notification banner; Windows and Linux play audio only |
-| Bubble mode | Always, hidden, or selected states; also toggle it from the × in the card's top-right corner or the context menu |
+| Bubble mode | Always, hidden, or selected states; also toggle it from the context menu |
 | Subagents | Include subagent activity in displayed states |
 | In-page companion | Show a lightweight character inside DSH |
 | Client target | Auto, WebUI, or official Desktop |

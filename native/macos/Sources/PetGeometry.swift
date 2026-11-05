@@ -12,20 +12,6 @@ enum PetGeometry {
         )
     }
 
-    /// The close control drawn in the card's top-right corner. It lives
-    /// inside the card rect, so `isInteractive` already treats it as a hit
-    /// target; the controller narrows the actual click to this small area.
-    static func closeButtonRect(bubble: CGRect, scale: CGFloat) -> CGRect {
-        let diameter = 18 * scale
-        let margin = 8 * scale
-        return CGRect(
-            x: bubble.maxX - diameter - margin,
-            y: bubble.minY + margin,
-            width: diameter,
-            height: diameter
-        )
-    }
-
     /// Whether a point in the panel's view coordinates should receive mouse
     /// events. Everything else in the transparent window must pass clicks
     /// through to the application below (issue #92).

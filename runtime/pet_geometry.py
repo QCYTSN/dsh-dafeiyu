@@ -33,16 +33,6 @@ def position_window(
     return window_x, window_y, pet_x, pet_y
 
 
-def bubble_close_rect(
-    bubble: tuple[int, int, int, int], scale: float
-) -> tuple[int, int, int, int]:
-    """Return the close button rect at the card's top-right corner."""
-    x, y, width, _height = bubble
-    diameter = round(18 * scale)
-    margin = round(8 * scale)
-    return x + width - diameter - margin, y + margin, diameter, diameter
-
-
 def bubble_top(pet_y: int, pet_height: int, card_height: int, window_height: int) -> int:
     above = pet_y - card_height - 19
     desired = above if above >= 7 else pet_y + pet_height + 19
