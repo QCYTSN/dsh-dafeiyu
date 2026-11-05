@@ -1163,7 +1163,7 @@ final class PetController: NSObject {
         cardPath.stroke()
 
         let textX = rect.minX + 16 * s
-        let textWidth = max(40, rect.width - 32 * s)
+        let textWidth = max(40, rect.width - 58 * s)
         // 字号不随气泡等比缩小：缩小卡片只压缩几何尺寸（宽度、内边距、文字框），
         // 字号保持基准大小。否则 bubbleScale 取下限 0.8 时标题会被缩到 8.8pt 而难以辨认。
         // 放大方向仍跟随 bubbleScale（上限 1.2），保持原有观感。

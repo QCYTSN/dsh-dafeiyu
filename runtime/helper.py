@@ -994,7 +994,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             detail_font = QFont("Microsoft YaHei UI")
             detail_font.setPointSizeF(9.0 * max(1.0, s))
             text_x = card_x + round(16 * s)
-            text_width = max(40, card_width - round(32 * s))
+            text_width = max(40, card_width - round(58 * s))
             painter.setFont(title_font)
             painter.setPen(QColor("#25282D"))
             title = f"{len(self.tasks)} 个任务进行中"
