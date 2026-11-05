@@ -22,12 +22,12 @@ try:
     from .animation_model import AnimationModel, crossfade_duration
     from .layout_store import default_layout_path, load_layout, save_layout
     from .asset_paths import bundle_root
-    from .pet_geometry import bubble_top, position_window
+    from .pet_geometry import bubble_close_rect, bubble_top, position_window
 except ImportError:
     from animation_model import AnimationModel, crossfade_duration
     from layout_store import default_layout_path, load_layout, save_layout
     from asset_paths import bundle_root
-    from pet_geometry import bubble_top, position_window
+    from pet_geometry import bubble_close_rect, bubble_top, position_window
 
 
 PROTOCOL_VERSION = 1
@@ -347,12 +347,15 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 else {"SUCCESS", "ERROR"}
             )
             self.activity_level = os.environ.get("DSH_DAFEIYU_ACTIVITY_LEVEL", "normal")
+            self.bubble_mode_before_hide = "always"
             configured_bubble_mode = os.environ.get("DSH_DAFEIYU_BUBBLE_MODE")
             self.bubble_mode = (
                 configured_bubble_mode
                 if configured_bubble_mode in {"always", "hidden", "custom"}
                 else self.layout.get("bubbleMode", "always")
             )
+            if self.bubble_mode != "hidden":
+                self.bubble_mode_before_hide = self.bubble_mode
             configured_bubble_states = os.environ.get("DSH_DAFEIYU_BUBBLE_STATES")
             if configured_bubble_states is not None:
                 self.bubble_states = [part.strip() for part in configured_bubble_states.split(",") if part.strip()]
@@ -540,6 +543,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self._schedule_micro()
             bubble_mode = message.get("bubbleMode")
             if bubble_mode in {"always", "hidden", "custom"}:
+                if bubble_mode != "hidden":
+                    self.bubble_mode_before_hide = bubble_mode
                 self.bubble_mode = bubble_mode
             bubble_states = message.get("bubbleStates")
             if isinstance(bubble_states, list):
@@ -706,6 +711,34 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 return any(task.get("state") in self.bubble_states for task in self.tasks)
             state = self.overlay_state or self.status_state or self.model.base_state or "IDLE"
             return state in self.bubble_states
+
+        def _close_rect(self) -> tuple[int, int, int, int]:
+            card_x, card_y, card_width, _ = self._bubble_rect()
+            return bubble_close_rect((card_x, card_y, card_width, self._card_height()), self.bubble_scale)
+
+        def _hit_close(self, x: float, y: float) -> bool:
+            bx, by, bw, bh = self._close_rect()
+            return bx - 3 <= x <= bx + bw + 3 and by - 3 <= y <= by + bh + 3
+
+        def _set_bubble_mode(self, mode: str) -> None:
+            if mode not in {"always", "hidden", "custom"}:
+                return
+            if mode != "hidden":
+                self.bubble_mode_before_hide = mode
+            self.bubble_mode = mode
+            self._sync_bubble_size()
+            self._move_to_pet(self.pet_x, self.pet_y)
+            self._save_layout()
+            emit_reply("settings", bubbleMode=mode)
+            self.update()
+
+        def _toggle_bubble(self) -> None:
+            if self.bubble_mode == "hidden":
+                restore = self.bubble_mode_before_hide
+                self._set_bubble_mode(restore if restore != "hidden" else "always")
+            else:
+                self.bubble_mode_before_hide = self.bubble_mode
+                self._set_bubble_mode("hidden")
 
         def _sync_bubble_size(self) -> None:
             old_size = (self.width(), self.height())
@@ -903,6 +936,21 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 return round((58 + rows * 26 + footer) * self.bubble_scale)
             return round((84 + footer) * self.bubble_scale)
 
+        def _draw_close_button(self, painter: QPainter, card_x: int, card_y: int, card_width: int, s: float) -> None:
+            diameter = round(18 * s)
+            margin = round(8 * s)
+            x = card_x + card_width - diameter - margin
+            y = card_y + margin
+            painter.setPen(Qt.PenStyle.NoPen)
+            painter.setBrush(QColor(240, 241, 243, 235))
+            painter.drawEllipse(x, y, diameter, diameter)
+            pen = QPen(QColor(116, 121, 129, 220), max(1.1, 1.5 * s))
+            pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+            painter.setPen(pen)
+            inset = diameter * 0.3
+            painter.drawLine(QPoint(round(x + inset), round(y + inset)), QPoint(round(x + diameter - inset), round(y + diameter - inset)))
+            painter.drawLine(QPoint(round(x + diameter - inset), round(y + inset)), QPoint(round(x + inset), round(y + diameter - inset)))
+
         def _draw_card_background(
             self,
             painter: QPainter,
@@ -1077,6 +1125,9 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     detail_text,
                 )
 
+            if self._bubble_visible():
+                self._draw_close_button(painter, card_x, card_y, card_width, s)
+
             if self.balance_summary and self._bubble_visible():
                 balance_font = QFont("Microsoft YaHei UI")
                 balance_font.setPointSizeF(9.0 * max(1.0, s))
@@ -1131,6 +1182,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                     self._finish_drag()
                     self._move_to_pet(self.pet_x, self.pet_y)
                     self._save_layout()
+                elif self._bubble_visible() and self._hit_close(event.position().x(), event.position().y()):
+                    self._toggle_bubble()
                 else:
                     self._play_click_interaction(event.position().x(), event.position().y())
             self.drag_origin = None
@@ -1184,6 +1237,7 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 action.setCheckable(True)
                 action.setChecked(abs(self.bubble_scale - bubble_scale) < 0.05)
                 bubble_size_actions[action] = bubble_scale
+            bubble_toggle_action = menu.addAction("显示气泡" if self.bubble_mode == "hidden" else "隐藏气泡")
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
@@ -1204,6 +1258,8 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 self._move_to_pet(self.pet_x, self.pet_y)
                 self._save_layout()
                 emit_reply("settings", bubbleScale=self.bubble_scale)
+            elif selected == bubble_toggle_action:
+                self._toggle_bubble()
             elif selected == reduced_action:
                 self._set_reduced_motion(reduced_action.isChecked())
                 self._save_layout()

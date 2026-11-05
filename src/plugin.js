@@ -427,6 +427,9 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
         if (Number.isFinite(report.scale)) patch.scale = Math.min(1.4, Math.max(0.55, report.scale))
         if (Number.isFinite(report.bubbleScale)) patch.bubbleScale = Math.min(1.2, Math.max(0.8, report.bubbleScale))
         if (typeof report.reducedMotion === 'boolean') patch.reducedMotion = report.reducedMotion
+        if (report.bubbleMode === 'always' || report.bubbleMode === 'hidden' || report.bubbleMode === 'custom') {
+          patch.bubbleMode = report.bubbleMode
+        }
         if (Object.keys(patch).length === 0) return
         // Capture the host values before the write: the fallback only applies
         // while the host still holds the same baseline.

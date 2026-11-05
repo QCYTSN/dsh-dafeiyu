@@ -83,6 +83,9 @@ final class PetController: NSObject {
     var soundEnabled: Bool
     var soundStates: Set<String>
     var bubbleMode: String
+    /// The mode to restore when the card's close button or the context-menu
+    /// toggle brings a hidden bubble back.
+    private var bubbleModeBeforeHide: String = "always"
     var bubbleStates: [String]
 
     // Durable status
@@ -161,6 +164,9 @@ final class PetController: NSObject {
         self.bubbleMode = ["always", "hidden", "custom"].contains(configuredBubbleMode ?? "")
             ? configuredBubbleMode!
             : layout.bubbleMode
+        if self.bubbleMode != "hidden" {
+            self.bubbleModeBeforeHide = self.bubbleMode
+        }
         self.bubbleStates = env["DSH_DAFEIYU_BUBBLE_STATES"]
             .map { $0.split(separator: ",").map { String($0).trimmingCharacters(in: .whitespaces) } }
             ?? layout.bubbleStates
@@ -547,6 +553,12 @@ final class PetController: NSObject {
     }
 
     func handleClick(at point: NSPoint, clickCount: Int) {
+        if bubbleVisible(),
+           PetGeometry.closeButtonRect(bubble: bubbleRect(), scale: bubbleScale)
+               .insetBy(dx: -3, dy: -3).contains(point) {
+            toggleBubbleVisibility(nil)
+            return
+        }
         if clickCount >= 2 {
             playInteraction("head_pat", message: "好啦好啦，知道你喜欢我~")
             return
@@ -602,6 +614,14 @@ final class PetController: NSObject {
         bubbleItem.submenu = bubbleMenu
         menu.addItem(bubbleItem)
 
+        let bubbleToggle = NSMenuItem(
+            title: bubbleMode == "hidden" ? "显示气泡" : "隐藏气泡",
+            action: #selector(toggleBubbleVisibility(_:)),
+            keyEquivalent: ""
+        )
+        bubbleToggle.target = self
+        menu.addItem(bubbleToggle)
+
         let reduced = NSMenuItem(title: "减少动态", action: #selector(toggleReducedMotion(_:)), keyEquivalent: "")
         reduced.target = self
         reduced.state = reducedMotion ? .on : .off
@@ -645,6 +665,23 @@ final class PetController: NSObject {
         resizeAndReposition()
         saveLayout()
         reportSettings(["bubbleScale": bubbleScale])
+    }
+
+    @objc private func toggleBubbleVisibility(_ sender: Any?) {
+        if bubbleMode == "hidden" {
+            setBubbleMode(bubbleModeBeforeHide == "hidden" ? "always" : bubbleModeBeforeHide)
+        } else {
+            bubbleModeBeforeHide = bubbleMode
+            setBubbleMode("hidden")
+        }
+    }
+
+    private func setBubbleMode(_ mode: String) {
+        guard ["always", "hidden", "custom"].contains(mode) else { return }
+        bubbleMode = mode
+        saveLayout()
+        reportSettings(["bubbleMode": mode])
+        resizeAndReposition()
     }
 
     private func setReducedMotion(_ enabled: Bool) {
@@ -815,6 +852,9 @@ final class PetController: NSObject {
         }
         if let value = message["bubbleMode"] as? String, ["always", "hidden", "custom"].contains(value) {
             bubbleMode = value
+            if value != "hidden" {
+                bubbleModeBeforeHide = value
+            }
             changed = true
         }
         if let value = message["bubbleStates"] as? [String] {
@@ -998,6 +1038,7 @@ final class PetController: NSObject {
         } else if !balanceSummary.isEmpty {
             drawStatusCard(rect: rect, card: ("大肥鱼陪你待命", "DSH · 等待下一次任务", "IDLE"))
         }
+        drawCloseButton(in: rect)
         if !balanceSummary.isEmpty {
             drawText(balanceSummary,
                      in: NSRect(x: rect.minX + 16 * bubbleScale, y: rect.maxY - 31 * bubbleScale,
@@ -1005,6 +1046,22 @@ final class PetController: NSObject {
                      font: NSFont.systemFont(ofSize: 9 * max(1, bubbleScale)),
                      color: Self.hex("#53616F"))
         }
+    }
+
+    private func drawCloseButton(in rect: NSRect) {
+        let s = bubbleScale
+        let button = PetGeometry.closeButtonRect(bubble: rect, scale: s)
+        NSColor(calibratedWhite: 0.94, alpha: 0.92).setFill()
+        NSBezierPath(ovalIn: button).fill()
+        NSColor(calibratedWhite: 0.52, alpha: 0.85).setStroke()
+        let cross = NSBezierPath()
+        let inset = button.width * 0.3
+        cross.move(to: NSPoint(x: button.minX + inset, y: button.minY + inset))
+        cross.line(to: NSPoint(x: button.maxX - inset, y: button.maxY - inset))
+        cross.move(to: NSPoint(x: button.maxX - inset, y: button.minY + inset))
+        cross.line(to: NSPoint(x: button.minX + inset, y: button.maxY - inset))
+        cross.lineWidth = max(1.1, 1.5 * s)
+        cross.stroke()
     }
 
     private func drawStatusCard(rect: NSRect, card: (title: String, detail: String, state: String)) {

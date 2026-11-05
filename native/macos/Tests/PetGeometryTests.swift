@@ -34,6 +34,16 @@ final class PetGeometryTests: XCTestCase {
         XCTAssertFalse(PetGeometry.isInteractive(CGPoint(x: 100, y: 50), pet: pet, bubble: nil))
     }
 
+    func testCloseButtonSitsInsideTheCardTopRight() {
+        let card = CGRect(x: 14, y: 7, width: 364, height: 120)
+        let button = PetGeometry.closeButtonRect(bubble: card, scale: 1)
+        XCTAssertEqual(button.width, 18, accuracy: 0.001)
+        XCTAssertEqual(button.height, 18, accuracy: 0.001)
+        XCTAssertEqual(button.maxX, card.maxX - 8, accuracy: 0.001)
+        XCTAssertEqual(button.minY, card.minY + 8, accuracy: 0.001)
+        XCTAssertTrue(card.contains(button))
+    }
+
     func testInteractiveEdgeToleratesAFractionalPoint() {
         let pet = CGRect(x: 10, y: 10, width: 100, height: 100)
         XCTAssertTrue(PetGeometry.isInteractive(CGPoint(x: 9.5, y: 10), pet: pet, bubble: nil))
