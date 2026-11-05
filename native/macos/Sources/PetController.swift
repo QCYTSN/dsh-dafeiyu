@@ -610,17 +610,18 @@ final class PetController: NSObject {
             item.state = abs(bubbleScale - value) < 0.05 ? .on : .off
             bubbleMenu.addItem(item)
         }
-        let bubbleItem = NSMenuItem(title: "气泡大小", action: nil, keyEquivalent: "")
-        bubbleItem.submenu = bubbleMenu
-        menu.addItem(bubbleItem)
-
+        bubbleMenu.addItem(.separator())
         let bubbleToggle = NSMenuItem(
             title: bubbleMode == "hidden" ? "显示气泡" : "隐藏气泡",
             action: #selector(toggleBubbleVisibility(_:)),
             keyEquivalent: ""
         )
         bubbleToggle.target = self
-        menu.addItem(bubbleToggle)
+        bubbleMenu.addItem(bubbleToggle)
+
+        let bubbleItem = NSMenuItem(title: "气泡大小", action: nil, keyEquivalent: "")
+        bubbleItem.submenu = bubbleMenu
+        menu.addItem(bubbleItem)
 
         let reduced = NSMenuItem(title: "减少动态", action: #selector(toggleReducedMotion(_:)), keyEquivalent: "")
         reduced.target = self

@@ -1237,7 +1237,10 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
                 action.setCheckable(True)
                 action.setChecked(abs(self.bubble_scale - bubble_scale) < 0.05)
                 bubble_size_actions[action] = bubble_scale
-            bubble_toggle_action = menu.addAction("显示气泡" if self.bubble_mode == "hidden" else "隐藏气泡")
+            bubble_size_menu.addSeparator()
+            bubble_toggle_action = bubble_size_menu.addAction(
+                "显示气泡" if self.bubble_mode == "hidden" else "隐藏气泡"
+            )
             reduced_action = menu.addAction("减少动态")
             reduced_action.setCheckable(True)
             reduced_action.setChecked(self.reduced_motion)
