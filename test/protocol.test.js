@@ -24,6 +24,12 @@ test('protocol accepts the helper readiness handshake', () => {
   assert.equal(assertCompanionMessage(message).kind, 'ready')
 })
 
+test('say carries free text for the bubble', () => {
+  const message = createMessage(CompanionMessageKind.SAY, { text: 'halo sayang', ttlMs: 5000 })
+  assert.equal(assertCompanionMessage(message).kind, 'say')
+  assert.equal(JSON.parse(encodeMessage(message)).text, 'halo sayang')
+})
+
 test('protocol creates and encodes a multi-task message', () => {
   const message = createMessage(CompanionMessageKind.TASKS, {
     tasks: [

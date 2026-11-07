@@ -2,6 +2,15 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## Unreleased
+
+### Added
+
+- A local `POST /plugins/dsh-dafeiyu/say` endpoint (`text`, optional `ttlMs`)
+  lets scripts and tools show a line in the companion bubble. The protocol
+  gains a `say` message kind; helper-side handling keeps the session status in
+  the detail row and clamps the text to 200 characters.
+
 ## 0.1.23 · 2026-10-29
 
 ### Fixed

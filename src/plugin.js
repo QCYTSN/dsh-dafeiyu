@@ -30,6 +30,7 @@ export const CONFIG_ENDPOINT = '/plugins/dsh-dafeiyu/config'
 export const EVENTS_ENDPOINT = '/plugins/dsh-dafeiyu/events'
 export const MANIFEST_ENDPOINT = '/plugins/dsh-dafeiyu/manifest'
 export const FRAME_ENDPOINT = '/plugins/dsh-dafeiyu/frame'
+export const SAY_ENDPOINT = '/plugins/dsh-dafeiyu/say'
 export { BALANCE_ENDPOINT }
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -127,6 +128,45 @@ async function readPatch(req) {
     value.soundStates = normalizeSoundStates(value.soundStates)
   }
   return value
+}
+
+async function readJsonBody(req, limit = 4096) {
+  const chunks = []
+  let bytes = 0
+  for await (const chunk of req) {
+    bytes += chunk.length
+    if (bytes > limit) throw new Error('request body is too large')
+    chunks.push(chunk)
+  }
+  if (chunks.length === 0) return {}
+  const value = JSON.parse(Buffer.concat(chunks).toString('utf8'))
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error('body must be an object')
+  }
+  return value
+}
+
+export function createSayHandler(bridge) {
+  return async (req, res) => {
+    if (!isLocalRequest(req)) {
+      jsonResponse(res, 403, { error: 'local access only' })
+      return
+    }
+    if (req.method !== 'POST') {
+      jsonResponse(res, 405, { error: 'method not allowed' })
+      return
+    }
+    try {
+      const body = await readJsonBody(req)
+      const text = String(body.text ?? '').trim().slice(0, 200)
+      if (!text) throw new Error('text is required')
+      const ttlMs = Math.min(30000, Math.max(1000, Number(body.ttlMs) || 5000))
+      bridge.send(createMessage(CompanionMessageKind.SAY, { text, ttlMs }))
+      jsonResponse(res, 200, { ok: true })
+    } catch (error) {
+      jsonResponse(res, 400, { error: error instanceof Error ? error.message : String(error) })
+    }
+  }
 }
 
 export function createConfigHandler(settings) {
@@ -567,6 +607,10 @@ function mountCompanion(ctx, config = {}, eventCtx = ctx, logger) {
       httpCtx.effect(
         () => httpCtx.webServer.register({ kind: 'exact', path: BALANCE_ENDPOINT, handler: createBalanceHandler(balance) }),
         'dsh-dafeiyu: local balance endpoint',
+      )
+      httpCtx.effect(
+        () => httpCtx.webServer.register({ kind: 'exact', path: SAY_ENDPOINT, handler: createSayHandler({ send: (message) => bridge?.send(message) }) }),
+        'dsh-dafeiyu: local say endpoint',
       )
       const assetRoutes = createAssetRoutes()
       if (assetRoutes) {
