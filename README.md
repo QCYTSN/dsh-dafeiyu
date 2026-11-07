@@ -128,6 +128,20 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.23.tgz"
 
 账户余额和 API 余额的查询方式参考了 [keshing/balance-display](https://github.com/keshing/balance-display) 与 DSH 的公开账户服务。插件不会发起模型调用。
 
+## 让大肥鱼说一句话
+
+插件提供一个仅限本机访问的接口，脚本或工具可以让大肥鱼在气泡里说一句话：
+
+```bash
+curl -X POST http://127.0.0.1:3082/plugins/dsh-dafeiyu/say \
+  -H 'content-type: application/json' \
+  -d '{"text":"我回来啦~","ttlMs":5000}'
+```
+
+- `text` 必填，最多 200 字；`ttlMs` 1–30 秒，默认 5 秒。
+- 文字只替换气泡标题，详情行仍是当前会话状态；请求不是本机来源时返回 403。
+- 端口按实际 DSH WebUI 端口填写。
+
 ## 常用设置
 
 | 设置 | 作用 |

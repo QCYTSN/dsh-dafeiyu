@@ -124,6 +124,20 @@ A failed refresh retains the last successful result and marks it as stale. Missi
 
 Implementation references include [keshing/balance-display](https://github.com/keshing/balance-display) and DSH's public account service. Balance queries do not invoke a model.
 
+## Make the companion say something
+
+The plugin exposes a local-only endpoint that scripts or tools can use to show a line in the bubble:
+
+```bash
+curl -X POST http://127.0.0.1:3082/plugins/dsh-dafeiyu/say \
+  -H 'content-type: application/json' \
+  -d '{"text":"I am back~","ttlMs":5000}'
+```
+
+- `text` is required and capped at 200 characters; `ttlMs` is clamped to 1–30 s and defaults to 5 s.
+- The text replaces the bubble title only; the detail line keeps showing the current session state. Non-local requests answer 403.
+- Use the port your DSH WebUI actually listens on.
+
 ## Settings
 
 | Setting | Behavior |

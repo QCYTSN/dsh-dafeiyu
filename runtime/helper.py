@@ -448,6 +448,13 @@ def run_visual(recorder: EventRecorder, snapshot_path: Path | None = None) -> in
             elif kind == "balance":
                 self.balance_summary = str(message.get("summary", ""))[:200]
                 self._sync_bubble_size()
+            elif kind == "say":
+                text = str(message.get("text", "")).strip()
+                if text:
+                    ttl_ms = max(1000, min(30000, int(message.get("ttlMs") or 5000)))
+                    self._show_overlay(text[:200], "", self.status_state, ttl_ms)
+                    self._sync_bubble_size()
+                    self.update()
             elif kind == "alert":
                 if message.get("alert") == "APPROVAL":
                     self._notify_alert("APPROVAL")
