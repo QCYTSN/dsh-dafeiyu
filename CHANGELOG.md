@@ -2,6 +2,16 @@
 
 > This is release history. For installation, use the [latest stable release](https://github.com/QCYTSN/dsh-dafeiyu/releases/latest), not commands from older entries.
 
+## Unreleased
+
+### Added
+
+- `DSH_DAFEIYU_HELPER` replaces the bundled native Helper with a user-supplied
+  `.py` script or executable, so a machine whose frozen Helper aborts (for
+  example the paint-time `none_dealloc` crash on newer Linux distributions) can
+  run `runtime/helper.py` on its own PySide6
+  ([#101](https://github.com/QCYTSN/dsh-dafeiyu/issues/101)).
+
 ## 0.1.23 · 2026-10-29
 
 ### Fixed

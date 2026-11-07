@@ -255,6 +255,40 @@ test('ordinary Linux falls back to Python when its bundled helper is absent', ()
   }), { command: 'python3', args: [helperPath] })
 })
 
+test('DSH_DAFEIYU_HELPER runs a Python override with the configured interpreter', () => {
+  assert.deepEqual(resolve({
+    helperOverride: '/opt/bigfish/runtime/helper.py',
+    pythonEnv: '/opt/venv/bin/python',
+  }), {
+    command: '/opt/venv/bin/python',
+    args: ['/opt/bigfish/runtime/helper.py'],
+  })
+})
+
+test('DSH_DAFEIYU_HELPER defaults to python3 for a Python override', () => {
+  assert.deepEqual(resolve({ helperOverride: '/opt/bigfish/runtime/helper.py' }), {
+    command: 'python3',
+    args: ['/opt/bigfish/runtime/helper.py'],
+  })
+})
+
+test('DSH_DAFEIYU_HELPER executes a non-Python override directly', () => {
+  assert.deepEqual(resolve({ helperOverride: '/opt/bigfish/bin/helper-wrapper' }), {
+    command: '/opt/bigfish/bin/helper-wrapper',
+    args: [],
+  })
+})
+
+test('DSH_DAFEIYU_HELPER uses py -3 for a Python override on native Windows', () => {
+  assert.deepEqual(resolve({
+    platform: 'win32',
+    helperOverride: 'C:\\tools\\bigfish\\helper.py',
+  }), {
+    command: 'py',
+    args: ['-3', 'C:\\tools\\bigfish\\helper.py'],
+  })
+})
+
 test('Linux arm64 launches its own bundled helper, never the x64 binary', () => {
   assert.notEqual(linuxArm64BundledHelperPath, linuxBundledHelperPath)
   assert.deepEqual(resolve({ arch: 'arm64' }), { command: linuxArm64BundledPath, args: [] })

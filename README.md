@@ -163,6 +163,21 @@ dsh plugin --profile desktop add "C:\Downloads\dsh-dafeiyu-0.1.23.tgz"
 
 原生角色显示在 **Host 所在的桌面**：远程服务器、无图形环境和浏览器客户端不在同一台机器时，请先确认 Host 的运行位置。页面内角色可在浏览器中显示。
 
+### 自定义 Helper（排错）
+
+随包 Helper 在你的系统上无法启动时（例如较新的 Linux 发行版上，冻结 Helper 在 `paintEvent` 中报 `Fatal Python error: none_dealloc`，而系统 PySide6 运行源 Helper 正常，见 [#101](https://github.com/QCYTSN/dsh-dafeiyu/issues/101)），可以在启动 DSH 前把 `DSH_DAFEIYU_HELPER` 指向自己的 Helper：
+
+```bash
+python3 -m venv ~/bigfish-venv
+~/bigfish-venv/bin/pip install "PySide6>=6.7,<7"
+
+# 指向插件目录里的源 Helper；DSH_DAFEIYU_PYTHON 指定运行它的解释器
+export DSH_DAFEIYU_HELPER="$HOME/.local/share/dsh/profiles/web/node_modules/dsh-dafeiyu/runtime/helper.py"
+export DSH_DAFEIYU_PYTHON="$HOME/bigfish-venv/bin/python"
+```
+
+`DSH_DAFEIYU_HELPER` 以 `.py` 结尾时用 `DSH_DAFEIYU_PYTHON`（未设置则 `python3`；Windows 上为 `py -3`）运行该脚本；其他路径按可执行文件直接启动，可用于自带解释器的包装脚本。该变量优先于随包 Helper；Host 需要重启一次才能读到新的环境变量。
+
 ## 更新与排错
 
 WebUI 用户完全退出 DSH 后执行：

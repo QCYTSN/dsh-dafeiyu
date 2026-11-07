@@ -282,12 +282,29 @@ function resolveHelperLaunch({
   darwinBundledPath = darwinBundledHelperPath,
   helperPath,
   pythonEnv,
+  helperOverride,
   headless = false,
   fileExists = existsSync,
   windowsPath = toWindowsPath,
   cmdExe = defaultCmdExe,
   wslHelperCache = cacheWslBundledHelper,
 }) {
+  if (helperOverride) {
+    // A user-supplied Helper takes precedence over the bundled one. A `.py`
+    // path runs on the configured Python, which lets a machine whose frozen
+    // Helper aborts (for example the paint-time none_dealloc crash on some
+    // Linux distributions) use runtime/helper.py instead; any other path is
+    // executed directly and may be a wrapper script that starts its own
+    // interpreter. See "Custom Helper" in the README.
+    const script = /\.py$/i.test(helperOverride)
+    const command = script
+      ? pythonEnv || (platform === 'win32' ? 'py' : 'python3')
+      : helperOverride
+    const scriptArgs = platform === 'win32' && /(^|[\\/])py(?:\.exe)?$/i.test(command)
+      ? ['-3', helperOverride]
+      : [helperOverride]
+    return { command, args: script ? scriptArgs : [] }
+  }
   if (platform === 'win32' && fileExists(bundledPath)) {
     // Run the versioned Windows-local copy when the cache is available. The
     // plugin directory then never holds a running executable, so a plugin
@@ -355,6 +372,7 @@ function defaultLaunch(headless = false) {
     darwinBundledPath: darwinBundledHelperPath,
     helperPath: defaultHelperPath,
     pythonEnv: process.env.DSH_DAFEIYU_PYTHON,
+    helperOverride: process.env.DSH_DAFEIYU_HELPER,
     headless,
   })
 }
