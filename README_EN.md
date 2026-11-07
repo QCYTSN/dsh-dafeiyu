@@ -155,6 +155,22 @@ Release packages include the Helper. A normal installation needs neither Python 
 
 The native window appears on the machine running the Host. A remote server or a Host without a graphical desktop cannot show a native window on your browser's machine. The optional in-page companion can appear in the browser.
 
+### Custom Helper (troubleshooting)
+
+When the bundled Helper cannot start on your system (for example, a newer Linux distribution where the frozen Helper aborts with `Fatal Python error: none_dealloc` in `paintEvent` while the source Helper runs on the system PySide6 — see [#101](https://github.com/QCYTSN/dsh-dafeiyu/issues/101)), point `DSH_DAFEIYU_HELPER` at your own Helper before starting DSH:
+
+```bash
+python3 -m venv ~/bigfish-venv
+~/bigfish-venv/bin/pip install "PySide6>=6.7,<7"
+
+# Point at the source Helper inside the plugin directory; DSH_DAFEIYU_PYTHON
+# selects the interpreter that runs it.
+export DSH_DAFEIYU_HELPER="$HOME/.local/share/dsh/profiles/web/node_modules/dsh-dafeiyu/runtime/helper.py"
+export DSH_DAFEIYU_PYTHON="$HOME/bigfish-venv/bin/python"
+```
+
+A `DSH_DAFEIYU_HELPER` ending in `.py` runs on `DSH_DAFEIYU_PYTHON` (or `python3`; `py -3` on Windows). Any other path is executed directly, so it may be a wrapper script that starts its own interpreter. The override wins over every bundled Helper; restart the Host once so it can read the new environment variable.
+
 ## Update and troubleshoot
 
 Desktop 0.2.0-rc.2 does not offer automatic plugin updates. Uninstall BigFish in the Plugins page, add `dsh-dafeiyu@0.1.23`, and enable it. Alternatively use Desktop's bundled CLI below.
